@@ -1,0 +1,68 @@
+{
+  "job_id": "gta6-gta-6-vice-city-lançamento-nov",
+  "approved": true,
+  "score": 1.0,
+  "summary": "10/10 checks passed, score=1.00 — APPROVED",
+  "checks": [
+    {
+      "name": "video mp4_exists",
+      "passed": true,
+      "message": "Video MP4: 519KB",
+      "severity": "info"
+    },
+    {
+      "name": "resolution",
+      "passed": true,
+      "message": "1080x1920",
+      "severity": "info"
+    },
+    {
+      "name": "pixel_format",
+      "passed": true,
+      "message": "yuv420p",
+      "severity": "info"
+    },
+    {
+      "name": "duration",
+      "passed": true,
+      "message": "22.8s",
+      "severity": "info"
+    },
+    {
+      "name": "frame_count",
+      "passed": true,
+      "message": "570 frames",
+      "severity": "info"
+    },
+    {
+      "name": "file_size",
+      "passed": true,
+      "message": "519KB",
+      "severity": "info"
+    },
+    {
+      "name": "audio wav_exists",
+      "passed": true,
+      "message": "Audio WAV: 982KB",
+      "severity": "info"
+    },
+    {
+      "name": "audio_duration",
+      "passed": true,
+      "message": "20.9s",
+      "severity": "info"
+    },
+    {
+      "name": "script_quality",
+      "passed": true,
+      "message": "333 chars with sections",
+      "severity": "info"
+    },
+    {
+      "name": "thumbnail_exists",
+      "passed": true,
+      "message": "Thumbnail: 50KB",
+      "severity": "info"
+    }
+  ]
+}
