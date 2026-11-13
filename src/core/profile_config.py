@@ -121,7 +121,8 @@ GTA6_PROFILE = ProfileConfig(
             "GTA 6 lançamento", "GTA 6 novidades", "GTA 6 leak",
         ),
         rss_feeds=(
-            "https://www.rockstargames.com/newswire/feed",
+            "https://www.eurogamer.net/?format=rss",
+            "https://www.videogameschronicle.com/feed",
         ),
         youtube_channels=(
             "UCdFoQjLgY9nOwCJNOE9vSJw",  # Rockstar Games

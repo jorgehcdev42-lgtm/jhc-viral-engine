@@ -45,7 +45,10 @@ class TrendingTopic:
 # Known official GTA 6 / Rockstar RSS feeds
 DEFAULT_RSS_FEEDS: dict[str, tuple[tuple[str, str], ...]] = {
     "gta6": (
-        ("Rockstar Newswire", "https://www.rockstargames.com/newswire/feed"),
+        ("Eurogamer", "https://www.eurogamer.net/?format=rss"),
+        ("VGC", "https://www.videogameschronicle.com/feed"),
+        # Rockstar Newswire feed returns 404 as of 2026-11; kept for reference
+        # ("Rockstar Newswire", "https://www.rockstargames.com/newswire/feed"),
     ),
     "marvel-dc": (),
 }
