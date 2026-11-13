@@ -1,0 +1,1 @@
+"""JHC Viral Engine — Skills module (lightweight, on-demand)."""
