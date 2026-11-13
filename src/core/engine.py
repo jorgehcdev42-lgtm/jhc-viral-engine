@@ -165,10 +165,20 @@ class ViralEngine:
         """Generate original Reel script in pt-BR."""
         from src.production.scriptwriter import ScriptWriter
         writer = ScriptWriter(profile)
-        script = await writer.generate(job.topic)
+        result = await writer.generate(job.topic)
         out = self.data_root / profile.profile_id / "scripts" / f"{job.job_id}.txt"
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(script, encoding="utf-8")
+        out.write_text(result.text, encoding="utf-8")
+        # Save caption and hashtags as metadata alongside script
+        meta_out = self.data_root / profile.profile_id / "scripts" / f"{job.job_id}.meta.json"
+        import json
+        meta_out.write_text(json.dumps({
+            "caption": result.caption,
+            "hashtags": list(result.hashtags),
+            "hook": result.hook,
+            "llm_used": result.llm_used,
+            "model": result.model,
+        }, ensure_ascii=False, indent=2), encoding="utf-8")
         return job.advance(PipelineStage.MEDIA_PREP, script_path=str(out))
 
     async def _stage_media_prep(self, job: PipelineJob, profile: ProfileConfig) -> PipelineJob:

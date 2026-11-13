@@ -62,28 +62,21 @@ class Renderer:
         self, job: PipelineJob, out_path: Path, ffmpeg: str
     ) -> None:
         """Render video with narration audio and optional subtitle burn-in."""
+        # First try with subtitles filter; fall back to plain render if libass unavailable
+        has_subtitles = job.subtitle_path and Path(job.subtitle_path).exists()
+
+        if has_subtitles:
+            success = await self._try_render_with_subtitles(job, out_path, ffmpeg)
+            if success:
+                return
+            logger.warning("Subtitle burn-in failed (libass likely missing); rendering without subtitles")
+
+        # Render without subtitles
         cmd = [
             ffmpeg, "-y",
             "-f", "lavfi",
-            "-i", f"color=c=black:s={self.WIDTH}x{self.HEIGHT}:r={self.FPS}",
+            "-i", f"color=c=#0a0a1a:s={self.WIDTH}x{self.HEIGHT}:r={self.FPS}",
             "-i", job.narration_path,
-        ]
-
-        # Add subtitle filter if available
-        vf_filters = []
-        if job.subtitle_path and Path(job.subtitle_path).exists():
-            escaped_srt = str(job.subtitle_path).replace("\\", "\\\\").replace(":", "\\:")
-            vf_filters.append(
-                f"subtitles={escaped_srt}:force_style="
-                "'FontSize=24,PrimaryColour=&H00FFFFFF&,"
-                "OutlineColour=&H00000000&,Outline=2,Shadow=1,"
-                "Alignment=2,MarginV=80'"
-            )
-
-        if vf_filters:
-            cmd.extend(["-vf", ",".join(vf_filters)])
-
-        cmd.extend([
             "-c:v", self.VIDEO_CODEC,
             "-preset", self.PRESET,
             "-crf", str(self.CRF),
@@ -94,7 +87,7 @@ class Renderer:
             "-shortest",
             "-movflags", "+faststart",
             str(out_path),
-        ])
+        ]
 
         proc = await asyncio.create_subprocess_exec(
             *cmd,
@@ -104,6 +97,47 @@ class Renderer:
         _, stderr = await proc.communicate()
         if proc.returncode != 0:
             raise RuntimeError(f"FFmpeg render failed: {stderr.decode()[-500:]}")
+
+    async def _try_render_with_subtitles(
+        self, job: PipelineJob, out_path: Path, ffmpeg: str
+    ) -> bool:
+        """Attempt render with subtitle burn-in. Returns True on success."""
+        escaped_srt = str(Path(job.subtitle_path).resolve()).replace("\\", "\\\\\\\\").replace(":", "\\\\:")
+        cmd = [
+            ffmpeg, "-y",
+            "-f", "lavfi",
+            "-i", f"color=c=#0a0a1a:s={self.WIDTH}x{self.HEIGHT}:r={self.FPS}",
+            "-i", job.narration_path,
+            "-vf", (
+                f"subtitles='{escaped_srt}':force_style="
+                "'FontSize=24,PrimaryColour=&H00FFFFFF&,"
+                "OutlineColour=&H00000000&,Outline=2,Shadow=1,"
+                "Alignment=2,MarginV=80'"
+            ),
+            "-c:v", self.VIDEO_CODEC,
+            "-preset", self.PRESET,
+            "-crf", str(self.CRF),
+            "-pix_fmt", "yuv420p",
+            "-c:a", self.AUDIO_CODEC,
+            "-b:a", self.AUDIO_BITRATE,
+            "-ar", "48000",
+            "-shortest",
+            "-movflags", "+faststart",
+            str(out_path),
+        ]
+
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            err_msg = stderr.decode()[-500:]
+            if "subtitles" in err_msg.lower() or "libass" in err_msg.lower() or "filter" in err_msg.lower():
+                return False
+            raise RuntimeError(f"FFmpeg render failed: {err_msg}")
+        return True
 
     async def _render_placeholder(self, out_path: Path, ffmpeg: str) -> None:
         """Render 5-second placeholder when no audio available."""
