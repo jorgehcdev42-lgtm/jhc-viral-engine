@@ -253,8 +253,45 @@ class ViralEngine:
         return out_path
 
     async def _stage_review(self, job: PipelineJob, profile: ProfileConfig) -> PipelineJob:
-        """Quality check on rendered video."""
-        # Placeholder — automated quality gate
+        """Quality gate: validate video, audio, script, and thumbnail."""
+        from src.production.quality_gate import QualityGate
+
+        qg = QualityGate()
+        video_path = Path(job.output_path) if job.output_path else None
+        script_path = Path(job.script_path) if job.script_path else None
+        audio_path = Path(job.narration_path) if job.narration_path else None
+
+        # Generate thumbnail if not exists
+        thumb_path = None
+        if job.script_path and job.output_path:
+            from src.production.thumbnail_generator import ThumbnailGenerator
+            from src.production.script_to_scenes import parse_script_to_scenes
+            try:
+                script_text = Path(job.script_path).read_text(encoding="utf-8")
+                scenes = parse_script_to_scenes(script_text)
+                hook_text = scenes[0].text if scenes else "Vice City Radar"
+                thumb_dir = self.data_root / profile.profile_id / "thumbnails"
+                thumb_path = thumb_dir / f"{job.job_id}.png"
+                if not thumb_path.exists():
+                    gen = ThumbnailGenerator()
+                    gen.generate(hook_text[:80], thumb_path, category="news")
+            except Exception as exc:
+                logger.warning("Thumbnail generation failed: %s", exc)
+
+        if not video_path or not video_path.exists():
+            return job.advance(PipelineStage.REVIEW, error="No video to review")
+
+        report = await qg.evaluate(video_path, script_path, thumb_path, audio_path)
+        report_dir = self.data_root / profile.profile_id / "quality"
+        await qg.save_report(report, report_dir)
+
+        if not report.approved:
+            return job.advance(
+                PipelineStage.REVIEW,
+                error=f"Quality gate rejected: {report.summary}",
+            )
+
+        logger.info("Quality gate passed: %s", report.summary)
         return job.advance(PipelineStage.SCHEDULE)
 
     async def _stage_schedule(self, job: PipelineJob, profile: ProfileConfig) -> PipelineJob:
