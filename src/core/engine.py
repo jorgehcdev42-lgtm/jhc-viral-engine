@@ -210,11 +210,47 @@ class ViralEngine:
         return job.advance(PipelineStage.RENDER)
 
     async def _stage_render(self, job: PipelineJob, profile: ProfileConfig) -> PipelineJob:
-        """Render final MP4 in 9:16 format optimized for Instagram."""
+        """Render final MP4 with composed scenes or fallback to plain renderer."""
+        # Try scene-based rendering first (visual quality upgrade)
+        if job.script_path and Path(job.script_path).exists():
+            try:
+                output = await self._render_with_scenes(job, profile)
+                if output:
+                    return job.advance(PipelineStage.REVIEW, output_path=str(output))
+            except Exception as exc:
+                logger.warning("Scene rendering failed, falling back to plain: %s", exc)
+
+        # Fallback to original renderer
         from src.production.renderer import Renderer
         renderer = Renderer(profile)
         output = await renderer.render(job)
         return job.advance(PipelineStage.REVIEW, output_path=str(output))
+
+    async def _render_with_scenes(
+        self, job: PipelineJob, profile: ProfileConfig
+    ) -> Optional[Path]:
+        """Render video using SceneComposer for dynamic visual sequences."""
+        from src.production.scene_composer import SceneComposer, GTA6_IDENTITY
+        from src.production.script_to_scenes import script_file_to_scenes
+
+        script_path = Path(job.script_path)
+        scenes = await script_file_to_scenes(script_path)
+        if not scenes:
+            return None
+
+        composer = SceneComposer(GTA6_IDENTITY)
+        frames_dir = self.data_root / profile.profile_id / "frames" / job.job_id
+        frame_paths = await composer.compose_sequence(scenes, frames_dir)
+
+        out_dir = self.data_root / profile.profile_id / "output"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"{job.job_id}.mp4"
+
+        audio_path = Path(job.narration_path) if job.narration_path else None
+        await SceneComposer.frames_to_video(frame_paths, out_path, audio_path)
+
+        logger.info("Scene-rendered video: %s (%d frames)", out_path, len(frame_paths))
+        return out_path
 
     async def _stage_review(self, job: PipelineJob, profile: ProfileConfig) -> PipelineJob:
         """Quality check on rendered video."""
