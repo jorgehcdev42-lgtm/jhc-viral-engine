@@ -777,3 +777,88 @@ async def apply_watermark(
     if not result["success"]:
         raise HTTPException(status_code=500, detail=result.get("error", "Unknown error"))
     return result
+
+
+# --- Publishing / Central de Publicações ---
+
+@app.get("/api/publishing/status")
+async def get_publishing_status():
+    """Get overall publishing queue summary and connection states."""
+    from src.publishing.adapters import PublishQueue, get_adapter, ADAPTERS
+    queue = PublishQueue(DATA_ROOT)
+    summary = queue.get_queue_summary()
+
+    # Check connection state for each platform × active profile
+    connections = {}
+    for pid in ["gta6-br", "gta6-global"]:
+        connections[pid] = {}
+        for platform in ADAPTERS:
+            adapter = get_adapter(platform, DATA_ROOT, pid)
+            state = await adapter.check_connection()
+            connections[pid][platform] = state.value
+
+    return {"queue": summary, "connections": connections}
+
+
+@app.get("/api/publishing/jobs/{profile_id}")
+async def list_publish_jobs(profile_id: str, limit: int = Query(30, ge=1, le=100)):
+    """List recent publish jobs for a profile across all platforms."""
+    from src.publishing.adapters import PublishQueue
+    queue = PublishQueue(DATA_ROOT)
+    pending = queue.get_pending_jobs(limit=limit)
+    # Filter by profile_id
+    profile_jobs = [j.to_dict() for j in pending if j.profile_id == profile_id]
+    return profile_jobs
+
+
+@app.post("/api/publishing/schedule")
+async def schedule_publish(
+    profile_id: str = Query(...),
+    platform: str = Query(...),
+    video_path: str = Query(...),
+    title: str = Query(...),
+    description: str = Query(""),
+    hashtags: str = Query("", description="Comma-separated hashtags"),
+    scheduled_at: Optional[float] = Query(None, description="Unix timestamp for scheduled publish"),
+):
+    """Schedule a video for publishing to a specific platform."""
+    import uuid
+    from src.publishing.adapters import PublishQueue, PublishJob, PublishState, ADAPTERS
+
+    if platform not in ADAPTERS:
+        raise HTTPException(status_code=400, detail=f"Unknown platform: {platform}. Available: {list(ADAPTERS.keys())}")
+
+    if not Path(video_path).exists():
+        raise HTTPException(status_code=400, detail=f"Video file not found: {video_path}")
+
+    tags = tuple(h.strip() for h in hashtags.split(",") if h.strip()) if hashtags else ()
+
+    job = PublishJob(
+        job_id=str(uuid.uuid4())[:8],
+        profile_id=profile_id,
+        platform=platform,
+        video_path=video_path,
+        title=title,
+        description=description,
+        hashtags=tags,
+        scheduled_at=scheduled_at,
+        state=PublishState.NOT_CONFIGURED.value,
+    )
+
+    queue = PublishQueue(DATA_ROOT)
+    queue.add_job(job)
+
+    return {"status": "scheduled", "job_id": job.job_id, "job": job.to_dict()}
+
+
+@app.get("/api/publishing/connection/{profile_id}/{platform}")
+async def check_connection(profile_id: str, platform: str):
+    """Check connection status for a specific profile + platform."""
+    from src.publishing.adapters import get_adapter, ADAPTERS
+
+    if platform not in ADAPTERS:
+        raise HTTPException(status_code=400, detail=f"Unknown platform: {platform}")
+
+    adapter = get_adapter(platform, DATA_ROOT, profile_id)
+    state = await adapter.check_connection()
+    return {"profile_id": profile_id, "platform": platform, "state": state.value}
