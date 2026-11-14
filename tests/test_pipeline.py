@@ -35,7 +35,7 @@ def engine(tmp_path: Path) -> ViralEngine:
 class TestProfileConfig:
     def test_gta6_profile_exists(self, gta6_profile: ProfileConfig) -> None:
         assert gta6_profile.profile_id == "gta6"
-        assert gta6_profile.name == "Vice City Radar"
+        assert gta6_profile.name == "Leonida GTA VI Flash"
         assert gta6_profile.niche == "gaming"
         assert gta6_profile.enabled is True
 
