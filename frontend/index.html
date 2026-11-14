@@ -648,6 +648,7 @@ body::after {
  <div class="nav-item" data-page="editorial"><span class="nav-icon">📰</span> Editorial</div>
  <div class="nav-item" data-page="production"><span class="nav-icon">⚡</span> Produção</div>
  <div class="nav-item" data-page="quality"><span class="nav-icon">✅</span> Quality Gate</div>
+ <div class="nav-item" data-page="publishing"><span class="nav-icon">📡</span> Publicações</div>
  </div>
 
  <div class="nav-section">
@@ -877,6 +878,65 @@ body::after {
  <button class="btn btn-primary" onclick="fetchQualityReports()">Carregar</button>
  </div>
  <div id="quality-results"><div class="empty-state">Selecione um perfil e carregue os relatórios</div></div>
+ </div>
+ </div>
+
+ <!-- ===== PUBLISHING / CENTRAL DE PUBLICAÇÕES ===== -->
+ <div id="page-publishing" class="page">
+ <div class="page-header"><div class="page-title">Central de Publicações</div></div>
+
+ <div class="card">
+ <div class="card-header"><span class="card-icon">🔗</span><div class="card-title">Estado das Conexões</div></div>
+ <div id="connection-status"><div class="loading-state"><div class="loading-spinner"></div>Carregando...</div></div>
+ </div>
+
+ <div class="card">
+ <div class="card-header"><span class="card-icon">📡</span><div class="card-title">Agendar Publicação</div></div>
+ <div class="input-row" style="flex-wrap:wrap;gap:0.75rem">
+ <div style="flex:1;min-width:180px">
+ <label style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;display:block;margin-bottom:0.3rem">Perfil</label>
+ <select id="pub-profile" class="gta-select">
+ <option value="gta6-br">Leonida GTA VI Flash BR</option>
+ <option value="gta6-global">Leonida GTA VI Flash Global</option>
+ </select>
+ </div>
+ <div style="flex:1;min-width:180px">
+ <label style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;display:block;margin-bottom:0.3rem">Plataforma</label>
+ <select id="pub-platform" class="gta-select">
+ <option value="instagram">Instagram</option>
+ <option value="youtube">YouTube</option>
+ <option value="tiktok">TikTok</option>
+ </select>
+ </div>
+ </div>
+ <div class="input-row">
+ <input type="text" id="pub-video-path" class="gta-input" placeholder="Caminho absoluto do vídeo no servidor">
+ </div>
+ <div class="input-row">
+ <input type="text" id="pub-title" class="gta-input" placeholder="Título da publicação">
+ </div>
+ <div class="input-row">
+ <input type="text" id="pub-description" class="gta-input" placeholder="Descrição / caption">
+ </div>
+ <div class="input-row">
+ <input type="text" id="pub-hashtags" class="gta-input" placeholder="#GTA6, #LeonidaGTA6FlashBR, #GamesBrasil">
+ </div>
+ <div class="input-row">
+ <button class="btn btn-primary" onclick="schedulePublish()">📡 Agendar Publicação</button>
+ </div>
+ <div id="pub-schedule-msg"></div>
+ </div>
+
+ <div class="card">
+ <div class="card-header"><span class="card-icon">📋</span><div class="card-title">Fila de Publicações</div></div>
+ <div class="input-row">
+ <select id="pub-queue-profile" class="gta-select">
+ <option value="gta6-br">Leonida GTA VI Flash BR</option>
+ <option value="gta6-global">Leonida GTA VI Flash Global</option>
+ </select>
+ <button class="btn btn-secondary" onclick="loadPublishJobs()">Atualizar</button>
+ </div>
+ <div id="pub-queue"><div class="empty-state">Nenhuma publicação na fila</div></div>
  </div>
  </div>
 
@@ -1235,6 +1295,77 @@ async function applyWatermark() {
  msg.innerHTML = '<div class="error-box">' + (data.detail || 'Erro') + '</div>';
  }
  } catch(e) { msg.innerHTML = '<div class="error-box">' + e.message + '</div>'; }
+}
+
+// === CENTRAL DE PUBLICAÇÕES ===
+
+async function loadPublishingStatus() {
+ const data = await api('/api/publishing/status');
+ if (data.error) { document.getElementById('connection-status').innerHTML = '<div class="error-box">' + data.error + '</div>'; return; }
+ let html = '<table class="data-table"><thead><tr><th>Perfil</th><th>Instagram</th><th>YouTube</th><th>TikTok</th></tr></thead><tbody>';
+ for (const [pid, platforms] of Object.entries(data.connections)) {
+ const stateBadge = (s) => {
+ if (s === 'connected') return '<span class="badge badge-active">Conectado</span>';
+ if (s === 'auth_required') return '<span class="badge badge-pink">Auth Necessária</span>';
+ if (s === 'token_expired') return '<span class="badge badge-inactive">Token Expirado</span>';
+ return '<span class="badge badge-no-media">' + s + '</span>';
+ };
+ html += '<tr><td style="font-weight:600;color:var(--text-primary)">' + pid + '</td>';
+ html += '<td>' + stateBadge(platforms.instagram || 'unknown') + '</td>';
+ html += '<td>' + stateBadge(platforms.youtube || 'unknown') + '</td>';
+ html += '<td>' + stateBadge(platforms.tiktok || 'unknown') + '</td></tr>';
+ }
+ html += '</tbody></table>';
+ html += '<p style="margin-top:0.75rem;font-size:0.75rem;color:var(--text-muted)">Fila total: ' + data.queue.total_jobs + ' jobs | Plataformas: ' + JSON.stringify(data.queue.platform_counts || {}) + '</p>';
+ document.getElementById('connection-status').innerHTML = html;
+}
+
+async function schedulePublish() {
+ const pid = document.getElementById('pub-profile').value;
+ const platform = document.getElementById('pub-platform').value;
+ const videoPath = document.getElementById('pub-video-path').value.trim();
+ const title = document.getElementById('pub-title').value.trim();
+ const desc = document.getElementById('pub-description').value.trim();
+ const tags = document.getElementById('pub-hashtags').value.trim();
+ if (!videoPath || !title) { alert('Informe o caminho do vídeo e o título'); return; }
+ const msg = document.getElementById('pub-schedule-msg');
+ msg.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div>Agendando...</div>';
+ try {
+ const params = new URLSearchParams({ profile_id: pid, platform, video_path: videoPath, title, description: desc, hashtags: tags });
+ const r = await fetch(API + '/api/publishing/schedule?' + params, { method: 'POST' });
+ const data = await r.json();
+ if (r.ok) {
+ msg.innerHTML = '<div class="success-box">✅ Agendado! Job ID: ' + data.job_id + ' → ' + platform + ' (' + pid + ')</div>';
+ loadPublishJobs();
+ } else {
+ msg.innerHTML = '<div class="error-box">' + (data.detail || 'Erro ao agendar') + '</div>';
+ }
+ } catch(e) { msg.innerHTML = '<div class="error-box">' + e.message + '</div>'; }
+}
+
+async function loadPublishJobs() {
+ const pid = document.getElementById('pub-queue-profile').value;
+ const jobs = await api('/api/publishing/jobs/' + pid);
+ if (jobs.error) { document.getElementById('pub-queue').innerHTML = '<div class="error-box">' + jobs.error + '</div>'; return; }
+ if (!jobs.length) { document.getElementById('pub-queue').innerHTML = '<div class="empty-state">Nenhuma publicação na fila para ' + pid + '</div>'; return; }
+ const stateBadge = (s) => {
+ if (s === 'published') return '<span class="badge badge-active">Publicado</span>';
+ if (s === 'scheduled') return '<span class="badge badge-media">Agendado</span>';
+ if (s === 'error') return '<span class="badge badge-inactive">Erro</span>';
+ if (s === 'not_configured' || s === 'auth_required') return '<span class="badge badge-pink">' + s + '</span>';
+ return '<span class="badge badge-no-media">' + s + '</span>';
+ };
+ let html = '<table class="data-table"><thead><tr><th>Job ID</th><th>Plataforma</th><th>Título</th><th>Estado</th><th>Criado</th></tr></thead><tbody>';
+ for (const j of jobs) {
+ const created = j.created_at ? new Date(j.created_at * 1000).toLocaleString('pt-BR') : '—';
+ html += '<tr><td style="font-family:monospace;font-size:0.7rem;color:var(--gta-neon-cyan)">' + j.job_id + '</td>';
+ html += '<td style="font-weight:600;text-transform:capitalize">' + j.platform + '</td>';
+ html += '<td style="color:var(--text-primary)">' + (j.title || '').substring(0, 40) + '</td>';
+ html += '<td>' + stateBadge(j.state) + '</td>';
+ html += '<td style="font-size:0.7rem;color:var(--text-muted)">' + created + '</td></tr>';
+ }
+ html += '</tbody></table>';
+ document.getElementById('pub-queue').innerHTML = html;
 }
 
 // Init
