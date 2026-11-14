@@ -614,3 +614,72 @@ async def serve_output(profile_id: str, filename: str):
     if not output_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(str(output_path), media_type="video/mp4")
+
+
+# --- Scheduler & Automation ---
+
+@app.get("/api/scheduler/status")
+async def get_scheduler_status():
+    """Get overall scheduler status with quotas and daily stats for all active profiles."""
+    from src.automation.scheduler import ProductionScheduler
+    scheduler = ProductionScheduler(DATA_ROOT)
+    return scheduler.get_scheduler_status()
+
+
+@app.get("/api/scheduler/quota/{profile_id}")
+async def get_quota(profile_id: str):
+    """Get production quota for a specific profile."""
+    from src.automation.scheduler import ProductionScheduler
+    scheduler = ProductionScheduler(DATA_ROOT)
+    quota = scheduler.get_quota(profile_id)
+    return quota.to_dict()
+
+
+@app.put("/api/scheduler/quota/{profile_id}")
+async def update_quota(
+    profile_id: str,
+    max_candidates_per_day: int = Query(5, ge=1, le=20),
+    max_approved_per_day: int = Query(3, ge=1, le=10),
+    enabled: bool = Query(True),
+):
+    """Update production quota for a profile."""
+    from src.automation.scheduler import ProductionScheduler, DailyQuota
+    scheduler = ProductionScheduler(DATA_ROOT)
+    current = scheduler.get_quota(profile_id)
+    updated = DailyQuota(
+        profile_id=profile_id,
+        max_candidates_per_day=max_candidates_per_day,
+        max_approved_per_day=max_approved_per_day,
+        min_quality_score=current.min_quality_score,
+        require_authorized_media=current.require_authorized_media,
+        enabled=enabled,
+    )
+    scheduler.update_quota(updated)
+    return updated.to_dict()
+
+
+@app.get("/api/scheduler/calendar/{profile_id}")
+async def get_calendar(
+    profile_id: str,
+    start_date: str = Query(None, description="YYYY-MM-DD"),
+    end_date: str = Query(None, description="YYYY-MM-DD"),
+):
+    """Get calendar entries for a profile within a date range."""
+    from src.automation.scheduler import ProductionScheduler
+    from datetime import date, timedelta
+    scheduler = ProductionScheduler(DATA_ROOT)
+    if not start_date:
+        start_date = date.today().isoformat()
+    if not end_date:
+        end_date = (date.today() + timedelta(days=30)).isoformat()
+    entries = scheduler.get_calendar_entries(profile_id, start_date, end_date)
+    return [e.to_dict() for e in entries]
+
+
+@app.get("/api/scheduler/can-produce/{profile_id}")
+async def can_produce(profile_id: str):
+    """Check if a profile can produce more content today."""
+    from src.automation.scheduler import ProductionScheduler
+    scheduler = ProductionScheduler(DATA_ROOT)
+    can, reason = scheduler.can_produce_today(profile_id)
+    return {"can_produce": can, "reason": reason}
