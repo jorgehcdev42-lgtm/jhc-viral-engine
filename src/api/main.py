@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from src.core.profile_config import ALL_PROFILES, get_profile, list_profiles
-from src.media.library import SmartMediaLibrary
+from src.media.library import SmartMediaLibrary, VIDEO_EXTENSIONS
 from src.media.video_selector import SmartVideoSelector
 from src.editorial.topic_selector import TopicSelector, TopicCandidate
 from src.production.reel_templates import (
@@ -323,6 +323,46 @@ async def index_media(request: IndexRequest):
 @app.get("/api/media/verify")
 async def verify_media():
     return library.verify_files_exist()
+
+
+@app.get("/api/filesystem/browse")
+async def browse_directory(path: str = Query("/", description="Directory path to list")):
+    """List subdirectories and video files for pack selection."""
+    dir_path = Path(path)
+    if not dir_path.exists():
+        raise HTTPException(status_code=400, detail=f"Path not found: {path}")
+    if not dir_path.is_dir():
+        raise HTTPException(status_code=400, detail=f"Not a directory: {path}")
+
+    try:
+        entries = []
+        for item in sorted(dir_path.iterdir()):
+            is_dir = item.is_dir()
+            is_video = not is_dir and item.suffix.lower() in VIDEO_EXTENSIONS
+            if is_dir or is_video:
+                entry = {
+                    "name": item.name,
+                    "path": str(item),
+                    "is_dir": is_dir,
+                    "is_video": is_video,
+                    "size_mb": round(item.stat().st_size / (1024 * 1024), 1) if not is_dir else None,
+                }
+                if is_dir:
+                    # Non-recursive count to avoid slow rglob on large directories
+                    video_count = sum(
+                        1 for child in item.iterdir()
+                        if child.is_file() and child.suffix.lower() in VIDEO_EXTENSIONS
+                    )
+                    entry["video_count"] = video_count
+                entries.append(entry)
+
+        return {
+            "current_path": str(dir_path),
+            "parent_path": str(dir_path.parent) if dir_path.parent != dir_path else None,
+            "entries": entries[:200],
+        }
+    except PermissionError:
+        raise HTTPException(status_code=403, detail=f"Permission denied: {path}")
 
 
 @app.put("/api/media/{file_path:path}/tags")

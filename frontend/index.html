@@ -247,10 +247,17 @@ tr:last-child td { border-bottom: none; }
  <div id="page-media" class="page">
  <div class="header"><h2>Biblioteca de Mídia</h2></div>
  <div class="card">
- <div class="card-title"><span class="icon">📂</span> Importar Vídeos</div>
+ <div class="card-title"><span class="icon">📂</span> Navegar e Importar Vídeos</div>
+ <div style="margin-bottom:0.75rem;display:flex;gap:0.5rem;align-items:center;">
+ <button class="btn btn-sm" style="background:var(--bg-card);border:1px solid var(--border);color:var(--text-secondary)" onclick="browseDir('/Volumes/SSD EXT MACBOOK')">💾 SSD Externo</button>
+ <button class="btn btn-sm" style="background:var(--bg-card);border:1px solid var(--border);color:var(--text-secondary)" onclick="browseDir('/')">🏠 Raiz</button>
+ <button class="btn btn-sm" style="background:var(--bg-card);border:1px solid var(--border);color:var(--text-secondary)" onclick="browseUp()">⬆️ Voltar</button>
+ <span id="browse-current-path" style="font-size:0.8rem;color:var(--neon-cyan);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1" title=""></span>
+ </div>
+ <div id="browse-results" style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:0.75rem"><div class="empty-state">Clique em um botão acima para navegar</div></div>
  <div class="input-group">
- <input type="text" id="index-path" placeholder="/caminho/para/pack/gta6/videos">
- <button class="btn btn-primary" onclick="startIndexing()">Indexar</button>
+ <input type="text" id="index-path" placeholder="Selecione uma pasta acima ou digite o caminho..." readonly style="cursor:pointer" onclick="document.getElementById('index-path').removeAttribute('readonly');this.focus()">
+ <button class="btn btn-primary" onclick="startIndexing()">📥 Indexar Pasta Selecionada</button>
  </div>
  <div id="index-progress"></div>
  </div>
@@ -479,6 +486,39 @@ async function loadDiagnostics() {
  document.getElementById('diag-verify').innerHTML = v.error
  ? `<div class="error-msg">${v.error}</div>`
  : `<pre style="font-size:0.8rem;color:var(--neon-cyan);background:rgba(0,220,255,0.05);padding:1rem;border-radius:8px;overflow-x:auto">${JSON.stringify(v, null, 2)}</pre>`;
+}
+
+// Filesystem Browser
+let currentBrowsePath = '/';
+
+async function browseDir(path) {
+ currentBrowsePath = path;
+ document.getElementById('browse-current-path').textContent = path;
+ document.getElementById('browse-current-path').title = path;
+ document.getElementById('index-path').value = path;
+ const container = document.getElementById('browse-results');
+ container.innerHTML = '<div class="loading">Carregando...</div>';
+ const data = await api('/api/filesystem/browse?path=' + encodeURIComponent(path));
+ if (data.error) { container.innerHTML = `<div class="error-msg">${data.error}</div>`; return; }
+ if (!data.entries || data.entries.length === 0) { container.innerHTML = '<div class="empty-state">Pasta vazia ou sem vídeos</div>'; return; }
+ let html = '<table style="width:100%"><thead><tr><th></th><th>Nome</th><th>Vídeos</th><th>Tamanho</th><th></th></tr></thead><tbody>';
+ for (const e of data.entries) {
+ if (e.is_dir) {
+ html += `<tr style="cursor:pointer" onclick="browseDir('${e.path.replace(/'/g, "\\'")}')">
+ <td>📁</td><td style="font-weight:600">${e.name}</td>
+ <td>${e.video_count > 0 ? `<span class="badge badge-media">${e.video_count} vídeos</span>` : '<span style="color:var(--text-secondary)">-</span>'}</td>
+ <td>-</td><td><span class="btn btn-sm" style="background:rgba(0,220,255,0.1);color:var(--neon-cyan)">Selecionar</span></td></tr>`;
+ } else {
+ html += `<tr><td>🎬</td><td>${e.name}</td><td>-</td><td>${e.size_mb} MB</td><td></td></tr>`;
+ }
+ }
+ html += '</tbody></table>';
+ container.innerHTML = html;
+}
+
+function browseUp() {
+ const parent = currentBrowsePath.split('/').slice(0, -1).join('/') || '/';
+ browseDir(parent);
 }
 
 // Init
