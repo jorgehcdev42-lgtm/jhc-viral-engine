@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: jhc-viral-engine-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn src.api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.14.0"
+      - key: DATA_ROOT
+        value: "/data"
+    disk:
+      name: jhc-data
+      mountPath: /data
+      sizeGB: 1
+
+# Deploy instructions:
+# 1. Push this repo to GitHub
+# 2. Go to https://render.com → New → Web Service
+# 3. Connect your GitHub repo
+# 4. Render auto-detects render.yaml
+# 5. Set environment variables if needed
+# 6. Deploy!
+#
+# Alternative: Render alone (no Netlify needed)
+# The API serves the frontend at / automatically.
+# Access at: https://jhc-viral-engine-api.onrender.com/

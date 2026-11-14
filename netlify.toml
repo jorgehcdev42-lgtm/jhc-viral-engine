@@ -1,0 +1,29 @@
+[build]
+  publish = "frontend"
+  command = "echo 'Static frontend only — backend deploys separately on Render'"
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://jhc-viral-engine-api.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Deploy instructions:
+# 1. Push this repo to GitHub
+# 2. Go to https://app.netlify.com → Add new site → Import from Git
+# 3. Select this repository
+# 4. Build settings are auto-detected from netlify.toml
+# 5. Set environment variable API_URL to your Render backend URL
+# 6. Deploy!
+#
+# NOTE: Netlify serves ONLY the static frontend (HTML/CSS/JS).
+# The FastAPI backend MUST be deployed separately on Render (see render.yaml).
+# The /api/* redirect above proxies API calls to the Render backend.
+# Update the redirect "to" URL after your Render service is live.
