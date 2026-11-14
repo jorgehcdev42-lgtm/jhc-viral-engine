@@ -341,6 +341,26 @@ class ViralEngine:
         from src.production.scene_composer import SceneComposer
         await SceneComposer.frames_to_video(frame_paths, out_path, audio_path)
 
+        # FASE 2: Apply watermark/branding overlay if configured for this profile
+        try:
+            from src.production.watermark import WatermarkEngine
+            wm_engine = WatermarkEngine(self.data_root)
+            wm_config = wm_engine.get_config(profile.profile_id)
+            if wm_config.enabled and wm_config.logo_path and Path(wm_config.logo_path).exists():
+                branded_path = out_path.with_stem(out_path.stem + "_branded")
+                wm_result = await wm_engine.apply_watermark(out_path, branded_path, profile.profile_id)
+                if wm_result["success"]:
+                    # Replace output with branded version
+                    branded_path.rename(out_path)
+                    logger.info(
+                        "Watermark applied to %s (%.1fs render)",
+                        out_path.name, wm_result.get("render_time_seconds", 0),
+                    )
+                else:
+                    logger.warning("Watermark failed for %s: %s", out_path.name, wm_result.get("error"))
+        except Exception as wm_exc:
+            logger.debug("WatermarkEngine unavailable, skipping branding: %s", wm_exc)
+
         media_count = len(selected_clips)
         logger.info(
             "Template-rendered video: %s (%d frames, template=%s, real_media=%d/%d scenes)",
