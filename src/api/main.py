@@ -904,3 +904,122 @@ async def get_all_oauth_connections():
     from src.publishing.oauth import OAuthManager
     manager = OAuthManager(DATA_ROOT)
     return manager.get_all_connections(["gta6-br", "gta6-global"])
+
+# --- AutoPublish Scheduler Endpoints (PRIORIDADE 3+4) ---
+
+@app.get("/api/autopublish/status")
+async def autopublish_status():
+    """Get AutoPublishScheduler status summary."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    scheduler = AutoPublishScheduler(DATA_ROOT)
+    return scheduler.get_status_summary()
+
+@app.post("/api/autopublish/submit")
+async def autopublish_submit(
+    profile_id: str = Query(...),
+    platform: str = Query(...),
+    video_path: str = Query(...),
+    title: str = Query(...),
+    description: str = Query(""),
+    hashtags: str = Query(""),
+    scheduled_at: Optional[float] = Query(None),
+):
+    """Submit a new auto-publish job with idempotency and dedup checks."""
+    import uuid
+    from src.automation.autopublish_scheduler import AutoPublishScheduler, AutoPublishJob
+    scheduler = AutoPublishScheduler(DATA_ROOT)
+    tags = tuple(h.strip() for h in hashtags.split(",") if h.strip()) if hashtags else ()
+    job = AutoPublishJob(
+        job_id=str(uuid.uuid4())[:8],
+        profile_id=profile_id,
+        platform=platform,
+        video_path=video_path,
+        title=title,
+        description=description,
+        hashtags=tags,
+        scheduled_at=scheduled_at,
+    )
+    return scheduler.submit_job(job)
+
+@app.get("/api/autopublish/jobs")
+async def autopublish_list_jobs(
+    profile_id: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """List active auto-publish jobs with optional filters."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    scheduler = AutoPublishScheduler(DATA_ROOT)
+    return scheduler.list_jobs(profile_id=profile_id, state=state, limit=limit)
+
+@app.get("/api/autopublish/history")
+async def autopublish_history(
+    profile_id: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """Get historical completed/failed/cancelled publish jobs."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    scheduler = AutoPublishScheduler(DATA_ROOT)
+    return scheduler.get_history(profile_id=profile_id, limit=limit)
+
+@app.post("/api/autopublish/approve/{job_id}")
+async def autopublish_approve(
+    job_id: str,
+    score: float = Query(0.0, ge=0.0, le=1.0),
+):
+    """Approve a job via QualityGate (required before publishing)."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    scheduler = AutoPublishScheduler(DATA_ROOT)
+    return scheduler.check_quality_gate(job_id, passed=True, score=score)
+
+@app.post("/api/autopublish/reject/{job_id}")
+async def autopublish_reject(
+    job_id: str,
+    score: float = Query(0.0, ge=0.0, le=1.0),
+):
+    """Reject a job via QualityGate."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    scheduler = AutoPublishScheduler(DATA_ROOT)
+    return scheduler.check_quality_gate(job_id, passed=False, score=score)
+
+@app.post("/api/autopublish/auth-check/{job_id}")
+async def autopublish_auth_check(
+    job_id: str,
+    auth_state: str = Query(..., description="connected|auth_required|token_expired"),
+):
+    """Update auth state for a job — blocks publishing if not connected."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    scheduler = AutoPublishScheduler(DATA_ROOT)
+    return scheduler.check_auth(job_id, auth_state)
+
+@app.post("/api/autopublish/cancel/{job_id}")
+async def autopublish_cancel(job_id: str):
+    """Cancel a pending or approved publish job."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    scheduler = AutoPublishScheduler(DATA_ROOT)
+    return scheduler.cancel_job(job_id)
+
+@app.post("/api/autopublish/reschedule/{job_id}")
+async def autopublish_reschedule(
+    job_id: str,
+    scheduled_at: float = Query(..., description="New Unix timestamp"),
+):
+    """Reschedule a pending or approved publish job."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    scheduler = AutoPublishScheduler(DATA_ROOT)
+    return scheduler.reschedule_job(job_id, scheduled_at)
+
+@app.get("/api/autopublish/eligible")
+async def autopublish_eligible(limit: int = Query(10, ge=1, le=50)):
+    """Get jobs eligible for publishing right now (approved + auth connected + scheduled)."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    scheduler = AutoPublishScheduler(DATA_ROOT)
+    jobs = scheduler.get_eligible_jobs(limit=limit)
+    return [j.to_dict() for j in jobs]
+
+@app.get("/api/autopublish/launchd")
+async def autopublish_launchd_status():
+    """Get launchd integration status (disabled by default)."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    scheduler = AutoPublishScheduler(DATA_ROOT)
+    return scheduler.get_launchd_status()
