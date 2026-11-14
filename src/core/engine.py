@@ -226,13 +226,22 @@ class ViralEngine:
         output = await renderer.render(job)
         return job.advance(PipelineStage.REVIEW, output_path=str(output))
 
+    @staticmethod
+    def _sanitize_job_id(topic: str, profile_id: str) -> str:
+        """Create filesystem-safe job ID from topic and profile."""
+        import re
+        slug = re.sub(r"[^a-z0-9]+", "-", topic[:40].lower()).strip("-")
+        slug = re.sub(r"-+", "-", slug)
+        return f"{profile_id}-{slug}" if slug else f"{profile_id}-reel-{int(__import__('time').time())}"
+
     async def _render_with_scenes(
         self, job: PipelineJob, profile: ProfileConfig
     ) -> Optional[Path]:
-        """Render video using DynamicSceneEngine for animated neon visuals."""
+        """Render video using DynamicSceneEngine with template-driven visuals."""
         from src.production.dynamic_scene_engine import DynamicSceneEngine, DynamicSceneSpec
         from src.production.script_to_scenes import parse_script_to_scenes
         from src.production.visual_identity import VICE_CITY_IDENTITY
+        from src.production.reel_templates import select_template_for_category
 
         script_path = Path(job.script_path)
         script_text = script_path.read_text(encoding="utf-8")
@@ -240,40 +249,61 @@ class ViralEngine:
         if not base_scenes:
             return None
 
-        # Convert base scenes to dynamic specs with motion
+        # Select template based on first scene's inferred category
+        first_scene_type = base_scenes[0].scene_type if base_scenes else "hook"
+        category_map = {"hook": "news", "title_card": "announcement", "info_card": "news"}
+        category = category_map.get(first_scene_type, "news")
+        template = select_template_for_category(category)
+
+        # Build dynamic specs from template structure + script content
         dyn_specs: list[DynamicSceneSpec] = []
-        for i, s in enumerate(base_scenes):
-            # Alternate accent colors per scene for visual variety
-            accents = [(255, 45, 120), (0, 220, 255), (255, 140, 50), (180, 60, 255)]
-            accent = accents[i % len(accents)]
-            # Ken Burns: alternate zoom directions
-            zoom_start = 1.0 if i % 2 == 0 else 1.08
-            zoom_end = 1.08 if i % 2 == 0 else 1.0
+        template_scenes = list(template.scenes)
+        for i, tmpl_scene in enumerate(template_scenes):
+            # Map script content to template scene slots
+            if i < len(base_scenes):
+                text = base_scenes[i].text
+                subtitle = base_scenes[i].subtitle_text
+            elif base_scenes:
+                # Reuse last script scene for remaining template slots
+                text = base_scenes[-1].text
+                subtitle = base_scenes[-1].subtitle_text
+            else:
+                text = template.name.replace("_", " ").upper()
+                subtitle = ""
+
             dyn_specs.append(DynamicSceneSpec(
-                scene_type=s.scene_type,
-                text=s.text,
-                duration_seconds=s.duration_seconds,
-                subtitle_text=s.subtitle_text,
-                category="news",
-                zoom_start=zoom_start,
-                zoom_end=zoom_end,
-                accent_color=accent,
-                text_animation="fade_in",
+                scene_type=tmpl_scene.scene_type,
+                text=text,
+                duration_seconds=tmpl_scene.duration_seconds,
+                subtitle_text=subtitle,
+                category=category,
+                zoom_start=tmpl_scene.zoom_start,
+                zoom_end=tmpl_scene.zoom_end,
+                pan_x_start=tmpl_scene.pan_x_start,
+                pan_x_end=tmpl_scene.pan_x_end,
+                accent_color=tmpl_scene.accent_color,
+                bg_style=tmpl_scene.bg_style,
+                text_animation=tmpl_scene.text_animation,
+                glow_intensity=tmpl_scene.glow_intensity,
             ))
 
         engine = DynamicSceneEngine(VICE_CITY_IDENTITY)
-        frames_dir = self.data_root / profile.profile_id / "frames" / job.job_id
+        safe_job_id = self._sanitize_job_id(job.topic, job.profile_id)
+        frames_dir = self.data_root / profile.profile_id / "frames" / safe_job_id
         frame_paths = await engine.render_sequence(dyn_specs, frames_dir)
 
         out_dir = self.data_root / profile.profile_id / "output"
         out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / f"{job.job_id}.mp4"
+        out_path = out_dir / f"{safe_job_id}.mp4"
 
         audio_path = Path(job.narration_path) if job.narration_path else None
         from src.production.scene_composer import SceneComposer
         await SceneComposer.frames_to_video(frame_paths, out_path, audio_path)
 
-        logger.info("Scene-rendered video: %s (%d frames)", out_path, len(frame_paths))
+        logger.info(
+            "Template-rendered video: %s (%d frames, template=%s)",
+            out_path, len(frame_paths), template.name,
+        )
         return out_path
 
     async def _stage_review(self, job: PipelineJob, profile: ProfileConfig) -> PipelineJob:
