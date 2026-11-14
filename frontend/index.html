@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JHC Viral Engine — Painel de Controle</title>
+<style>
+:root {
+ --bg-deep: #080614;
+ --bg-card: #14102E;
+ --bg-sidebar: #0C0A1E;
+ --neon-pink: #FF2D78;
+ --neon-cyan: #00DCFF;
+ --neon-orange: #FF8C32;
+ --neon-purple: #B43CFF;
+ --text-primary: #FFFFFF;
+ --text-secondary: #9898B0;
+ --border: rgba(255,255,255,0.08);
+ --success: #00FF88;
+ --warning: #FFD700;
+ --danger: #FF4444;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+ background: var(--bg-deep);
+ color: var(--text-primary);
+ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Helvetica Neue', sans-serif;
+ display: flex;
+ min-height: 100vh;
+}
+.sidebar {
+ width: 260px;
+ background: var(--bg-sidebar);
+ border-right: 1px solid var(--border);
+ padding: 1.5rem 0;
+ flex-shrink: 0;
+ position: fixed;
+ top: 0; bottom: 0;
+ overflow-y: auto;
+}
+.sidebar-brand {
+ padding: 0 1.5rem 1.5rem;
+ border-bottom: 1px solid var(--border);
+ margin-bottom: 1rem;
+}
+.sidebar-brand h1 {
+ font-size: 1.2rem;
+ color: var(--neon-pink);
+ text-transform: uppercase;
+ letter-spacing: 0.08em;
+}
+.sidebar-brand span {
+ font-size: 0.75rem;
+ color: var(--text-secondary);
+ display: block;
+ margin-top: 0.25rem;
+}
+.nav-section {
+ padding: 0.5rem 0;
+}
+.nav-section-title {
+ font-size: 0.65rem;
+ text-transform: uppercase;
+ letter-spacing: 0.1em;
+ color: var(--text-secondary);
+ padding: 0.5rem 1.5rem;
+}
+.nav-item {
+ display: flex;
+ align-items: center;
+ gap: 0.75rem;
+ padding: 0.6rem 1.5rem;
+ cursor: pointer;
+ transition: all 0.15s;
+ font-size: 0.9rem;
+ color: var(--text-secondary);
+ border-left: 3px solid transparent;
+}
+.nav-item:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
+.nav-item.active {
+ background: rgba(255,45,120,0.08);
+ color: var(--neon-pink);
+ border-left-color: var(--neon-pink);
+}
+.nav-icon { width: 18px; text-align: center; }
+.main {
+ margin-left: 260px;
+ flex: 1;
+ padding: 2rem;
+ max-width: 1200px;
+}
+.header {
+ display: flex;
+ justify-content: space-between;
+ align-items: center;
+ margin-bottom: 2rem;
+}
+.header h2 { font-size: 1.5rem; }
+.health-badge {
+ display: flex;
+ align-items: center;
+ gap: 0.5rem;
+ padding: 0.4rem 1rem;
+ border-radius: 20px;
+ font-size: 0.8rem;
+ font-weight: 600;
+}
+.health-badge.ok { background: rgba(0,255,136,0.12); color: var(--success); }
+.health-badge.err { background: rgba(255,68,68,0.12); color: var(--danger); }
+.health-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.stats-grid {
+ display: grid;
+ grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+ gap: 1rem;
+ margin-bottom: 2rem;
+}
+.stat-card {
+ background: var(--bg-card);
+ border: 1px solid var(--border);
+ border-radius: 12px;
+ padding: 1.25rem;
+}
+.stat-value { font-size: 2rem; font-weight: 700; color: var(--neon-cyan); }
+.stat-label { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.card {
+ background: var(--bg-card);
+ border: 1px solid var(--border);
+ border-radius: 12px;
+ padding: 1.5rem;
+ margin-bottom: 1.5rem;
+}
+.card-title {
+ font-size: 1rem;
+ font-weight: 600;
+ margin-bottom: 1rem;
+ display: flex;
+ align-items: center;
+ gap: 0.5rem;
+}
+.card-title .icon { color: var(--neon-cyan); }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+th { text-align: left; padding: 0.6rem 0.75rem; color: var(--text-secondary); font-weight: 500; border-bottom: 1px solid var(--border); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); }
+tr:last-child td { border-bottom: none; }
+.badge {
+ display: inline-block;
+ padding: 0.15rem 0.6rem;
+ border-radius: 10px;
+ font-size: 0.7rem;
+ font-weight: 600;
+ text-transform: uppercase;
+}
+.badge-active { background: rgba(0,255,136,0.15); color: var(--success); }
+.badge-inactive { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
+.badge-media { background: rgba(0,220,255,0.12); color: var(--neon-cyan); }
+.badge-no-media { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
+.loading { color: var(--text-secondary); font-style: italic; padding: 2rem; text-align: center; }
+.error-msg { color: var(--danger); padding: 1rem; background: rgba(255,68,68,0.08); border-radius: 8px; margin-bottom: 1rem; }
+.empty-state { color: var(--text-secondary); text-align: center; padding: 2rem; font-size: 0.9rem; }
+.page { display: none; }
+.page.active { display: block; }
+.btn {
+ padding: 0.5rem 1.2rem;
+ border-radius: 8px;
+ border: none;
+ cursor: pointer;
+ font-size: 0.85rem;
+ font-weight: 600;
+ transition: all 0.15s;
+}
+.btn-primary { background: var(--neon-pink); color: white; }
+.btn-primary:hover { background: #E0206A; }
+.btn-sm { padding: 0.3rem 0.8rem; font-size: 0.75rem; }
+.input-group { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+.input-group input {
+ flex: 1;
+ padding: 0.5rem 0.75rem;
+ border-radius: 8px;
+ border: 1px solid var(--border);
+ background: rgba(255,255,255,0.04);
+ color: var(--text-primary);
+ font-size: 0.85rem;
+ outline: none;
+}
+.input-group input:focus { border-color: var(--neon-cyan); }
+</style>
+</head>
+<body>
+
+<nav class="sidebar">
+ <div class="sidebar-brand">
+ <h1>Vice City Radar</h1>
+ <span>JHC Viral Engine v1.0</span>
+ </div>
+ <div class="nav-section">
+ <div class="nav-section-title">Principal</div>
+ <div class="nav-item active" data-page="dashboard"><span class="nav-icon">📊</span> Dashboard</div>
+ <div class="nav-item" data-page="profiles"><span class="nav-icon">👤</span> Perfis</div>
+ <div class="nav-item" data-page="media"><span class="nav-icon">🎬</span> Biblioteca de Mídia</div>
+ <div class="nav-item" data-page="templates"><span class="nav-icon">🎨</span> Templates</div>
+ </div>
+ <div class="nav-section">
+ <div class="nav-section-title">Produção</div>
+ <div class="nav-item" data-page="editorial"><span class="nav-icon">📰</span> Editorial</div>
+ <div class="nav-item" data-page="production"><span class="nav-icon">⚡</span> Produção</div>
+ <div class="nav-item" data-page="quality"><span class="nav-icon">✅</span> Quality Gate</div>
+ </div>
+ <div class="nav-section">
+ <div class="nav-section-title">Sistema</div>
+ <div class="nav-item" data-page="diagnostics"><span class="nav-icon">🔧</span> Diagnóstico</div>
+ </div>
+</nav>
+
+<main class="main">
+ <!-- DASHBOARD -->
+ <div id="page-dashboard" class="page active">
+ <div class="header">
+ <h2>Dashboard</h2>
+ <div id="health-badge" class="health-badge ok"><span class="health-dot"></span> Verificando...</div>
+ </div>
+ <div class="stats-grid" id="dashboard-stats">
+ <div class="stat-card"><div class="stat-value" id="stat-profiles">-</div><div class="stat-label">Perfis</div></div>
+ <div class="stat-card"><div class="stat-value" id="stat-templates">-</div><div class="stat-label">Templates</div></div>
+ <div class="stat-card"><div class="stat-value" id="stat-media">-</div><div class="stat-label">Vídeos Indexados</div></div>
+ <div class="stat-card"><div class="stat-value" id="stat-uptime">-</div><div class="stat-label">Uptime</div></div>
+ </div>
+ <div class="card">
+ <div class="card-title"><span class="icon">📋</span> Perfis Ativos</div>
+ <div id="dashboard-profiles"><div class="loading">Carregando...</div></div>
+ </div>
+ <div class="card">
+ <div class="card-title"><span class="icon">🎨</span> Templates Disponíveis</div>
+ <div id="dashboard-templates"><div class="loading">Carregando...</div></div>
+ </div>
+ </div>
+
+ <!-- PROFILES -->
+ <div id="page-profiles" class="page">
+ <div class="header"><h2>Perfis Editoriais</h2></div>
+ <div class="card">
+ <div class="card-title"><span class="icon">👤</span> Todos os Perfis</div>
+ <div id="profiles-table"><div class="loading">Carregando...</div></div>
+ </div>
+ </div>
+
+ <!-- MEDIA LIBRARY -->
+ <div id="page-media" class="page">
+ <div class="header"><h2>Biblioteca de Mídia</h2></div>
+ <div class="card">
+ <div class="card-title"><span class="icon">📂</span> Importar Vídeos</div>
+ <div class="input-group">
+ <input type="text" id="index-path" placeholder="/caminho/para/pack/gta6/videos">
+ <button class="btn btn-primary" onclick="startIndexing()">Indexar</button>
+ </div>
+ <div id="index-progress"></div>
+ </div>
+ <div class="card">
+ <div class="card-title"><span class="icon">📊</span> Estatísticas da Biblioteca</div>
+ <div id="media-stats"><div class="loading">Carregando...</div></div>
+ </div>
+ <div class="card">
+ <div class="card-title"><span class="icon">🔍</span> Buscar Vídeos</div>
+ <div class="input-group">
+ <input type="text" id="media-search-query" placeholder="Buscar por nome, tag ou categoria...">
+ <button class="btn btn-primary" onclick="searchMedia()">Buscar</button>
+ </div>
+ <div id="media-results"><div class="empty-state">Digite um termo e clique em Buscar</div></div>
+ </div>
+ </div>
+
+ <!-- TEMPLATES -->
+ <div id="page-templates" class="page">
+ <div class="header"><h2>Templates de Produção</h2></div>
+ <div class="card">
+ <div class="card-title"><span class="icon">🎨</span> 10 Templates Disponíveis</div>
+ <div id="templates-table"><div class="loading">Carregando...</div></div>
+ </div>
+ </div>
+
+ <!-- EDITORIAL -->
+ <div id="page-editorial" class="page">
+ <div class="header"><h2>Inteligência Editorial</h2></div>
+ <div class="card">
+ <div class="card-title"><span class="icon">📰</span> Tendências e Seleção de Pautas</div>
+ <div class="input-group">
+ <select id="editorial-profile" style="flex:1;padding:0.5rem;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:white;font-size:0.85rem;">
+ <option value="gta6">Vice City Radar (GTA 6)</option>
+ </select>
+ <button class="btn btn-primary" onclick="fetchTrends()">Buscar Tendências</button>
+ <button class="btn btn-primary" style="background:var(--neon-cyan);color:#000" onclick="selectTopics()">Selecionar Pautas</button>
+ </div>
+ <div id="editorial-results"><div class="empty-state">Selecione um perfil e busque tendências</div></div>
+ </div>
+ </div>
+
+ <!-- PRODUCTION -->
+ <div id="page-production" class="page">
+ <div class="header"><h2>Fila de Produção</h2></div>
+ <div class="card">
+ <div class="card-title"><span class="icon">⚡</span> Status do Batch</div>
+ <div id="batch-status"><div class="empty-state">Nenhum batch ativo. Use a página Editorial para criar.</div></div>
+ </div>
+ </div>
+
+ <!-- QUALITY GATE -->
+ <div id="page-quality" class="page">
+ <div class="header"><h2>Quality Gate</h2></div>
+ <div class="card">
+ <div class="card-title"><span class="icon">✅</span> Relatórios de Qualidade</div>
+ <div class="input-group">
+ <select id="quality-profile" style="flex:1;padding:0.5rem;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:white;font-size:0.85rem;">
+ <option value="gta6">Vice City Radar (GTA 6)</option>
+ </select>
+ <button class="btn btn-primary" onclick="fetchQualityReports()">Carregar Relatórios</button>
+ </div>
+ <div id="quality-results"><div class="empty-state">Selecione um perfil e carregue os relatórios</div></div>
+ </div>
+ </div>
+
+ <!-- DIAGNOSTICS -->
+ <div id="page-diagnostics" class="page">
+ <div class="header"><h2>Diagnóstico do Sistema</h2></div>
+ <div class="card">
+ <div class="card-title"><span class="icon">🔧</span> Health Check</div>
+ <div id="diag-health"><div class="loading">Carregando...</div></div>
+ </div>
+ <div class="card">
+ <div class="card-title"><span class="icon">📁</span> Verificação de Arquivos</div>
+ <div id="diag-verify"><div class="loading">Carregando...</div></div>
+ </div>
+ </div>
+</main>
+
+<script>
+const API = 'http://127.0.0.1:8765';
+
+async function api(path) {
+ try {
+ const r = await fetch(API + path);
+ if (!r.ok) throw new Error(`HTTP ${r.status}`);
+ return await r.json();
+ } catch (e) {
+ return { error: e.message };
+ }
+}
+
+// Navigation
+document.querySelectorAll('.nav-item').forEach(item => {
+ item.addEventListener('click', () => {
+ document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+ document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+ item.classList.add('active');
+ document.getElementById('page-' + item.dataset.page).classList.add('active');
+ loadPageData(item.dataset.page);
+ });
+});
+
+function loadPageData(page) {
+ if (page === 'dashboard') loadDashboard();
+ if (page === 'profiles') loadProfiles();
+ if (page === 'media') loadMediaStats();
+ if (page === 'templates') loadTemplates();
+ if (page === 'diagnostics') loadDiagnostics();
+}
+
+// Dashboard
+async function loadDashboard() {
+ const h = await api('/api/health');
+ const badge = document.getElementById('health-badge');
+ if (h.error) {
+ badge.className = 'health-badge err';
+ badge.innerHTML = '<span class="health-dot"></span> Offline';
+ document.getElementById('stat-profiles').textContent = '-';
+ document.getElementById('stat-templates').textContent = '-';
+ document.getElementById('stat-media').textContent = '-';
+ document.getElementById('stat-uptime').textContent = '-';
+ return;
+ }
+ badge.className = 'health-badge ok';
+ badge.innerHTML = '<span class="health-dot"></span> Operacional';
+ document.getElementById('stat-profiles').textContent = h.profiles_count;
+ document.getElementById('stat-templates').textContent = h.templates_count;
+ document.getElementById('stat-media').textContent = h.media_files_count;
+ document.getElementById('stat-uptime').textContent = h.uptime_seconds < 60 ? h.uptime_seconds + 's' : Math.floor(h.uptime_seconds/60) + 'min';
+
+ const profiles = await api('/api/profiles');
+ if (!profiles.error) {
+ const active = profiles.filter(p => p.enabled);
+ document.getElementById('dashboard-profiles').innerHTML = `<table><thead><tr><th>ID</th><th>Nome</th><th>Nicho</th><th>Status</th></tr></thead><tbody>${active.map(p => `<tr><td>${p.profile_id}</td><td>${p.name}</td><td>${p.niche}</td><td><span class="badge badge-active">Ativo</span></td></tr>`).join('')}</tbody></table>`;
+ }
+
+ const templates = await api('/api/templates');
+ if (!templates.error) {
+ document.getElementById('dashboard-templates').innerHTML = `<table><thead><tr><th>Template</th><th>Categoria</th><th>Duração</th><th>Cenas</th><th>Mídia</th></tr></thead><tbody>${templates.slice(0,5).map(t => `<tr><td>${t.name}</td><td>${t.category}</td><td>${t.duration}s</td><td>${t.scene_count}</td><td><span class="badge ${t.requires_media?'badge-media':'badge-no-media'}">${t.requires_media?'Sim':'Não'}</span></td></tr>`).join('')}</tbody></table>`;
+ }
+}
+
+// Profiles
+async function loadProfiles() {
+ const profiles = await api('/api/profiles');
+ if (profiles.error) { document.getElementById('profiles-table').innerHTML = `<div class="error-msg">${profiles.error}</div>`; return; }
+ document.getElementById('profiles-table').innerHTML = `<table><thead><tr><th>ID</th><th>Nome</th><th>Nicho</th><th>Status</th><th>Descrição</th></tr></thead><tbody>${profiles.map(p => `<tr><td>${p.profile_id}</td><td>${p.name}</td><td>${p.niche}</td><td><span class="badge ${p.enabled?'badge-active':'badge-inactive'}">${p.enabled?'Ativo':'Inativo'}</span></td><td style="color:var(--text-secondary);font-size:0.8rem">${p.description}</td></tr>`).join('')}</tbody></table>`;
+}
+
+// Media
+async function loadMediaStats() {
+ const stats = await api('/api/media/stats');
+ if (stats.error) { document.getElementById('media-stats').innerHTML = `<div class="error-msg">${stats.error}</div>`; return; }
+ document.getElementById('media-stats').innerHTML = `
+ <div class="stats-grid">
+ <div class="stat-card"><div class="stat-value">${stats.total_files}</div><div class="stat-label">Arquivos</div></div>
+ <div class="stat-card"><div class="stat-value">${stats.corrupt_files}</div><div class="stat-label">Corrompidos</div></div>
+ <div class="stat-card"><div class="stat-value">${stats.total_size_mb}</div><div class="stat-label">MB Total</div></div>
+ </div>
+ ${Object.keys(stats.categories).length ? '<p style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-secondary)">Categorias: ' + Object.entries(stats.categories).map(([k,v])=>`${k}: ${v}`).join(', ') + '</p>' : '<p style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-secondary)">Nenhuma mídia indexada ainda. Informe o caminho do pack na caixa acima.</p>'}
+ `;
+}
+
+async function startIndexing() {
+ const path = document.getElementById('index-path').value.trim();
+ if (!path) { alert('Informe o caminho do diretório'); return; }
+ document.getElementById('index-progress').innerHTML = '<div class="loading">Indexando... Isso pode levar alguns minutos.</div>';
+ const result = await fetch(API + '/api/media/index', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({directory: path, recursive: true}) }).then(r=>r.json()).catch(e=>({error:e.message}));
+ if (result.error) { document.getElementById('index-progress').innerHTML = `<div class="error-msg">${result.error}</div>`; return; }
+ document.getElementById('index-progress').innerHTML = `<div style="padding:1rem;background:rgba(0,255,136,0.08);border-radius:8px;margin-top:0.5rem"><strong>Indexação concluída!</strong><br>${result.summary}</div>`;
+ loadMediaStats();
+}
+
+async function searchMedia() {
+ const q = document.getElementById('media-search-query').value.trim();
+ const results = await api('/api/media/search?query=' + encodeURIComponent(q) + '&limit=20');
+ if (results.error) { document.getElementById('media-results').innerHTML = `<div class="error-msg">${results.error}</div>`; return; }
+ if (!results.length) { document.getElementById('media-results').innerHTML = '<div class="empty-state">Nenhum vídeo encontrado</div>'; return; }
+ document.getElementById('media-results').innerHTML = `<table><thead><tr><th>Arquivo</th><th>Duração</th><th>Resolução</th><th>Codec</th><th>Categoria</th><th>Direitos</th></tr></thead><tbody>${results.map(m => `<tr><td>${m.file_name}</td><td>${m.duration_seconds ? m.duration_seconds.toFixed(1)+'s' : '-'}</td><td>${m.width&&m.height ? m.width+'×'+m.height : '-'}</td><td>${m.codec||'-'}</td><td>${m.category||'-'}</td><td>${m.rights_status}</td></tr>`).join('')}</tbody></table>`;
+}
+
+// Templates
+async function loadTemplates() {
+ const templates = await api('/api/templates');
+ if (templates.error) { document.getElementById('templates-table').innerHTML = `<div class="error-msg">${templates.error}</div>`; return; }
+ document.getElementById('templates-table').innerHTML = `<table><thead><tr><th>Template</th><th>Descrição</th><th>Categoria</th><th>Duração</th><th>Cenas</th><th>Mídia</th><th>Música</th></tr></thead><tbody>${templates.map(t => `<tr><td style="font-weight:600;color:var(--neon-cyan)">${t.name}</td><td style="font-size:0.8rem;color:var(--text-secondary)">${t.description}</td><td>${t.category}</td><td>${t.duration}s</td><td>${t.scene_count}</td><td><span class="badge ${t.requires_media?'badge-media':'badge-no-media'}">${t.requires_media?'Sim':'Não'}</span></td><td>${t.music_mood}</td></tr>`).join('')}</tbody></table>`;
+}
+
+// Editorial
+async function fetchTrends() {
+ const profileId = document.getElementById('editorial-profile').value;
+ document.getElementById('editorial-results').innerHTML = '<div class="loading">Buscando tendências...</div>';
+ const trends = await api('/api/research/trends/' + profileId + '?limit=10');
+ if (trends.error) { document.getElementById('editorial-results').innerHTML = `<div class="error-msg">${trends.error}</div>`; return; }
+ document.getElementById('editorial-results').innerHTML = `<table><thead><tr><th>Título</th><th>Fonte</th><th>Categoria</th><th>Relevância</th></tr></thead><tbody>${trends.map(t => `<tr><td>${t.title.substring(0,70)}${t.title.length>70?'...':''}</td><td>${t.source_name}</td><td>${t.category}</td><td>${t.relevance_score.toFixed(2)}</td></tr>`).join('')}</tbody></table>`;
+}
+
+async function selectTopics() {
+ const profileId = document.getElementById('editorial-profile').value;
+ document.getElementById('editorial-results').innerHTML = '<div class="loading">Selecionando pautas...</div>';
+ const topics = await fetch(API + '/api/editorial/select/' + profileId + '?max_topics=5', {method:'POST'}).then(r=>r.json()).catch(e=>({error:e.message}));
+ if (topics.error) { document.getElementById('editorial-results').innerHTML = `<div class="error-msg">${topics.error}</div>`; return; }
+ document.getElementById('editorial-results').innerHTML = `<div style="margin-bottom:0.5rem;font-size:0.85rem;color:var(--success)">✅ ${topics.length} pautas selecionadas</div><table><thead><tr><th>Título</th><th>Fonte</th><th>Score Editorial</th><th>Categoria</th></tr></thead><tbody>${topics.map(t => `<tr><td>${t.title.substring(0,70)}${t.title.length>70?'...':''}</td><td>${t.source_name}</td><td style="color:var(--neon-cyan);font-weight:600">${t.editorial_score}</td><td>${t.category}</td></tr>`).join('')}</tbody></table>`;
+}
+
+// Quality
+async function fetchQualityReports() {
+ const profileId = document.getElementById('quality-profile').value;
+ document.getElementById('quality-results').innerHTML = '<div class="loading">Carregando relatórios...</div>';
+ const reports = await api('/api/quality/reports/' + profileId);
+ if (reports.error) { document.getElementById('quality-results').innerHTML = `<div class="error-msg">${reports.error}</div>`; return; }
+ if (!reports.length) { document.getElementById('quality-results').innerHTML = '<div class="empty-state">Nenhum relatório de qualidade encontrado</div>'; return; }
+ document.getElementById('quality-results').innerHTML = `<table><thead><tr><th>Job ID</th><th>Status</th><th>Score</th><th>Resumo</th></tr></thead><tbody>${reports.map(r => `<tr><td style="font-size:0.8rem">${r.job_id||'-'}</td><td><span class="badge ${r.status==='READY_FOR_PUBLICATION'||r.approved?'badge-active':r.status==='REJECTED'?'badge-inactive':'badge-media'}">${r.status||(r.approved?'APPROVED':'REVIEW')}</span></td><td style="font-weight:600;color:var(--neon-cyan)">${(r.overall_score||r.score||0).toFixed(2)}</td><td style="font-size:0.8rem;color:var(--text-secondary)">${(r.summary||'').substring(0,80)}</td></tr>`).join('')}</tbody></table>`;
+}
+
+// Diagnostics
+async function loadDiagnostics() {
+ const h = await api('/api/health');
+ document.getElementById('diag-health').innerHTML = h.error
+ ? `<div class="error-msg">Backend indisponível: ${h.error}</div>`
+ : `<pre style="font-size:0.8rem;color:var(--neon-cyan);background:rgba(0,220,255,0.05);padding:1rem;border-radius:8px;overflow-x:auto">${JSON.stringify(h, null, 2)}</pre>`;
+
+ const v = await api('/api/media/verify');
+ document.getElementById('diag-verify').innerHTML = v.error
+ ? `<div class="error-msg">${v.error}</div>`
+ : `<pre style="font-size:0.8rem;color:var(--neon-cyan);background:rgba(0,220,255,0.05);padding:1rem;border-radius:8px;overflow-x:auto">${JSON.stringify(v, null, 2)}</pre>`;
+}
+
+// Init
+loadDashboard();
+</script>
+</body>
+</html>
