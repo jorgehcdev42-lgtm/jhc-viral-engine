@@ -853,12 +853,54 @@ async def schedule_publish(
 
 @app.get("/api/publishing/connection/{profile_id}/{platform}")
 async def check_connection(profile_id: str, platform: str):
-    """Check connection status for a specific profile + platform."""
-    from src.publishing.adapters import get_adapter, ADAPTERS
+    """Check connection status for a specific profile + platform via OAuthManager."""
+    from src.publishing.oauth import OAuthManager
+    manager = OAuthManager(DATA_ROOT)
+    return manager.get_connection_state(profile_id, platform)
 
-    if platform not in ADAPTERS:
-        raise HTTPException(status_code=400, detail=f"Unknown platform: {platform}")
+# --- OAuth Flow Endpoints (PRIORIDADE 2) ---
 
-    adapter = get_adapter(platform, DATA_ROOT, profile_id)
-    state = await adapter.check_connection()
-    return {"profile_id": profile_id, "platform": platform, "state": state.value}
+@app.get("/api/oauth/start/{profile_id}/{platform}")
+async def oauth_start(
+    profile_id: str,
+    platform: str,
+    redirect_base: str = Query("http://127.0.0.1:8765"),
+):
+    """Generate OAuth authorization URL with PKCE for profile + platform."""
+    from src.publishing.oauth import OAuthManager
+    manager = OAuthManager(DATA_ROOT)
+    result = manager.get_auth_url(profile_id, platform, redirect_base)
+    if "error" in result and "url" not in result:
+        raise HTTPException(status_code=400, detail=result.get("error", "OAuth setup error"))
+    return result
+
+@app.get("/api/oauth/callback/{platform}")
+async def oauth_callback(
+    platform: str,
+    code: str = Query(..., description="Authorization code from provider"),
+    state: str = Query(..., description="PKCE state token"),
+):
+    """Exchange authorization code for tokens and store credentials."""
+    from src.publishing.oauth import OAuthManager
+    manager = OAuthManager(DATA_ROOT)
+    result = await manager.handle_callback(platform, code, state)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+@app.post("/api/oauth/disconnect/{profile_id}/{platform}")
+async def oauth_disconnect(profile_id: str, platform: str):
+    """Remove stored OAuth credentials for profile + platform."""
+    from src.publishing.oauth import OAuthManager
+    manager = OAuthManager(DATA_ROOT)
+    removed = manager.disconnect(profile_id, platform)
+    if not removed:
+        raise HTTPException(status_code=404, detail="No credentials found")
+    return {"status": "disconnected", "profile_id": profile_id, "platform": platform}
+
+@app.get("/api/oauth/connections")
+async def get_all_oauth_connections():
+    """Get connection states for all active profiles × all platforms."""
+    from src.publishing.oauth import OAuthManager
+    manager = OAuthManager(DATA_ROOT)
+    return manager.get_all_connections(["gta6-br", "gta6-global"])
