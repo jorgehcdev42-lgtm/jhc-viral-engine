@@ -640,6 +640,7 @@ body::after {
  <div class="nav-item" data-page="profiles"><span class="nav-icon">👤</span> Perfis</div>
  <div class="nav-item" data-page="media"><span class="nav-icon">🎬</span> Biblioteca</div>
  <div class="nav-item" data-page="templates"><span class="nav-icon">🎨</span> Templates</div>
+ <div class="nav-item" data-page="branding"><span class="nav-icon">💧</span> Branding Studio</div>
  </div>
 
  <div class="nav-section">
@@ -732,6 +733,98 @@ body::after {
  <div class="card">
  <div class="card-header"><span class="card-icon">🎨</span><div class="card-title">10 Templates Disponíveis</div></div>
  <div id="templates-table"><div class="loading-state"><div class="loading-spinner"></div>Carregando...</div></div>
+ </div>
+ </div>
+
+ <!-- ===== BRANDING STUDIO ===== -->
+ <div id="page-branding" class="page">
+ <div class="page-header"><div class="page-title">Estúdio de Branding</div></div>
+
+ <div class="card">
+ <div class="card-header"><span class="card-icon">💧</span><div class="card-title">Configuração de Marca d'Água</div></div>
+ <div class="input-row">
+ <select id="branding-profile" class="gta-select" onchange="loadBrandingConfig()">
+ <option value="gta6-br">Leonida GTA VI Flash BR</option>
+ <option value="gta6-global">Leonida GTA VI Flash Global</option>
+ </select>
+ </div>
+ <div id="branding-config-form">
+ <div class="input-row" style="flex-wrap:wrap;gap:0.75rem">
+ <div style="flex:1;min-width:200px">
+ <label style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;display:block;margin-bottom:0.3rem">Posição</label>
+ <select id="wm-position" class="gta-select" onchange="updatePreview()">
+ <option value="bottom_right">Canto Inferior Direito</option>
+ <option value="bottom_left">Canto Inferior Esquerdo</option>
+ <option value="top_right">Canto Superior Direito</option>
+ <option value="top_left">Canto Superior Esquerdo</option>
+ <option value="center">Centro</option>
+ </select>
+ </div>
+ <div style="flex:1;min-width:150px">
+ <label style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;display:block;margin-bottom:0.3rem">Escala (%)</label>
+ <input type="range" id="wm-scale" min="5" max="50" value="12" class="gta-input" style="padding:0.3rem" oninput="document.getElementById('wm-scale-val').textContent=this.value+'%';updatePreview()">
+ <span id="wm-scale-val" style="font-size:0.8rem;color:var(--gta-neon-cyan)">12%</span>
+ </div>
+ <div style="flex:1;min-width:150px">
+ <label style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;display:block;margin-bottom:0.3rem">Opacidade</label>
+ <input type="range" id="wm-opacity" min="10" max="100" value="90" class="gta-input" style="padding:0.3rem" oninput="document.getElementById('wm-opacity-val').textContent=this.value+'%';updatePreview()">
+ <span id="wm-opacity-val" style="font-size:0.8rem;color:var(--gta-neon-cyan)">90%</span>
+ </div>
+ <div style="flex:1;min-width:150px">
+ <label style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;display:block;margin-bottom:0.3rem">Margem (px)</label>
+ <input type="number" id="wm-margin" class="gta-input" value="25" min="0" max="100" onchange="updatePreview()">
+ </div>
+ <div style="flex:1;min-width:200px">
+ <label style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;display:block;margin-bottom:0.3rem">Preset Plataforma</label>
+ <select id="wm-preset" class="gta-select" onchange="updatePreview()">
+ <option value="universal">Universal</option>
+ <option value="instagram">Instagram</option>
+ <option value="youtube">YouTube</option>
+ <option value="tiktok">TikTok</option>
+ </select>
+ </div>
+ </div>
+ <div class="input-row" style="margin-top:0.5rem">
+ <button class="btn btn-primary" onclick="saveBrandingConfig()">💾 Salvar Configuração</button>
+ <button class="btn btn-secondary" onclick="updatePreview()">👁️ Preview</button>
+ </div>
+ <div id="branding-save-msg"></div>
+ </div>
+ </div>
+
+ <div class="card">
+ <div class="card-header"><span class="card-icon">📐</span><div class="card-title">Preview da Posição</div></div>
+ <div id="branding-preview" style="position:relative;width:270px;height:480px;background:linear-gradient(170deg,#1a0533,#4a0e4e,#0d1b2a);border-radius:12px;border:1px solid var(--glass-border);overflow:hidden;margin:0 auto">
+ <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:0.75rem;text-align:center;padding:1rem">Carregando preview...</div>
+ <div id="wm-preview-box" style="position:absolute;border:2px dashed var(--gta-neon-pink);background:rgba(255,45,120,0.15);border-radius:4px;display:none;transition:all 0.3s ease">
+ <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:var(--gta-neon-pink);font-weight:700;text-transform:uppercase">LOGO</div>
+ </div>
+ <!-- Safe area guides -->
+ <div id="safe-top" style="position:absolute;top:0;left:0;right:0;background:rgba(255,68,68,0.08);border-bottom:1px dashed rgba(255,68,68,0.3)"></div>
+ <div id="safe-bottom" style="position:absolute;bottom:0;left:0;right:0;background:rgba(255,68,68,0.08);border-top:1px dashed rgba(255,68,68,0.3)"></div>
+ <div id="safe-left" style="position:absolute;top:0;bottom:0;left:0;background:rgba(255,68,68,0.05);border-right:1px dashed rgba(255,68,68,0.2)"></div>
+ <div id="safe-right" style="position:absolute;top:0;bottom:0;right:0;background:rgba(255,68,68,0.05);border-left:1px dashed rgba(255,68,68,0.2)"></div>
+ </div>
+ <div id="preview-info" style="text-align:center;margin-top:0.75rem;font-size:0.75rem;color:var(--text-muted)"></div>
+ </div>
+
+ <div class="card">
+ <div class="card-header"><span class="card-icon">🖼️</span><div class="card-title">Logo do Canal</div></div>
+ <div class="input-row">
+ <input type="text" id="logo-path" class="gta-input" placeholder="Caminho absoluto do logo PNG no servidor (ex: /path/to/logo.png)">
+ <button class="btn btn-primary" onclick="uploadLogo()">📤 Registrar Logo</button>
+ </div>
+ <div id="logo-upload-msg"></div>
+ <div id="current-logo" style="margin-top:0.75rem;font-size:0.8rem;color:var(--text-muted)"></div>
+ </div>
+
+ <div class="card">
+ <div class="card-header"><span class="card-icon">⚡</span><div class="card-title">Aplicar Marca d'Água</div></div>
+ <div class="input-row">
+ <input type="text" id="wm-input-video" class="gta-input" placeholder="Caminho absoluto do vídeo para aplicar marca">
+ <button class="btn btn-primary" onclick="applyWatermark()">💧 Aplicar</button>
+ </div>
+ <div id="wm-apply-msg"></div>
  </div>
  </div>
 
@@ -1043,6 +1136,105 @@ async function loadDiagnostics() {
  document.getElementById('diag-verify').innerHTML = v.error
  ? '<div class="error-box">' + v.error + '</div>'
  : '<pre style="font-size:0.75rem;color:var(--gta-neon-cyan);background:rgba(0,229,255,0.04);padding:1rem;border-radius:10px;overflow-x:auto;border:1px solid rgba(0,229,255,0.1)">' + JSON.stringify(v, null, 2) + '</pre>';
+}
+
+// === BRANDING STUDIO ===
+
+async function loadBrandingConfig() {
+ const pid = document.getElementById('branding-profile').value;
+ const cfg = await api('/api/branding/config/' + pid);
+ if (cfg.error) return;
+ document.getElementById('wm-position').value = cfg.position || 'bottom_right';
+ document.getElementById('wm-scale').value = cfg.scale_percent || 12;
+ document.getElementById('wm-scale-val').textContent = (cfg.scale_percent || 12) + '%';
+ document.getElementById('wm-opacity').value = Math.round((cfg.opacity || 0.9) * 100);
+ document.getElementById('wm-opacity-val').textContent = Math.round((cfg.opacity || 0.9) * 100) + '%';
+ document.getElementById('wm-margin').value = cfg.margin_px || 25;
+ document.getElementById('wm-preset').value = cfg.platform_preset || 'universal';
+ document.getElementById('current-logo').textContent = cfg.logo_path ? '✅ Logo: ' + cfg.logo_path.split('/').pop() : '⚠️ Nenhum logo configurado';
+ updatePreview();
+}
+
+async function saveBrandingConfig() {
+ const pid = document.getElementById('branding-profile').value;
+ const params = new URLSearchParams({
+ position: document.getElementById('wm-position').value,
+ scale_percent: document.getElementById('wm-scale').value,
+ opacity: (document.getElementById('wm-opacity').value / 100).toFixed(2),
+ margin_px: document.getElementById('wm-margin').value,
+ platform_preset: document.getElementById('wm-preset').value,
+ enabled: true,
+ });
+ const r = await fetch(API + '/api/branding/config/' + pid + '?' + params, { method: 'PUT' });
+ const data = await r.json();
+ const msg = document.getElementById('branding-save-msg');
+ if (r.ok) {
+ msg.innerHTML = '<div class="success-box">✅ Configuração salva para ' + pid + '</div>';
+ } else {
+ msg.innerHTML = '<div class="error-box">' + (data.detail || 'Erro ao salvar') + '</div>';
+ }
+ setTimeout(() => { msg.innerHTML = ''; }, 4000);
+}
+
+async function updatePreview() {
+ const pid = document.getElementById('branding-profile').value;
+ const vw = 1080, vh = 1920;
+ const preview = await api('/api/branding/preview/' + pid + '?video_width=' + vw + '&video_height=' + vh);
+ if (preview.error) return;
+ // Scale to preview container (270x480 = 1/4 of 1080x1920)
+ const sx = 270 / vw, sy = 480 / vh;
+ const box = document.getElementById('wm-preview-box');
+ const logoW = preview.logo_width_px * sx;
+ const logoH = logoW * 1.5;
+ box.style.display = 'block';
+ box.style.width = logoW + 'px';
+ box.style.height = logoH + 'px';
+ box.style.left = (preview.x * sx) + 'px';
+ box.style.top = (preview.y * sy) + 'px';
+ box.style.opacity = document.getElementById('wm-opacity').value / 100;
+ // Safe area guides
+ const sa = preview.safe_area;
+ document.getElementById('safe-top').style.height = (sa.top * sy) + 'px';
+ document.getElementById('safe-bottom').style.height = (sa.bottom * sy) + 'px';
+ document.getElementById('safe-left').style.width = (sa.left * sx) + 'px';
+ document.getElementById('safe-right').style.width = (sa.right * sx) + 'px';
+ document.getElementById('preview-info').textContent =
+ 'Posição: ' + preview.position + ' | Logo: ' + preview.logo_width_px + 'px | Safe area: ' + preview.platform_preset;
+}
+
+async function uploadLogo() {
+ const pid = document.getElementById('branding-profile').value;
+ const filePath = document.getElementById('logo-path').value.trim();
+ if (!filePath) { alert('Informe o caminho do logo'); return; }
+ const msg = document.getElementById('logo-upload-msg');
+ msg.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div>Registrando...</div>';
+ try {
+ const r = await fetch(API + '/api/branding/logo/' + pid + '?file_path=' + encodeURIComponent(filePath), { method: 'POST' });
+ const data = await r.json();
+ if (r.ok) {
+ msg.innerHTML = '<div class="success-box">✅ Logo registrado: ' + data.logo_path.split('/').pop() + '</div>';
+ loadBrandingConfig();
+ } else {
+ msg.innerHTML = '<div class="error-box">' + (data.detail || 'Erro') + '</div>';
+ }
+ } catch(e) { msg.innerHTML = '<div class="error-box">' + e.message + '</div>'; }
+}
+
+async function applyWatermark() {
+ const pid = document.getElementById('branding-profile').value;
+ const inputPath = document.getElementById('wm-input-video').value.trim();
+ if (!inputPath) { alert('Informe o caminho do vídeo'); return; }
+ const msg = document.getElementById('wm-apply-msg');
+ msg.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div>Aplicando marca d\'água...</div>';
+ try {
+ const r = await fetch(API + '/api/branding/apply/' + pid + '?input_path=' + encodeURIComponent(inputPath), { method: 'POST' });
+ const data = await r.json();
+ if (r.ok) {
+ msg.innerHTML = '<div class="success-box">✅ Marca aplicada! Output: ' + data.output.split('/').pop() + ' (' + (data.render_time_seconds || 0) + 's)</div>';
+ } else {
+ msg.innerHTML = '<div class="error-box">' + (data.detail || 'Erro') + '</div>';
+ }
+ } catch(e) { msg.innerHTML = '<div class="error-box">' + e.message + '</div>'; }
 }
 
 // Init
