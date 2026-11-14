@@ -1023,3 +1023,91 @@ async def autopublish_launchd_status():
     from src.automation.autopublish_scheduler import AutoPublishScheduler
     scheduler = AutoPublishScheduler(DATA_ROOT)
     return scheduler.get_launchd_status()
+
+# --- Thumbnail Engine Endpoints (ONDA P0) ---
+
+@app.get("/api/thumbnails/formats")
+async def thumbnail_formats(platform: Optional[str] = Query(None)):
+    """List available thumbnail formats, optionally filtered by platform."""
+    from src.production.thumbnail_engine import ThumbnailEngine
+    engine = ThumbnailEngine(DATA_ROOT)
+    return engine.list_formats(platform)
+
+@app.get("/api/thumbnails/templates")
+async def thumbnail_templates():
+    """List available thumbnail templates."""
+    from src.production.thumbnail_engine import ThumbnailEngine
+    engine = ThumbnailEngine(DATA_ROOT)
+    return engine.list_templates()
+
+@app.post("/api/thumbnails/generate")
+async def generate_thumbnail(
+    content_id: str = Query(...),
+    profile_id: str = Query(...),
+    platform: str = Query(...),
+    format_type: str = Query(...),
+    title: str = Query(...),
+    source_video_path: Optional[str] = Query(None),
+    source_image_path: Optional[str] = Query(None),
+    template: str = Query("news_urgent"),
+    variant: str = Query("A"),
+    frame_timestamp: float = Query(0.0),
+):
+    """Generate a single thumbnail for a piece of content."""
+    from src.production.thumbnail_engine import ThumbnailEngine, ThumbnailRequest
+    engine = ThumbnailEngine(DATA_ROOT)
+    request = ThumbnailRequest(
+        content_id=content_id,
+        profile_id=profile_id,
+        platform=platform,
+        format_type=format_type,
+        title=title,
+        source_video_path=source_video_path,
+        source_image_path=source_image_path,
+        template=template,
+        variant=variant,
+        frame_timestamp=frame_timestamp,
+    )
+    result = await engine.generate(request)
+    if not result.valid and result.errors:
+        raise HTTPException(status_code=500, detail=result.errors[0])
+    return result.to_dict()
+
+@app.post("/api/thumbnails/generate-variants")
+async def generate_thumbnail_variants(
+    content_id: str = Query(...),
+    profile_id: str = Query(...),
+    platform: str = Query(...),
+    format_type: str = Query(...),
+    title: str = Query(...),
+    source_video_path: Optional[str] = Query(None),
+    source_image_path: Optional[str] = Query(None),
+    template: str = Query("news_urgent"),
+    frame_timestamp: float = Query(0.0),
+):
+    """Generate up to 3 thumbnail variants (A/B/C) for the same content."""
+    from src.production.thumbnail_engine import ThumbnailEngine, ThumbnailRequest
+    engine = ThumbnailEngine(DATA_ROOT)
+    request = ThumbnailRequest(
+        content_id=content_id,
+        profile_id=profile_id,
+        platform=platform,
+        format_type=format_type,
+        title=title,
+        source_video_path=source_video_path,
+        source_image_path=source_image_path,
+        template=template,
+        frame_timestamp=frame_timestamp,
+    )
+    results = await engine.generate_variants(request)
+    return [r.to_dict() for r in results]
+
+@app.get("/api/thumbnails/history")
+async def thumbnail_history(
+    profile_id: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """Get thumbnail generation history."""
+    from src.production.thumbnail_engine import ThumbnailEngine
+    engine = ThumbnailEngine(DATA_ROOT)
+    return engine.get_history(profile_id=profile_id, limit=limit)
