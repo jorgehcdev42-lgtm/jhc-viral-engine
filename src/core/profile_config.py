@@ -53,12 +53,16 @@ class EditorialConfig:
 
 @dataclass(frozen=True)
 class PublishingConfig:
-    """Instagram publishing configuration."""
+    """Publishing and social platform configuration."""
     instagram_account_id: Optional[str] = None
     access_token: Optional[str] = None
     auto_publish: bool = False
     default_hashtags: tuple[str, ...] = ()
     timezone: str = "America/Sao_Paulo"
+    # Per-platform social handles (independent identifiers)
+    instagram_handle: str = ""
+    youtube_handle: str = ""
+    tiktok_handle: str = ""
 
 
 @dataclass(frozen=True)
@@ -422,9 +426,12 @@ GTA6_BR_PROFILE = ProfileConfig(
     publishing=PublishingConfig(
         default_hashtags=(
             "#GTA6", "#GTAVI", "#ViceCity", "#RockstarGames",
-            "#GTA6BR", "#ViceCityRadarBR", "#GamesBrasil",
+            "#GTA6BR", "#LeonidaGTA6FlashBR", "#GamesBrasil",
         ),
         timezone="America/Sao_Paulo",
+        instagram_handle="@leonidagta6flashbr",
+        youtube_handle="@LeonidagtaVIFlashBR",
+        tiktok_handle="",  # Pending confirmation
     ),
     enabled=True,
 )
