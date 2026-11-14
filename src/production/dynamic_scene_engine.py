@@ -53,6 +53,8 @@ class DynamicSceneSpec:
     bg_style: str = "gradient"  # gradient, radial, split, neon_grid
     text_animation: str = "fade_in"  # fade_in, slide_up, typewriter, scale_in
     glow_intensity: float = 0.6
+    # Media overlay (real video/image from SmartMediaLibrary)
+    media_overlay_path: Optional[str] = None
 
 
 class DynamicSceneEngine:

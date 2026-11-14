@@ -237,7 +237,11 @@ class ViralEngine:
     async def _render_with_scenes(
         self, job: PipelineJob, profile: ProfileConfig
     ) -> Optional[Path]:
-        """Render video using DynamicSceneEngine with template-driven visuals."""
+        """Render video using DynamicSceneEngine with template-driven visuals.
+
+        Integrates SmartVideoSelector to use real media clips from the library
+        when available, falling back to synthetic frames for scenes without media.
+        """
         from src.production.dynamic_scene_engine import DynamicSceneEngine, DynamicSceneSpec
         from src.production.script_to_scenes import parse_script_to_scenes
         from src.production.visual_identity import VICE_CITY_IDENTITY
@@ -255,7 +259,34 @@ class ViralEngine:
         category = category_map.get(first_scene_type, "news")
         template = select_template_for_category(category)
 
-        # Build dynamic specs from template structure + script content
+        # Try to select real media clips from library for this script
+        selected_clips: dict[int, object] = {}  # scene_index -> ClipSelection
+        try:
+            from src.media.library import SmartMediaLibrary
+            from src.media.video_selector import SmartVideoSelector
+            db_path = self.data_root / "media_library.db"
+            thumbs_dir = self.data_root / "thumbnails"
+            if db_path.exists():
+                lib = SmartMediaLibrary(db_path, thumbs_dir)
+                stats = lib.get_stats()
+                if stats["total_files"] > 0:
+                    selector = SmartVideoSelector(lib)
+                    scene_durations = [s.duration_seconds for s in template.scenes]
+                    result = selector.select_for_script(
+                        script_text,
+                        scene_durations=scene_durations,
+                        require_authorized=False,
+                    )
+                    for clip in result.clips:
+                        selected_clips[clip.scene_index] = clip
+                    logger.info(
+                        "SmartVideoSelector: %d/%d scenes matched with real media",
+                        len(selected_clips), len(template.scenes),
+                    )
+        except Exception as exc:
+            logger.debug("SmartVideoSelector unavailable, using synthetic frames: %s", exc)
+
+        # Build dynamic specs from template structure + script content + media overlay
         dyn_specs: list[DynamicSceneSpec] = []
         template_scenes = list(template.scenes)
         for i, tmpl_scene in enumerate(template_scenes):
@@ -264,12 +295,21 @@ class ViralEngine:
                 text = base_scenes[i].text
                 subtitle = base_scenes[i].subtitle_text
             elif base_scenes:
-                # Reuse last script scene for remaining template slots
                 text = base_scenes[-1].text
                 subtitle = base_scenes[-1].subtitle_text
             else:
                 text = template.name.replace("_", " ").upper()
                 subtitle = ""
+
+            # Check if we have a real media clip for this scene
+            media_overlay_path = None
+            if i in selected_clips:
+                clip = selected_clips[i]
+                media_overlay_path = clip.asset.file_path
+                logger.debug(
+                    "Scene %d using real media: %s (score=%.2f)",
+                    i, clip.asset.file_name, clip.relevance_score,
+                )
 
             dyn_specs.append(DynamicSceneSpec(
                 scene_type=tmpl_scene.scene_type,
@@ -285,6 +325,7 @@ class ViralEngine:
                 bg_style=tmpl_scene.bg_style,
                 text_animation=tmpl_scene.text_animation,
                 glow_intensity=tmpl_scene.glow_intensity,
+                media_overlay_path=media_overlay_path,
             ))
 
         engine = DynamicSceneEngine(VICE_CITY_IDENTITY)
@@ -300,9 +341,11 @@ class ViralEngine:
         from src.production.scene_composer import SceneComposer
         await SceneComposer.frames_to_video(frame_paths, out_path, audio_path)
 
+        media_count = len(selected_clips)
         logger.info(
-            "Template-rendered video: %s (%d frames, template=%s)",
+            "Template-rendered video: %s (%d frames, template=%s, real_media=%d/%d scenes)",
             out_path, len(frame_paths), template.name,
+            media_count, len(template.scenes),
         )
         return out_path
 
