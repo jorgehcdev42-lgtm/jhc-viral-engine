@@ -641,6 +641,7 @@ body::after {
  <div class="nav-item" data-page="media"><span class="nav-icon">🎬</span> Biblioteca</div>
  <div class="nav-item" data-page="templates"><span class="nav-icon">🎨</span> Templates</div>
  <div class="nav-item" data-page="branding"><span class="nav-icon">💧</span> Branding Studio</div>
+ <div class="nav-item" data-page="thumbnails"><span class="nav-icon">🖼️</span> Thumbnails</div>
  </div>
 
  <div class="nav-section">
@@ -826,6 +827,69 @@ body::after {
  <button class="btn btn-primary" onclick="applyWatermark()">💧 Aplicar</button>
  </div>
  <div id="wm-apply-msg"></div>
+ </div>
+ </div>
+
+ <!-- ===== THUMBNAIL FACTORY ===== -->
+ <div id="page-thumbnails" class="page">
+ <div class="page-header"><div class="page-title">Thumbnail Factory</div></div>
+
+ <div class="card">
+ <div class="card-header"><span class="card-icon">🖼️</span><div class="card-title">Gerar Thumbnail</div></div>
+ <div class="input-row" style="flex-wrap:wrap;gap:0.75rem">
+ <div style="flex:1;min-width:180px">
+ <label style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;display:block;margin-bottom:0.3rem">Perfil</label>
+ <select id="thumb-profile" class="gta-select">
+ <option value="gta6-br">Leonida GTA VI Flash BR</option>
+ <option value="gta6-global">Leonida GTA VI Flash Global</option>
+ </select>
+ </div>
+ <div style="flex:1;min-width:180px">
+ <label style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;display:block;margin-bottom:0.3rem">Plataforma</label>
+ <select id="thumb-platform" class="gta-select" onchange="updateFormatOptions()">
+ <option value="instagram">Instagram</option>
+ <option value="youtube">YouTube</option>
+ <option value="tiktok">TikTok</option>
+ </select>
+ </div>
+ <div style="flex:1;min-width:180px">
+ <label style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;display:block;margin-bottom:0.3rem">Formato</label>
+ <select id="thumb-format" class="gta-select"></select>
+ </div>
+ <div style="flex:1;min-width:180px">
+ <label style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;display:block;margin-bottom:0.3rem">Template</label>
+ <select id="thumb-template" class="gta-select"></select>
+ </div>
+ </div>
+ <div class="input-row">
+ <input type="text" id="thumb-title" class="gta-input" placeholder="Título da thumbnail (máx 60 chars)">
+ </div>
+ <div class="input-row">
+ <input type="text" id="thumb-video-path" class="gta-input" placeholder="Caminho do vídeo fonte (opcional — usa frame como base)">
+ </div>
+ <div class="input-row">
+ <button class="btn btn-primary" onclick="generateThumbnail()">🖼️ Gerar Thumbnail</button>
+ <button class="btn btn-secondary" onclick="generateVariants()">⚡ Gerar 3 Variantes</button>
+ </div>
+ <div id="thumb-gen-msg"></div>
+ </div>
+
+ <div class="card">
+ <div class="card-header"><span class="card-icon">📋</span><div class="card-title">Resultados</div></div>
+ <div id="thumb-results"><div class="empty-state">Gere uma thumbnail para ver os resultados</div></div>
+ </div>
+
+ <div class="card">
+ <div class="card-header"><span class="card-icon">📜</span><div class="card-title">Histórico</div></div>
+ <div class="input-row">
+ <select id="thumb-history-profile" class="gta-select">
+ <option value="">Todos os perfis</option>
+ <option value="gta6-br">Leonida GTA VI Flash BR</option>
+ <option value="gta6-global">Leonida GTA VI Flash Global</option>
+ </select>
+ <button class="btn btn-secondary" onclick="loadThumbHistory()">Carregar</button>
+ </div>
+ <div id="thumb-history"><div class="empty-state">Clique em Carregar para ver o histórico</div></div>
  </div>
  </div>
 
@@ -1367,6 +1431,161 @@ async function loadPublishJobs() {
  html += '</tbody></table>';
  document.getElementById('pub-queue').innerHTML = html;
 }
+
+// === THUMBNAIL FACTORY ===
+
+let thumbFormatsCache = {};
+let thumbTemplatesCache = {};
+
+async function initThumbnailPage() {
+ const [formats, templates] = await Promise.all([
+ api('/api/thumbnails/formats'),
+ api('/api/thumbnails/templates')
+ ]);
+ if (!formats.error) thumbFormatsCache = formats;
+ if (!templates.error) thumbTemplatesCache = templates;
+ // Populate template select
+ const tplSel = document.getElementById('thumb-template');
+ tplSel.innerHTML = '';
+ for (const [name, cfg] of Object.entries(thumbTemplatesCache)) {
+ const opt = document.createElement('option');
+ opt.value = name;
+ opt.textContent = name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+ tplSel.appendChild(opt);
+ }
+ updateFormatOptions();
+}
+
+function updateFormatOptions() {
+ const platform = document.getElementById('thumb-platform').value;
+ const fmtSel = document.getElementById('thumb-format');
+ fmtSel.innerHTML = '';
+ const specs = thumbFormatsCache[platform] || {};
+ for (const [fmt, spec] of Object.entries(specs)) {
+ const opt = document.createElement('option');
+ opt.value = fmt;
+ const uploadTag = spec.uploadable ? ' ✅ upload' : ' 📷 frame';
+ opt.textContent = `${fmt} (${spec.width}×${spec.height}${uploadTag})`;
+ fmtSel.appendChild(opt);
+ }
+}
+
+async function generateThumbnail() {
+ const pid = document.getElementById('thumb-profile').value;
+ const platform = document.getElementById('thumb-platform').value;
+ const format = document.getElementById('thumb-format').value;
+ const template = document.getElementById('thumb-template').value;
+ const title = document.getElementById('thumb-title').value.trim();
+ const videoPath = document.getElementById('thumb-video-path').value.trim();
+ if (!title) { alert('Informe o título da thumbnail'); return; }
+ const msg = document.getElementById('thumb-gen-msg');
+ msg.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div>Gerando...</div>';
+ const params = new URLSearchParams({
+ content_id: 'manual-' + Date.now(),
+ profile_id: pid, platform, format_type: format,
+ title, template, variant: 'A'
+ });
+ if (videoPath) params.set('source_video_path', videoPath);
+ try {
+ const r = await fetch(API + '/api/thumbnails/generate?' + params, { method: 'POST' });
+ const data = await r.json();
+ if (r.ok && data.valid) {
+ msg.innerHTML = `<div class="success-box">✅ Thumbnail gerada! ${data.width}×${data.height}, ${(data.size_bytes/1024).toFixed(1)}KB, score=${data.quality_score.toFixed(2)}, uploadable=${data.uploadable}</div>`;
+ renderThumbResults([data]);
+ } else {
+ msg.innerHTML = `<div class="error-box">${data.detail || data.errors?.[0] || 'Erro desconhecido'}</div>`;
+ }
+ } catch(e) { msg.innerHTML = `<div class="error-box">${e.message}</div>`; }
+}
+
+async function generateVariants() {
+ const pid = document.getElementById('thumb-profile').value;
+ const platform = document.getElementById('thumb-platform').value;
+ const format = document.getElementById('thumb-format').value;
+ const template = document.getElementById('thumb-template').value;
+ const title = document.getElementById('thumb-title').value.trim();
+ const videoPath = document.getElementById('thumb-video-path').value.trim();
+ if (!title) { alert('Informe o título da thumbnail'); return; }
+ const msg = document.getElementById('thumb-gen-msg');
+ msg.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div>Gerando 3 variantes...</div>';
+ const params = new URLSearchParams({
+ content_id: 'variant-' + Date.now(),
+ profile_id: pid, platform, format_type: format,
+ title, template
+ });
+ if (videoPath) params.set('source_video_path', videoPath);
+ try {
+ const r = await fetch(API + '/api/thumbnails/generate-variants?' + params, { method: 'POST' });
+ const data = await r.json();
+ if (r.ok && Array.isArray(data)) {
+ msg.innerHTML = `<div class="success-box">✅ ${data.length} variantes geradas!</div>`;
+ renderThumbResults(data);
+ } else {
+ msg.innerHTML = `<div class="error-box">Erro ao gerar variantes</div>`;
+ }
+ } catch(e) { msg.innerHTML = `<div class="error-box">${e.message}</div>`; }
+}
+
+function renderThumbResults(results) {
+ let html = '<table class="data-table"><thead><tr><th>Variante</th><th>Dimensões</th><th>Tamanho</th><th>Score</th><th>Upload</th><th>Status</th></tr></thead><tbody>';
+ for (const r of results) {
+ const statusBadge = r.valid
+ ? '<span class="badge badge-active">Válido</span>'
+ : '<span class="badge badge-inactive">Inválido</span>';
+ const uploadBadge = r.uploadable
+ ? '<span class="badge badge-media">Sim</span>'
+ : '<span class="badge badge-no-media">Frame</span>';
+ html += `<tr>
+ <td style="font-weight:700;color:var(--gta-neon-pink)">${r.variant}</td>
+ <td>${r.width}×${r.height}</td>
+ <td>${(r.size_bytes/1024).toFixed(1)} KB</td>
+ <td style="color:var(--gta-neon-cyan);font-weight:600">${r.quality_score.toFixed(2)}</td>
+ <td>${uploadBadge}</td>
+ <td>${statusBadge}</td>
+ </tr>`;
+ }
+ html += '</tbody></table>';
+ document.getElementById('thumb-results').innerHTML = html;
+}
+
+async function loadThumbHistory() {
+ const pid = document.getElementById('thumb-history-profile').value;
+ const url = '/api/thumbnails/history?limit=30' + (pid ? '&profile_id=' + pid : '');
+ const data = await api(url);
+ if (data.error) { document.getElementById('thumb-history').innerHTML = '<div class="error-box">' + data.error + '</div>'; return; }
+ if (!Array.isArray(data) || !data.length) { document.getElementById('thumb-history').innerHTML = '<div class="empty-state">Nenhum histórico encontrado</div>'; return; }
+ let html = '<table class="data-table"><thead><tr><th>ID</th><th>Plataforma</th><th>Formato</th><th>Var.</th><th>Score</th><th>Válido</th></tr></thead><tbody>';
+ for (const h of data.slice().reverse()) {
+ const validBadge = h.valid
+ ? '<span class="badge badge-active">Sim</span>'
+ : '<span class="badge badge-inactive">Não</span>';
+ html += `<tr>
+ <td style="font-family:monospace;font-size:0.7rem;color:var(--gta-neon-cyan)">${(h.content_id||'').substring(0,12)}</td>
+ <td style="text-transform:capitalize">${h.platform}</td>
+ <td>${h.format_type}</td>
+ <td style="font-weight:700;color:var(--gta-neon-pink)">${h.variant}</td>
+ <td style="color:var(--gta-neon-cyan)">${(h.quality_score||0).toFixed(2)}</td>
+ <td>${validBadge}</td>
+ </tr>`;
+ }
+ html += '</tbody></table>';
+ document.getElementById('thumb-history').innerHTML = html;
+}
+
+// Hook into page navigation to init thumbnail page
+const origLoadPageData = typeof loadPageData === 'function' ? loadPageData : null;
+function loadPageDataExtended(page) {
+ if (origLoadPageData) origLoadPageData(page);
+ if (page === 'thumbnails') initThumbnailPage();
+}
+// Override the nav click handler's loadPageData reference
+document.querySelectorAll('.nav-item').forEach(item => {
+ item.removeEventListener('click', item._thumbHandler);
+ item._thumbHandler = () => {
+ if (item.dataset.page === 'thumbnails') initThumbnailPage();
+ };
+ item.addEventListener('click', item._thumbHandler);
+});
 
 // Init
 loadDashboard();
