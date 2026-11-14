@@ -381,8 +381,104 @@ BEAT_PROFILE = ProfileConfig(
     enabled=False,
 )
 
+# --- Dual Market GTA 6 Profiles ---
+
+GTA6_BR_PROFILE = ProfileConfig(
+    profile_id="gta6-br",
+    name="Vice City Radar BR",
+    description="Canal brasileiro especializado em GTA 6 — conteúdo em português",
+    niche="gaming",
+    visual_identity=VisualIdentity(
+        primary_color="#FF2D78",   # Neon rosa
+        secondary_color="#B43CFF", # Roxo
+        accent_color="#FF8C32",    # Laranja tropical
+        font_family="Bebas Neue",
+        subtitle_style="bold_white_outline",
+    ),
+    research_sources=ResearchSources(
+        keywords=(
+            "GTA 6", "Grand Theft Auto VI", "GTA VI", "Vice City",
+            "Rockstar Games", "GTA 6 trailer", "GTA 6 gameplay",
+            "GTA 6 lançamento", "GTA 6 novidades", "GTA 6 leak",
+            "Jason", "Lucia", "mapa GTA 6",
+        ),
+        rss_feeds=(
+            "https://www.eurogamer.net/?format=rss",
+            "https://www.videogameschronicle.com/feed",
+        ),
+        youtube_channels=(
+            "UCdFoQjLgY9nOwCJNOE9vSJw",  # Rockstar Games
+        ),
+        subreddits=("GTAVI", "GrandTheftAuto", "GTA"),
+        language="pt-BR",
+    ),
+    editorial=EditorialConfig(
+        tone="informative_enthusiastic",
+        target_audience="gamers_brasil_18_35",
+        content_types=("news", "curiosities", "theories", "gameplay", "leaks_analysis"),
+        banned_topics=("spoilers_confirmados_sem_aviso",),
+        fact_check_required=True,
+    ),
+    publishing=PublishingConfig(
+        default_hashtags=(
+            "#GTA6", "#GTAVI", "#ViceCity", "#RockstarGames",
+            "#GTA6BR", "#ViceCityRadarBR", "#GamesBrasil",
+        ),
+        timezone="America/Sao_Paulo",
+    ),
+    enabled=True,
+)
+
+GTA6_GLOBAL_PROFILE = ProfileConfig(
+    profile_id="gta6-global",
+    name="Vice City Radar Global",
+    description="International GTA 6 channel — English content for global audience",
+    niche="gaming",
+    visual_identity=VisualIdentity(
+        primary_color="#B43CFF",   # Neon roxo
+        secondary_color="#00DCFF", # Cyan cinematográfico
+        accent_color="#FF2D78",    # Rosa neon
+        font_family="Bebas Neue",
+        subtitle_style="bold_white_outline",
+    ),
+    research_sources=ResearchSources(
+        keywords=(
+            "GTA 6", "Grand Theft Auto VI", "GTA VI", "Vice City",
+            "Rockstar Games", "GTA 6 trailer", "GTA 6 gameplay",
+            "GTA 6 release date", "GTA 6 news", "GTA 6 leak",
+            "Jason", "Lucia", "GTA 6 map",
+        ),
+        rss_feeds=(
+            "https://www.eurogamer.net/?format=rss",
+            "https://www.videogameschronicle.com/feed",
+        ),
+        youtube_channels=(
+            "UCdFoQjLgY9nOwCJNOE9vSJw",  # Rockstar Games
+        ),
+        subreddits=("GTAVI", "GrandTheftAuto", "GTA"),
+        language="en-US",
+    ),
+    editorial=EditorialConfig(
+        tone="informative_enthusiastic",
+        target_audience="global_gamers_18_35",
+        content_types=("news", "curiosities", "theories", "gameplay", "leaks_analysis"),
+        banned_topics=("unverified_spoilers",),
+        fact_check_required=True,
+    ),
+    publishing=PublishingConfig(
+        default_hashtags=(
+            "#GTA6", "#GTAVI", "#ViceCity", "#RockstarGames",
+            "#ViceCityRadarGlobal", "#Gaming", "#GTA6News",
+        ),
+        timezone="America/New_York",
+    ),
+    enabled=True,
+)
+
 ALL_PROFILES: dict[str, ProfileConfig] = {
     "gta6": GTA6_PROFILE,
+    "gta6-br": GTA6_BR_PROFILE,
+    "gta6-global": GTA6_GLOBAL_PROFILE,
     "marvel-dc": MARVEL_DC_PROFILE,
     "anime": ANIME_PROFILE,
     "futuro": FUTURO_PROFILE,
