@@ -184,9 +184,211 @@ MARVEL_DC_PROFILE = ProfileConfig(
     enabled=False,  # Prepared but not active yet
 )
 
+ANIME_PROFILE = ProfileConfig(
+    profile_id="anime",
+    name="Anime Radar",
+    description="Animes, mangás e cultura otaku",
+    niche="entertainment",
+    visual_identity=VisualIdentity(
+        primary_color="#FF6432",
+        secondary_color="#1A1A2E",
+        accent_color="#FFD700",
+        font_family="Noto Sans JP",
+        subtitle_style="bold_white_outline",
+    ),
+    research_sources=ResearchSources(
+        keywords=(
+            "anime", "mangá", "One Piece", "Naruto", "Demon Slayer",
+            "Jujutsu Kaisen", "Attack on Titan", "Dragon Ball",
+        ),
+        rss_feeds=("https://www.animenewsnetwork.com/news/rss.xml",),
+        subreddits=("anime", "manga"),
+        language="pt-BR",
+    ),
+    editorial=EditorialConfig(
+        tone="enthusiastic_curious",
+        target_audience="otakus_16_35",
+        content_types=("news", "reviews", "theories", "rankings", "curiosities"),
+        banned_topics=("spoilers_mangá_não_publicado",),
+        fact_check_required=True,
+    ),
+    publishing=PublishingConfig(
+        default_hashtags=(
+            "#Anime", "#Mangá", "#Otaku", "#OnePiece",
+            "#Naruto", "#DemonSlayer", "#JujutsuKaisen",
+        ),
+    ),
+    enabled=False,
+)
+
+FUTURO_PROFILE = ProfileConfig(
+    profile_id="futuro",
+    name="Futuro Radar",
+    description="Inteligência artificial, tecnologia e inovação",
+    niche="technology",
+    visual_identity=VisualIdentity(
+        primary_color="#00B4DC",
+        secondary_color="#0A0A1A",
+        accent_color="#00FF88",
+        font_family="Space Mono",
+        subtitle_style="bold_white_outline",
+    ),
+    research_sources=ResearchSources(
+        keywords=(
+            "inteligência artificial", "IA", "tecnologia", "inovação",
+            "machine learning", "robótica", "futuro", "startups",
+        ),
+        rss_feeds=(
+            "https://techcrunch.com/feed/",
+            "https://www.theverge.com/rss/index.xml",
+        ),
+        subreddits=("technology", "artificial"),
+        language="pt-BR",
+    ),
+    editorial=EditorialConfig(
+        tone="visionary_accessible",
+        target_audience="tech_enthusiasts_20_45",
+        content_types=("news", "analysis", "tutorials", "predictions", "reviews"),
+        banned_topics=("fake_news_tech",),
+        fact_check_required=True,
+    ),
+    publishing=PublishingConfig(
+        default_hashtags=(
+            "#IA", "#Tecnologia", "#Inovação", "#Futuro",
+            "#MachineLearning", "#Tech", "#AI",
+        ),
+    ),
+    enabled=False,
+)
+
+GAME_PROFILE = ProfileConfig(
+    profile_id="game",
+    name="Game Radar",
+    description="Games em geral, todas as plataformas",
+    niche="gaming",
+    visual_identity=VisualIdentity(
+        primary_color="#64DC32",
+        secondary_color="#1A1A2E",
+        accent_color="#FFD700",
+        font_family="Inter",
+        subtitle_style="bold_white_outline",
+    ),
+    research_sources=ResearchSources(
+        keywords=(
+            "games", "jogos", "PlayStation", "Xbox", "Nintendo",
+            "PC gaming", "Steam", "indie games", "eSports",
+        ),
+        rss_feeds=(
+            "https://www.eurogamer.net/?format=rss",
+            "https://www.videogameschronicle.com/feed",
+        ),
+        subreddits=("gaming", "pcgaming", "consoles"),
+        language="pt-BR",
+    ),
+    editorial=EditorialConfig(
+        tone="fun_informative",
+        target_audience="gamers_all_platforms_16_40",
+        content_types=("news", "reviews", "guides", "rankings", "curiosities"),
+        banned_topics=("reviews_sem_jogo_completo",),
+        fact_check_required=True,
+    ),
+    publishing=PublishingConfig(
+        default_hashtags=(
+            "#Games", "#Gaming", "#PlayStation", "#Xbox",
+            "#Nintendo", "#PCGaming", "#IndieGames",
+        ),
+    ),
+    enabled=False,
+)
+
+CINE_PROFILE = ProfileConfig(
+    profile_id="cine",
+    name="Cine Radar",
+    description="Filmes, séries e streaming",
+    niche="entertainment",
+    visual_identity=VisualIdentity(
+        primary_color="#C832B4",
+        secondary_color="#1A1A2E",
+        accent_color="#FFD700",
+        font_family="Playfair Display",
+        subtitle_style="bold_white_outline",
+    ),
+    research_sources=ResearchSources(
+        keywords=(
+            "filmes", "séries", "Netflix", "cinema", "streaming",
+            "estreias", "HBO", "Disney+", "Amazon Prime",
+        ),
+        rss_feeds=(
+            "https://www.indiewire.com/feed/",
+            "https://variety.com/feed/",
+        ),
+        subreddits=("movies", "television"),
+        language="pt-BR",
+    ),
+    editorial=EditorialConfig(
+        tone="cinephile_engaging",
+        target_audience="movie_lovers_18_50",
+        content_types=("news", "reviews", "recommendations", "analysis", "trailers"),
+        banned_topics=("spoilers_filmes_em_cartaz",),
+        fact_check_required=True,
+    ),
+    publishing=PublishingConfig(
+        default_hashtags=(
+            "#Cinema", "#Filmes", "#Séries", "#Netflix",
+            "#Streaming", "#Estreias", "#CineRadar",
+        ),
+    ),
+    enabled=False,
+)
+
+BEAT_PROFILE = ProfileConfig(
+    profile_id="beat",
+    name="Beat Radar",
+    description="Música eletrônica, DJs e produção musical",
+    niche="music",
+    visual_identity=VisualIdentity(
+        primary_color="#B43CFF",
+        secondary_color="#0A0A1A",
+        accent_color="#00FFCC",
+        font_family="Montserrat",
+        subtitle_style="bold_white_outline",
+    ),
+    research_sources=ResearchSources(
+        keywords=(
+            "DJ", "música eletrônica", "EDM", "festivais",
+            "produção musical", "house", "techno", "trance",
+        ),
+        rss_feeds=(
+            "https://djmag.com/feed",
+            "https://mixmag.net/feed",
+        ),
+        subreddits=("edmproduction", "electronicmusic"),
+        language="pt-BR",
+    ),
+    editorial=EditorialConfig(
+        tone="vibrant_connected",
+        target_audience="djs_producers_music_lovers_18_40",
+        content_types=("news", "releases", "festival_coverage", "tutorials", "interviews"),
+        banned_topics=("pirataria_musical",),
+        fact_check_required=True,
+    ),
+    publishing=PublishingConfig(
+        default_hashtags=(
+            "#DJ", "#EDM", "#MúsicaEletrônica", "#Festivais",
+            "#ProduçãoMusical", "#House", "#Techno", "#BeatRadar",
+        ),
+    ),
+    enabled=False,
+)
+
 ALL_PROFILES: dict[str, ProfileConfig] = {
     "gta6": GTA6_PROFILE,
     "marvel-dc": MARVEL_DC_PROFILE,
+    "anime": ANIME_PROFILE,
+    "futuro": FUTURO_PROFILE,
+    "game": GAME_PROFILE,
+    "cine": CINE_PROFILE,
+    "beat": BEAT_PROFILE,
 }
 
 
