@@ -1441,5 +1441,57 @@
     "freshness_hours": 0.4628587980555555,
     "confidence": 0.0,
     "verification_state": "unverified"
+  },
+  "60b47b883d7f212c": {
+    "title": "Call of Duty Endowment marks Remembrance Day with veterans' Valor Pack push",
+    "url": "https://www.eurogamer.net/call-of-duty-endowment-valor-pack-remembrance-day-veterans",
+    "source": "Eurogamer",
+    "published_at": "2026-11-14T11:15:00+00:00",
+    "fetched_at": "2026-11-14T12:08:14.943063+00:00",
+    "summary": "The Call of Duty Endowment is marking Remembrance Day and its 17th anniversary by encouraging Modern Warfare 4 and Warzone players to pick up its Valor Pack, with all of Activision's net proceeds going towards helping veterans find jobs. Read more",
+    "category": "activision",
+    "relevance_score": 0.0,
+    "freshness_hours": 0.8874841891666666,
+    "confidence": 0.0,
+    "verification_state": "unverified"
+  },
+  "247f88a610434f26": {
+    "title": "Magic: The Gathering animated series Planeswalker is coming to Netflix in 2027",
+    "url": "https://www.eurogamer.net/magic-the-gathering-planeswalker-netflix-animated-series-2027",
+    "source": "Eurogamer",
+    "published_at": "2026-11-14T10:39:50+00:00",
+    "fetched_at": "2026-11-14T12:08:14.943115+00:00",
+    "summary": "Netflix's long-gestating Magic: The Gathering animated series is called Planeswalker, and it's coming in 2027. Read more",
+    "category": "bird view / isometric",
+    "relevance_score": 0.0,
+    "freshness_hours": 1.4735953108333333,
+    "confidence": 0.0,
+    "verification_state": "unverified"
+  },
+  "20a539de042b5dc4": {
+    "title": "Vice City was the GTA that established Rockstar's killer formula - and 24 years on, it's still one of the best games ever made",
+    "url": "https://www.eurogamer.net/gta-vice-city-retrospective",
+    "source": "Eurogamer",
+    "published_at": "2026-11-14T10:00:00+00:00",
+    "fetched_at": "2026-11-14T12:08:14.943160+00:00",
+    "summary": "\"Get the limey out of here,\" Burt Reynolds tells the producers of GTA: Vice City during a recording session for the game, as Rockstar co-founder Dan Houser enters the studio. \"I'm not going to work if this limey Brit is in here!\" Houser refuses to leave, so the story goes - he just came down to meet one of his heroes! - and he and Reynolds end up chest-to-chest, about to come to blows, before a studio engineer breaks up the fight. Read more",
+    "category": "action adventure",
+    "relevance_score": 0.0,
+    "freshness_hours": 2.137484212222222,
+    "confidence": 0.0,
+    "verification_state": "unverified"
+  },
+  "d903965c5108dddb": {
+    "title": "Ubisoft is reportedly making a new Rainbow Six Vegas game, nearly two decades after Vegas 2",
+    "url": "https://www.eurogamer.net/rainbow-six-vegas-new-game-ubisoft-spades-report",
+    "source": "Eurogamer",
+    "published_at": "2026-11-14T12:19:50+00:00",
+    "fetched_at": "2026-11-14T12:20:14.089105+00:00",
+    "summary": "Ubisoft is reportedly working on a new Rainbow Six Vegas game 18 years after the last entry in the series. Read more",
+    "category": "first person",
+    "relevance_score": 0.0,
+    "freshness_hours": 0.006691424444444444,
+    "confidence": 0.0,
+    "verification_state": "unverified"
   }
 }

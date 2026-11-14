@@ -1,0 +1,26 @@
+{
+  "gta6-br": {
+    "profile_id": "gta6-br",
+    "max_candidates_per_day": 5,
+    "max_approved_per_day": 3,
+    "min_quality_score": 0.7,
+    "require_authorized_media": false,
+    "enabled": true
+  },
+  "gta6-global": {
+    "profile_id": "gta6-global",
+    "max_candidates_per_day": 5,
+    "max_approved_per_day": 3,
+    "min_quality_score": 0.7,
+    "require_authorized_media": false,
+    "enabled": true
+  },
+  "gta6": {
+    "profile_id": "gta6",
+    "max_candidates_per_day": 5,
+    "max_approved_per_day": 3,
+    "min_quality_score": 0.7,
+    "require_authorized_media": false,
+    "enabled": false
+  }
+}
