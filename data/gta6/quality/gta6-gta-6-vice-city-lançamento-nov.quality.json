@@ -7,7 +7,7 @@
     {
       "name": "video mp4_exists",
       "passed": true,
-      "message": "Video MP4: 519KB",
+      "message": "Video MP4: 3304KB",
       "severity": "info"
     },
     {
@@ -25,19 +25,19 @@
     {
       "name": "duration",
       "passed": true,
-      "message": "22.8s",
+      "message": "23.1s",
       "severity": "info"
     },
     {
       "name": "frame_count",
       "passed": true,
-      "message": "570 frames",
+      "message": "578 frames",
       "severity": "info"
     },
     {
       "name": "file_size",
       "passed": true,
-      "message": "519KB",
+      "message": "3304KB",
       "severity": "info"
     },
     {

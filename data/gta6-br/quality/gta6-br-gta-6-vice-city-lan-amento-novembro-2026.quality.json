@@ -1,0 +1,68 @@
+{
+  "job_id": "gta6-br-gta-6-vice-city-lan-amento-novembro-2026",
+  "approved": true,
+  "score": 1.0,
+  "summary": "10/10 checks passed, score=1.00 — APPROVED",
+  "checks": [
+    {
+      "name": "video mp4_exists",
+      "passed": true,
+      "message": "Video MP4: 4609KB",
+      "severity": "info"
+    },
+    {
+      "name": "resolution",
+      "passed": true,
+      "message": "1080x1920",
+      "severity": "info"
+    },
+    {
+      "name": "pixel_format",
+      "passed": true,
+      "message": "yuv420p",
+      "severity": "info"
+    },
+    {
+      "name": "duration",
+      "passed": true,
+      "message": "21.3s",
+      "severity": "info"
+    },
+    {
+      "name": "frame_count",
+      "passed": true,
+      "message": "532 frames",
+      "severity": "info"
+    },
+    {
+      "name": "file_size",
+      "passed": true,
+      "message": "4609KB",
+      "severity": "info"
+    },
+    {
+      "name": "audio wav_exists",
+      "passed": true,
+      "message": "Audio WAV: 1002KB",
+      "severity": "info"
+    },
+    {
+      "name": "audio_duration",
+      "passed": true,
+      "message": "21.3s",
+      "severity": "info"
+    },
+    {
+      "name": "script_quality",
+      "passed": true,
+      "message": "336 chars with sections",
+      "severity": "info"
+    },
+    {
+      "name": "thumbnail_exists",
+      "passed": true,
+      "message": "Thumbnail: 50KB",
+      "severity": "info"
+    }
+  ]
+}
