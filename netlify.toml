@@ -8,6 +8,14 @@
   status = 200
   force = true
 
+# SPA fallback: todas as rotas não-API servem index.html
+# Necessário porque o frontend é single-file (67KB index.html)
+# Sem isso, qualquer rota que não seja / ou /api/* retorna 404
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
 [[headers]]
   for = "/*"
   [headers.values]
