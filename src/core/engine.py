@@ -229,24 +229,48 @@ class ViralEngine:
     async def _render_with_scenes(
         self, job: PipelineJob, profile: ProfileConfig
     ) -> Optional[Path]:
-        """Render video using SceneComposer for dynamic visual sequences."""
-        from src.production.scene_composer import SceneComposer, GTA6_IDENTITY
-        from src.production.script_to_scenes import script_file_to_scenes
+        """Render video using DynamicSceneEngine for animated neon visuals."""
+        from src.production.dynamic_scene_engine import DynamicSceneEngine, DynamicSceneSpec
+        from src.production.script_to_scenes import parse_script_to_scenes
+        from src.production.visual_identity import VICE_CITY_IDENTITY
 
         script_path = Path(job.script_path)
-        scenes = await script_file_to_scenes(script_path)
-        if not scenes:
+        script_text = script_path.read_text(encoding="utf-8")
+        base_scenes = parse_script_to_scenes(script_text)
+        if not base_scenes:
             return None
 
-        composer = SceneComposer(GTA6_IDENTITY)
+        # Convert base scenes to dynamic specs with motion
+        dyn_specs: list[DynamicSceneSpec] = []
+        for i, s in enumerate(base_scenes):
+            # Alternate accent colors per scene for visual variety
+            accents = [(255, 45, 120), (0, 220, 255), (255, 140, 50), (180, 60, 255)]
+            accent = accents[i % len(accents)]
+            # Ken Burns: alternate zoom directions
+            zoom_start = 1.0 if i % 2 == 0 else 1.08
+            zoom_end = 1.08 if i % 2 == 0 else 1.0
+            dyn_specs.append(DynamicSceneSpec(
+                scene_type=s.scene_type,
+                text=s.text,
+                duration_seconds=s.duration_seconds,
+                subtitle_text=s.subtitle_text,
+                category="news",
+                zoom_start=zoom_start,
+                zoom_end=zoom_end,
+                accent_color=accent,
+                text_animation="fade_in",
+            ))
+
+        engine = DynamicSceneEngine(VICE_CITY_IDENTITY)
         frames_dir = self.data_root / profile.profile_id / "frames" / job.job_id
-        frame_paths = await composer.compose_sequence(scenes, frames_dir)
+        frame_paths = await engine.render_sequence(dyn_specs, frames_dir)
 
         out_dir = self.data_root / profile.profile_id / "output"
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / f"{job.job_id}.mp4"
 
         audio_path = Path(job.narration_path) if job.narration_path else None
+        from src.production.scene_composer import SceneComposer
         await SceneComposer.frames_to_video(frame_paths, out_path, audio_path)
 
         logger.info("Scene-rendered video: %s (%d frames)", out_path, len(frame_paths))
