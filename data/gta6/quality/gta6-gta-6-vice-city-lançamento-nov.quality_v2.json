@@ -1,0 +1,71 @@
+{
+  "job_id": "gta6-gta-6-vice-city-lançamento-nov",
+  "overall_score": 0.829,
+  "status": "TECHNICALLY_VALID",
+  "summary": "score=0.83 | status=TECHNICALLY_VALID | WARNINGS: visual_quality",
+  "visual_evidence": [
+    "data/gta6/inspection/m004/frame_001.jpg",
+    "data/gta6/inspection/m004/frame_002.jpg",
+    "data/gta6/inspection/m004/frame_003.jpg",
+    "data/gta6/inspection/m004/frame_004.jpg",
+    "data/gta6/inspection/m004/frame_005.jpg"
+  ],
+  "dimensions": [
+    {
+      "name": "technical",
+      "score": 1.0,
+      "status": "pass",
+      "weight": 2.0,
+      "details": [
+        "Resolution OK: 1080x1920",
+        "Pixel format OK",
+        "Duration OK: 23.1s",
+        "File size: 3304KB"
+      ]
+    },
+    {
+      "name": "visual_quality",
+      "score": 0.507,
+      "status": "warning",
+      "weight": 2.0,
+      "details": [
+        "Unique frames: 23/23 (100%)",
+        "Color variance: 503 (rich)",
+        "Avg brightness: 20 (dark)",
+        "Motion delta: 4.2 (static)"
+      ]
+    },
+    {
+      "name": "audio_quality",
+      "score": 1.0,
+      "status": "pass",
+      "weight": 1.5,
+      "details": [
+        "Duration: 20.9s",
+        "Format: 24000Hz 1ch 16bit"
+      ]
+    },
+    {
+      "name": "editorial_quality",
+      "score": 0.7,
+      "status": "pass",
+      "weight": 1.0,
+      "details": [
+        "Script length: 333 chars",
+        "Structure: sections present",
+        "Template language detected (4 phrases)"
+      ]
+    },
+    {
+      "name": "commercial_readiness",
+      "score": 1.0,
+      "status": "pass",
+      "weight": 1.0,
+      "details": [
+        "Thumbnail: 50KB",
+        "Metadata: caption + hashtags present",
+        "Rights: AI-generated visuals (no external media)"
+      ]
+    }
+  ]
+}
