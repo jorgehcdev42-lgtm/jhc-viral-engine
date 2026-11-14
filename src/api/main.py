@@ -58,6 +58,17 @@ THUMBS_DIR = DATA_ROOT / "thumbnails"
 
 library = SmartMediaLibrary(DB_PATH, THUMBS_DIR)
 
+FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
+
+
+@app.get("/", include_in_schema=False)
+async def serve_frontend():
+    """Serve the frontend SPA at root URL."""
+    index_path = FRONTEND_DIR / "index.html"
+    if not index_path.exists():
+        raise HTTPException(status_code=404, detail="Frontend not found")
+    return FileResponse(str(index_path), media_type="text/html")
+
 
 # --- Response Models ---
 
