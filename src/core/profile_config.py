@@ -104,7 +104,7 @@ class ProfileConfig:
 
 GTA6_PROFILE = ProfileConfig(
     profile_id="gta6",
-    name="Vice City Radar",
+    name="Leonida GTA VI Flash",
     description="Perfil especializado em Grand Theft Auto VI",
     niche="gaming",
     visual_identity=VisualIdentity(
@@ -385,7 +385,7 @@ BEAT_PROFILE = ProfileConfig(
 
 GTA6_BR_PROFILE = ProfileConfig(
     profile_id="gta6-br",
-    name="Vice City Radar BR",
+    name="Leonida GTA VI Flash BR",
     description="Canal brasileiro especializado em GTA 6 — conteúdo em português",
     niche="gaming",
     visual_identity=VisualIdentity(
@@ -431,7 +431,7 @@ GTA6_BR_PROFILE = ProfileConfig(
 
 GTA6_GLOBAL_PROFILE = ProfileConfig(
     profile_id="gta6-global",
-    name="Vice City Radar Global",
+    name="Leonida GTA VI Flash Global",
     description="International GTA 6 channel — English content for global audience",
     niche="gaming",
     visual_identity=VisualIdentity(
