@@ -7,22 +7,20 @@ services:
     startCommand: uvicorn src.api.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
-        value: "3.14.0"
+        value: "3.12.0"
       - key: DATA_ROOT
-        value: "/data"
-    disk:
-      name: jhc-data
-      mountPath: /data
-      sizeGB: 1
+        value: "/tmp/jhc-data"
+    autoDeploy: true
 
-# Deploy instructions:
-# 1. Push this repo to GitHub
-# 2. Go to https://render.com → New → Web Service
-# 3. Connect your GitHub repo
-# 4. Render auto-detects render.yaml
-# 5. Set environment variables if needed
-# 6. Deploy!
+# NOTA IMPORTANTE SOBRE PERSISTÊNCIA:
+# O plano gratuito do Render NÃO suporta discos persistentes.
+# Os dados em /tmp/jhc-data serão perdidos quando o serviço reiniciar
+# (após ~15 min de inatividade ou deploy).
 #
-# Alternative: Render alone (no Netlify needed)
-# The API serves the frontend at / automatically.
-# Access at: https://jhc-viral-engine-api.onrender.com/
+# Para produção real com persistência, uma das opções:
+# 1. Upgrade para plano Starter ($7/mês) → habilita disk persistente
+# 2. Usar Supabase PostgreSQL gratuito como banco externo
+# 3. Manter worker local no Mac + tunnel Cloudflare (temporário)
+#
+# Esta configuração é adequada para VALIDAÇÃO E TESTES do backend.
+# Não use para operações automáticas de publicação sem persistência confirmada.
