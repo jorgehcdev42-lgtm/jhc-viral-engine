@@ -1,0 +1,55 @@
+{
+  "profile_id": "gta6",
+  "max_daily": 3,
+  "last_updated": 1794630044.8378549,
+  "topics": [
+    {
+      "title": "Xbox boss announces Wolfenstein 3 and confirms new game in development at idSoftware despite reported job cut \"bloodbath\"",
+      "source_url": "https://www.eurogamer.net/wolfenstein-3-new-id-software-game-announced-xbox",
+      "source_name": "Eurogamer",
+      "published_date": "2026-11-14",
+      "category": "announcement",
+      "relevance_score": 0.4,
+      "freshness_hours": 16.0,
+      "content_hash": "e8522afd85e8c978",
+      "confidence": 1.0,
+      "audience_potential": 1.0,
+      "originality_score": 1.0,
+      "editorial_score": 0.82,
+      "selected": true,
+      "rejection_reason": ""
+    },
+    {
+      "title": "One week from launch, GTA 6's physical map reportedly leaks online thanks to the £350 collector's edition on show in a UK department store",
+      "source_url": "https://www.eurogamer.net/gta-6-map-leak-online-collectors-edition",
+      "source_name": "Eurogamer",
+      "published_date": "2026-11-14",
+      "category": "rumor",
+      "relevance_score": 0.46,
+      "freshness_hours": 13.1,
+      "content_hash": "c6601a2518465e80",
+      "confidence": 0.9,
+      "audience_potential": 0.88,
+      "originality_score": 1.0,
+      "editorial_score": 0.8,
+      "selected": true,
+      "rejection_reason": ""
+    },
+    {
+      "title": "Tell us your favourite Grand Theft Auto gaming memory and win a copy of GTA 6",
+      "source_url": "https://www.eurogamer.net/grand-theft-auto-gaming-memory-competition-gta-6-win",
+      "source_name": "Eurogamer",
+      "published_date": "2026-11-14",
+      "category": "action adventure",
+      "relevance_score": 0.46,
+      "freshness_hours": 12.4,
+      "content_hash": "ebccb61731259f46",
+      "confidence": 0.9,
+      "audience_potential": 0.7,
+      "originality_score": 1.0,
+      "editorial_score": 0.773,
+      "selected": true,
+      "rejection_reason": ""
+    }
+  ]
+}

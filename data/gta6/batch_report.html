@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JHC Viral Engine — Lote GTA 6 | Missão 005</title>
+<style>
+:root {
+ --neon-pink: #FF2D78;
+ --neon-cyan: #00DCFF;
+ --neon-orange: #FF8C32;
+ --bg-deep: #080614;
+ --bg-card: #14102E;
+ --text-primary: #FFFFFF;
+ --text-secondary: #C8C8DC;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+ background: var(--bg-deep);
+ color: var(--text-primary);
+ font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+ line-height: 1.6;
+ padding: 2rem;
+}
+.header {
+ text-align: center;
+ margin-bottom: 3rem;
+ padding: 2rem;
+ border-bottom: 2px solid var(--neon-pink);
+}
+.header h1 {
+ font-size: 2.5rem;
+ color: var(--neon-pink);
+ text-transform: uppercase;
+ letter-spacing: 0.1em;
+ margin-bottom: 0.5rem;
+}
+.header .subtitle {
+ color: var(--neon-cyan);
+ font-size: 1.1rem;
+}
+.summary {
+ display: grid;
+ grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+ gap: 1rem;
+ margin-bottom: 3rem;
+}
+.stat-card {
+ background: var(--bg-card);
+ border: 1px solid rgba(255,45,120,0.3);
+ border-radius: 12px;
+ padding: 1.5rem;
+ text-align: center;
+}
+.stat-card .value {
+ font-size: 2.5rem;
+ font-weight: bold;
+ color: var(--neon-cyan);
+}
+.stat-card .label {
+ color: var(--text-secondary);
+ font-size: 0.9rem;
+ text-transform: uppercase;
+ letter-spacing: 0.05em;
+}
+.reels-grid {
+ display: grid;
+ grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+ gap: 2rem;
+}
+.reel-card {
+ background: var(--bg-card);
+ border-radius: 16px;
+ overflow: hidden;
+ border: 1px solid rgba(255,255,255,0.1);
+ transition: transform 0.2s, border-color 0.2s;
+}
+.reel-card:hover {
+ transform: translateY(-4px);
+ border-color: var(--neon-pink);
+}
+.reel-card.approved { border-left: 4px solid #00FF88; }
+.reel-card.rejected { border-left: 4px solid #FF2D78; }
+.reel-card.failed { border-left: 4px solid #FF8C32; }
+.thumbnail-container {
+ position: relative;
+ width: 100%;
+ aspect-ratio: 9/16;
+ background: #0A0A1A;
+ overflow: hidden;
+}
+.thumbnail-container img {
+ width: 100%;
+ height: 100%;
+ object-fit: cover;
+}
+.status-badge {
+ position: absolute;
+ top: 12px;
+ right: 12px;
+ padding: 4px 12px;
+ border-radius: 20px;
+ font-size: 0.75rem;
+ font-weight: bold;
+ text-transform: uppercase;
+ letter-spacing: 0.05em;
+}
+.status-badge.approved { background: #00FF88; color: #000; }
+.status-badge.rejected { background: #FF2D78; color: #FFF; }
+.status-badge.failed { background: #FF8C32; color: #000; }
+.reel-info {
+ padding: 1.5rem;
+}
+.reel-info h3 {
+ font-size: 1.1rem;
+ margin-bottom: 0.75rem;
+ line-height: 1.3;
+}
+.reel-meta {
+ display: flex;
+ flex-wrap: wrap;
+ gap: 0.5rem;
+ margin-bottom: 1rem;
+}
+.meta-tag {
+ background: rgba(0,220,255,0.15);
+ color: var(--neon-cyan);
+ padding: 2px 8px;
+ border-radius: 4px;
+ font-size: 0.8rem;
+}
+.reel-specs {
+ font-size: 0.85rem;
+ color: var(--text-secondary);
+}
+.reel-specs div {
+ margin-bottom: 0.25rem;
+}
+.video-link {
+ display: inline-block;
+ margin-top: 1rem;
+ padding: 8px 20px;
+ background: var(--neon-pink);
+ color: white;
+ text-decoration: none;
+ border-radius: 8px;
+ font-weight: bold;
+ font-size: 0.9rem;
+ transition: background 0.2s;
+}
+.video-link:hover { background: #E0206A; }
+.footer {
+ text-align: center;
+ margin-top: 3rem;
+ padding: 2rem;
+ border-top: 1px solid rgba(255,255,255,0.1);
+ color: var(--text-secondary);
+ font-size: 0.85rem;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+ <h1>Vice City Radar</h1>
+ <div class="subtitle">Lote de Produção GTA 6 — Missão 005 | 2026-11-14</div>
+</div>
+
+<div class="summary">
+ <div class="stat-card">
+ <div class="value">3</div>
+ <div class="label">Tópicos Selecionados</div>
+ </div>
+ <div class="stat-card">
+ <div class="value">2</div>
+ <div class="label">Reels Produzidos</div>
+ </div>
+ <div class="stat-card">
+ <div class="value">1</div>
+ <div class="label">Rejeitado (fora do nicho)</div>
+ </div>
+ <div class="stat-card">
+ <div class="value">5.0 MB</div>
+ <div class="label">Total Gerado</div>
+ </div>
+</div>
+
+<h2 style="color: var(--neon-cyan); margin-bottom: 1.5rem; font-size: 1.5rem;">Reels do Lote</h2>
+
+<div class="reels-grid">
+
+ <!-- Reel 1: REJECTED -->
+ <div class="reel-card rejected">
+ <div class="thumbnail-container">
+ <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);font-size:0.9rem;padding:2rem;text-align:center;">
+ Tópico rejeitado pelo filtro editorial<br>(fora do nicho GTA 6)
+ </div>
+ <span class="status-badge rejected">Rejeitado</span>
+ </div>
+ <div class="reel-info">
+ <h3>Xbox boss announces Wolfenstein 3 and confirms new game in development</h3>
+ <div class="reel-meta">
+ <span class="meta-tag">announcement</span>
+ <span class="meta-tag">score: 0.820</span>
+ </div>
+ <div class="reel-specs">
+ <div><strong>Motivo:</strong> Topic validation failed — No keyword match with profile research sources</div>
+ <div><strong>Fonte:</strong> Eurogamer</div>
+ </div>
+ </div>
+ </div>
+
+ <!-- Reel 2: APPROVED -->
+ <div class="reel-card approved">
+ <div class="thumbnail-container">
+ <img src="../../thumbnails/gta6-gta-6-vice-city-lançamento-nov.png" alt="Thumbnail Reel 2" onerror="this.style.display='none';this.parentElement.innerHTML='<div style=\'display:flex;align-items:center;justify-content:center;height:100%;color:#C8C8DC;font-size:0.9rem;\'>Thumbnail não disponível</div>'">
+ <span class="status-badge approved">Aprovado</span>
+ </div>
+ <div class="reel-info">
+ <h3>One week from launch, GTA 6's physical map reportedly leaks online</h3>
+ <div class="reel-meta">
+ <span class="meta-tag">rumor</span>
+ <span class="meta-tag">score: 0.800</span>
+ </div>
+ <div class="reel-specs">
+ <div><strong>Duração:</strong> 41.40s</div>
+ <div><strong>Resolução:</strong> 1080×1920 (9:16)</div>
+ <div><strong>Codec:</strong> H.264 @ 30fps</div>
+ <div><strong>Tamanho:</strong> 744 KB</div>
+ <div><strong>Fonte:</strong> VGC</div>
+ </div>
+ <a class="video-link" href="../output/gta6-one-week-from-launch,-gta-6's-.mp4">▶ Assistir Vídeo</a>
+ </div>
+ </div>
+
+ <!-- Reel 3: APPROVED -->
+ <div class="reel-card approved">
+ <div class="thumbnail-container">
+ <img src="../../thumbnails/gta6-gta-6-vice-city-lançamento-nov.png" alt="Thumbnail Reel 3" onerror="this.style.display='none';this.parentElement.innerHTML='<div style=\'display:flex;align-items:center;justify-content:center;height:100%;color:#C8C8DC;font-size:0.9rem;\'>Thumbnail não disponível</div>'">
+ <span class="status-badge approved">Aprovado</span>
+ </div>
+ <div class="reel-info">
+ <h3>Tell us your favourite Grand Theft Auto gaming memory and win a copy</h3>
+ <div class="reel-meta">
+ <span class="meta-tag">action adventure</span>
+ <span class="meta-tag">score: 0.773</span>
+ </div>
+ <div class="reel-specs">
+ <div><strong>Duração:</strong> 26.96s</div>
+ <div><strong>Resolução:</strong> 1080×1920 (9:16)</div>
+ <div><strong>Codec:</strong> H.264 @ 25fps</div>
+ <div><strong>Tamanho:</strong> 4,185 KB</div>
+ <div><strong>Fonte:</strong> Eurogamer</div>
+ </div>
+ <a class="video-link" href="../output/gta6-tell-us-your-favourite-grand-t.mp4">▶ Assistir Vídeo</a>
+ </div>
+ </div>
+
+</div>
+
+<div class="footer">
+ <p>JHC Viral Engine — Autonomous Content Factory | Missão 005</p>
+ <p>Pesquisa: Eurogamer + VGC | Motor: DynamicSceneEngine neon | Quality Gate: V2 multidimensional</p>
+ <p>LLM: Fallback determinístico (Gemini/Ollama/8Token indisponíveis nesta sessão)</p>
+ <p>Gerado em 2026-11-14 | HEAD: dd4c980 | Branch: master | Push: Não realizado</p>
+</div>
+
+</body>
+</html>
