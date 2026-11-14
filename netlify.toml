@@ -1,11 +1,10 @@
 [build]
   publish = "frontend"
-  functions = "netlify/functions"
-  command = "echo 'Static frontend + serverless backend via Netlify Functions'"
+  command = "echo 'Static frontend — backend deploys separately on Render'"
 
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/api/:splat"
+  to = "https://jhc-viral-engine-api.onrender.com/api/:splat"
   status = 200
   force = true
 
@@ -16,6 +15,8 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
 
-# Architecture: Frontend (static HTML/CSS/JS) + Backend (FastAPI via mangum Lambda adapter)
-# Both served from the same Netlify site — no separate Render backend needed.
-# The /api/* redirect routes all API calls to the netlify/functions/api.py handler.
+# Architecture:
+# - Frontend (static HTML/CSS/JS) served by Netlify
+# - Backend (FastAPI Python) deployed separately on Render
+# - /api/* proxied to Render backend via redirect above
+# - Update the redirect "to" URL after Render service is live
