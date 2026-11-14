@@ -10,14 +10,17 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import secrets
 import time
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.core.profile_config import ALL_PROFILES, get_profile, list_profiles
 from src.media.library import SmartMediaLibrary, VIDEO_EXTENSIONS
@@ -42,9 +45,51 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# --- Security: API Key Authentication Middleware ---
+# Set JHC_API_KEY env var to enable auth. Without it, all routes are open (local dev).
+# In production (Render), this MUST be set to prevent unauthorized access.
+API_KEY = os.environ.get("JHC_API_KEY", "")
+
+# Routes that never require authentication
+PUBLIC_PATHS = {"/", "/api/health", "/docs", "/openapi.json", "/redoc"}
+
+
+class ApiKeyMiddleware(BaseHTTPMiddleware):
+    """Global middleware: rejects unauthenticated requests to protected /api/* routes."""
+
+    async def dispatch(self, request: Request, call_next):
+        # Skip auth if no key configured (local dev mode)
+        if not API_KEY:
+            return await call_next(request)
+
+        # Skip auth for public routes
+        path = request.url.path
+        if path in PUBLIC_PATHS or not path.startswith("/api/"):
+            return await call_next(request)
+
+        # Check X-API-Key header or ?api_key= query param
+        provided = request.headers.get("X-API-Key") or request.query_params.get("api_key")
+        if not provided or not secrets.compare_digest(provided, API_KEY):
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid or missing API key. Set X-API-Key header."},
+            )
+
+        return await call_next(request)
+
+
+app.add_middleware(ApiKeyMiddleware)
+
+# Restrict CORS to Netlify domain in production; allow all in local dev
+_allowed_origins = (
+    ["https://jhc-viral-engine.netlify.app"]
+    if os.environ.get("JHC_ENV") == "production"
+    else ["*"]
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -52,7 +97,7 @@ app.add_middleware(
 
 # --- Shared State ---
 
-DATA_ROOT = Path("data")
+DATA_ROOT = Path(os.environ.get("JHC_DATA_ROOT", "data"))
 DB_PATH = DATA_ROOT / "media_library.db"
 THUMBS_DIR = DATA_ROOT / "thumbnails"
 
