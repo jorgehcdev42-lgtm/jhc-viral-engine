@@ -683,3 +683,97 @@ async def can_produce(profile_id: str):
     scheduler = ProductionScheduler(DATA_ROOT)
     can, reason = scheduler.can_produce_today(profile_id)
     return {"can_produce": can, "reason": reason}
+
+
+# --- Branding / Watermark Studio ---
+
+@app.get("/api/branding/configs")
+async def get_branding_configs():
+    """Get watermark configurations for all profiles."""
+    from src.production.watermark import WatermarkEngine
+    engine = WatermarkEngine(DATA_ROOT)
+    return engine.get_all_configs()
+
+
+@app.get("/api/branding/config/{profile_id}")
+async def get_branding_config(profile_id: str):
+    """Get watermark configuration for a specific profile."""
+    from src.production.watermark import WatermarkEngine
+    engine = WatermarkEngine(DATA_ROOT)
+    config = engine.get_config(profile_id)
+    return config.to_dict()
+
+
+@app.put("/api/branding/config/{profile_id}")
+async def update_branding_config(
+    profile_id: str,
+    position: str = Query("bottom_right"),
+    scale_percent: float = Query(12.0, ge=5.0, le=50.0),
+    opacity: float = Query(0.9, ge=0.1, le=1.0),
+    margin_px: int = Query(25, ge=0, le=100),
+    platform_preset: str = Query("universal"),
+    enabled: bool = Query(True),
+):
+    """Update watermark configuration for a profile."""
+    from src.production.watermark import WatermarkEngine, WatermarkConfig
+    engine = WatermarkEngine(DATA_ROOT)
+    current = engine.get_config(profile_id)
+    updated = WatermarkConfig(
+        profile_id=profile_id,
+        logo_path=current.logo_path,
+        position=position,
+        scale_percent=scale_percent,
+        opacity=opacity,
+        margin_px=margin_px,
+        enabled=enabled,
+        platform_preset=platform_preset,
+    )
+    engine.update_config(updated)
+    return updated.to_dict()
+
+
+@app.get("/api/branding/preview/{profile_id}")
+async def preview_watermark_position(
+    profile_id: str,
+    video_width: int = Query(1080),
+    video_height: int = Query(1920),
+):
+    """Get computed overlay coordinates for preview without rendering."""
+    from src.production.watermark import WatermarkEngine
+    engine = WatermarkEngine(DATA_ROOT)
+    return engine.preview_position(profile_id, video_width, video_height)
+
+
+@app.post("/api/branding/logo/{profile_id}")
+async def upload_logo(profile_id: str, file_path: str = Query(..., description="Absolute path to logo file on server")):
+    """Register a logo file for a profile (file must already exist on server)."""
+    from src.production.watermark import WatermarkEngine
+    engine = WatermarkEngine(DATA_ROOT)
+    source = Path(file_path)
+    if not source.exists():
+        raise HTTPException(status_code=400, detail=f"File not found: {file_path}")
+    try:
+        dest = engine.save_logo(profile_id, source)
+        return {"status": "saved", "logo_path": str(dest), "profile_id": profile_id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/branding/apply/{profile_id}")
+async def apply_watermark(
+    profile_id: str,
+    input_path: str = Query(..., description="Absolute path to input video"),
+    force: bool = Query(False),
+):
+    """Apply watermark to a single video file."""
+    from src.production.watermark import WatermarkEngine
+    engine = WatermarkEngine(DATA_ROOT)
+    inp = Path(input_path)
+    if not inp.exists():
+        raise HTTPException(status_code=400, detail=f"Input file not found: {input_path}")
+    out_dir = engine.exports_dir / profile_id
+    out_path = out_dir / f"{inp.stem}_branded{inp.suffix}"
+    result = await engine.apply_watermark(inp, out_path, profile_id, force=force)
+    if not result["success"]:
+        raise HTTPException(status_code=500, detail=result.get("error", "Unknown error"))
+    return result
