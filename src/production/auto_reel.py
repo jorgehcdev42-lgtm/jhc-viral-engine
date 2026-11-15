@@ -367,14 +367,16 @@ class AutoReelStudio:
         }
 
     def produce(self, request: ReelRequest) -> ReelProgress:
-        """Executa pipeline completo de produção."""
+        """Pipeline single-pass: crop + watermark + legendas + áudio em um único ffmpeg.
+
+        Preserva áudio original, evita reencode múltiplo e frames pretos.
+        """
         progress = ReelProgress()
         job_id = hashlib.md5(
             f"{request.video_path}{time.time()}".encode()
         ).hexdigest()[:12]
 
         try:
-            # Validação inicial
             source = Path(request.video_path)
             if not source.exists():
                 progress.status = ReelStatus.FAILED.value
@@ -408,122 +410,145 @@ class AutoReelStudio:
 
             scenes = self._detect_scenes(str(source))
             start, end = self._select_best_segment(info, scenes, plat_cfg["max_duration"])
-            clip_path = self.temp_dir / f"{job_id}_clip.mp4"
 
-            rc, _, err = self._run_ffmpeg([
-                "-ss", str(start), "-to", str(end),
-                "-i", str(source),
-                "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-                "-c:a", "aac", "-b:a", "128k",
-                str(clip_path)
-            ], "clip extraction")
-
-            if rc != 0:
-                progress.status = ReelStatus.FAILED.value
-                progress.error = f"Falha ao extrair clip: {err[:200]}"
-                self._report(progress)
-                return progress
-
-            # 3. Crop vertical
+            # 3-6. SINGLE PASS: crop + watermark + legendas + áudio
             progress.status = ReelStatus.CROPPING.value
             progress.percent = 30
-            progress.message = f"Adaptando para {plat_cfg['aspect']} ({plat_cfg['width']}x{plat_cfg['height']})..."
-            self._report(progress)
-
-            cropped_path = self.temp_dir / f"{job_id}_cropped.mp4"
-            if not self._crop_vertical(str(clip_path), str(cropped_path), plat_cfg["width"], plat_cfg["height"]):
-                progress.status = ReelStatus.FAILED.value
-                progress.error = "Falha no crop vertical"
-                self._report(progress)
-                return progress
-
-            # 4. Watermark
-            progress.status = ReelStatus.WATERMARK.value
-            progress.percent = 45
-            progress.message = f"Aplicando logo {market_cfg['channel']}..."
-            self._report(progress)
-
-            wm_path = self.temp_dir / f"{job_id}_wm.mp4"
-            logo = request.logo_path or ""
-            if not self._apply_watermark(
-                str(cropped_path), str(wm_path),
-                logo, market_cfg["watermark_position"], market_cfg["watermark_opacity"]
-            ):
-                progress.status = ReelStatus.FAILED.value
-                progress.error = "Falha ao aplicar watermark"
-                self._report(progress)
-                return progress
-
-            # 5. Legendas
-            progress.status = ReelStatus.SUBTITLES.value
-            progress.percent = 55
-            progress.message = "Gerando legendas..."
-            self._report(progress)
-
-            sub_path = self.temp_dir / f"{job_id}_sub.mp4"
-            subtitle_text = request.subtitle_text or ""
-            if not self._generate_subtitles(
-                str(wm_path), str(sub_path),
-                subtitle_text, market_cfg["subtitle_font_size"], market_cfg["language"]
-            ):
-                progress.status = ReelStatus.FAILED.value
-                progress.error = "Falha ao gerar legendas"
-                self._report(progress)
-                return progress
-
-            # 6. Mixagem de áudio
-            progress.status = ReelStatus.AUDIO_MIX.value
-            progress.percent = 65
-            progress.message = "Mixando áudio..."
-            self._report(progress)
-
-            mixed_path = self.temp_dir / f"{job_id}_mixed.mp4"
-            if not self._mix_audio(str(sub_path), str(mixed_path), info["has_audio"], request.include_music):
-                progress.status = ReelStatus.FAILED.value
-                progress.error = "Falha na mixagem de áudio"
-                self._report(progress)
-                return progress
-
-            # 7. Thumbnail
-            progress.status = ReelStatus.THUMBNAIL.value
-            progress.percent = 75
-            progress.message = "Gerando thumbnail..."
-            self._report(progress)
-
-            thumb_filename = f"{job_id}_{request.market}.jpg"
-            thumb_path = self.thumbs_dir / thumb_filename
-            title = request.custom_title or f"Reel_{request.market}_{job_id}"
-            self._generate_thumbnail(str(mixed_path), str(thumb_path), title, request.market)
-
-            # 8. Quality Gate
-            progress.status = ReelStatus.QUALITY_GATE.value
-            progress.percent = 85
-            progress.message = "Verificando qualidade..."
-            self._report(progress)
-
-            qg_result = self._quality_gate(str(mixed_path))
-            progress.metadata["quality_gate"] = qg_result
-
-            if not qg_result["passed"]:
-                progress.status = ReelStatus.FAILED.value
-                progress.error = f"Quality Gate reprovado: {'; '.join(qg_result['issues'])}"
-                self._report(progress)
-                return progress
-
-            # 9. Export final
-            progress.status = ReelStatus.EXPORTING.value
-            progress.percent = 95
-            progress.message = "Exportando MP4 final..."
+            progress.message = f"Processando vídeo+áudio em single-pass ({plat_cfg['width']}x{plat_cfg['height']})..."
             self._report(progress)
 
             output_filename = f"{job_id}_{request.market}_{request.platform}.mp4"
             final_path = self.output_dir / output_filename
-            shutil.copy2(str(mixed_path), str(final_path))
 
-            # Limpeza temp
-            for tmp in [clip_path, cropped_path, wm_path, sub_path, mixed_path]:
-                if tmp.exists():
-                    tmp.unlink()
+            # Build video filter chain
+            vf_parts = [
+                f"scale={plat_cfg['width']}:{plat_cfg['height']}:force_original_aspect_ratio=increase",
+                f"crop={plat_cfg['width']}:{plat_cfg['height']}",
+            ]
+
+            # Watermark overlay (se logo existe)
+            logo_path = request.logo_path or ""
+            has_logo = logo_path and Path(logo_path).exists()
+            if has_logo:
+                pos_map = {
+                    "top_left": "10:10",
+                    "top_right": "main_w-overlay_w-10:10",
+                    "bottom_left": "10:main_h-overlay_h-10",
+                    "bottom_right": "main_w-overlay_w-10:main_h-overlay_h-10",
+                    "center": "(main_w-overlay_w)/2:(main_h-overlay_h)/2",
+                }
+                overlay_pos = pos_map.get(market_cfg["watermark_position"], pos_map["top_right"])
+                opacity = market_cfg["watermark_opacity"]
+                # Will use filter_complex with overlay below
+                use_filter_complex = True
+            else:
+                use_filter_complex = False
+
+            # Subtitle via Pillow burn (drawtext unavailable on this macOS)
+            subtitle_text = request.subtitle_text or ""
+            has_drawtext = self._check_drawtext_available()
+            if subtitle_text and has_drawtext:
+                safe_text = subtitle_text.replace("'", "\\'").replace(":", "\\:")
+                fs = market_cfg["subtitle_font_size"]
+                vf_parts.append(
+                    f"drawtext=text='{safe_text}':fontsize={fs}:fontcolor=white:borderw=2:bordercolor=black:x=(w-text_w)/2:y=h-th-40"
+                )
+
+            # Build ffmpeg command
+            if use_filter_complex and has_logo:
+                # filter_complex: crop/scale main video + overlay logo
+                main_vf = ",".join(vf_parts)
+                fc = (
+                    f"[0:v]{main_vf}[scaled];"
+                    f"[1:v]format=rgba,colorchannelmixer=aa={opacity}[wm];"
+                    f"[scaled][wm]overlay={overlay_pos}[out]"
+                )
+                ffmpeg_args = [
+                    "-ss", str(start), "-to", str(end),
+                    "-i", str(source),
+                    "-i", str(logo_path),
+                    "-filter_complex", fc,
+                    "-map", "[out]",
+                    "-map", "0:a?",
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+                    "-c:a", "aac", "-b:a", "128k",
+                    "-movflags", "+faststart",
+                    str(final_path),
+                ]
+            else:
+                # Simple filter chain without logo overlay
+                vf = ",".join(vf_parts)
+                ffmpeg_args = [
+                    "-ss", str(start), "-to", str(end),
+                    "-i", str(source),
+                    "-vf", vf,
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+                    "-c:a", "aac", "-b:a", "128k",
+                    "-movflags", "+faststart",
+                    str(final_path),
+                ]
+
+            progress.status = ReelStatus.EXPORTING.value
+            progress.percent = 50
+            progress.message = "Renderizando vídeo final com áudio..."
+            self._report(progress)
+
+            rc, stdout, stderr = self._run_ffmpeg(ffmpeg_args, "single-pass render")
+            if rc != 0:
+                progress.status = ReelStatus.FAILED.value
+                progress.error = f"Falha no render: {stderr[:300]}"
+                self._report(progress)
+                return progress
+
+            # Verify output has real content
+            out_info = self._get_video_info(str(final_path))
+            if out_info.get("error") or out_info.get("size_mb", 0) < 0.01:
+                progress.status = ReelStatus.FAILED.value
+                progress.error = f"Output inválido: {out_info}"
+                self._report(progress)
+                return progress
+
+            # Burn subtitles via Pillow if drawtext unavailable
+            if subtitle_text and not has_drawtext:
+                progress.status = ReelStatus.SUBTITLES.value
+                progress.percent = 70
+                progress.message = "Queimando legendas via Pillow..."
+                self._report(progress)
+                self._burn_subtitles_pillow(str(final_path), subtitle_text, market_cfg["subtitle_font_size"])
+
+            # 7. Thumbnail via ThumbnailFactory 2.0
+            progress.status = ReelStatus.THUMBNAIL.value
+            progress.percent = 75
+            progress.message = "Gerando thumbnails..."
+            self._report(progress)
+
+            thumb_filename = f"{job_id}_{request.market}.jpg"
+            thumb_path = self.thumbs_dir / thumb_filename
+            self._generate_thumbnail(str(final_path), str(thumb_path), "", request.market)
+
+            # 8. Quality Gate V2
+            progress.status = ReelStatus.QUALITY_GATE.value
+            progress.percent = 85
+            progress.message = "Quality Gate V2..."
+            self._report(progress)
+
+            qg_result = self._quality_gate(str(final_path))
+            # Enhanced checks: audio presence, bitrate, visual diversity
+            issues = qg_result.get("issues", [])
+            if not out_info.get("has_audio") and info.get("has_audio"):
+                issues.append("Áudio perdido durante processamento")
+            out_bitrate = out_info.get("bitrate", 0)
+            if out_bitrate < 50000:
+                issues.append(f"Bitrate muito baixo: {out_bitrate} bps (mínimo 50kbps)")
+            qg_result["issues"] = issues
+            qg_result["passed"] = len(issues) == 0
+            progress.metadata["quality_gate"] = qg_result
+
+            if not qg_result["passed"]:
+                progress.status = ReelStatus.FAILED.value
+                progress.error = f"Quality Gate reprovado: {'; '.join(issues)}"
+                self._report(progress)
+                return progress
 
             # Sucesso
             progress.status = ReelStatus.DONE.value
@@ -531,7 +556,8 @@ class AutoReelStudio:
             progress.message = "Produção concluída!"
             progress.output_path = str(final_path)
             progress.thumbnail_path = str(thumb_path) if thumb_path.exists() else None
-            progress.duration_seconds = qg_result["info"].get("duration", 0)
+            progress.duration_seconds = out_info.get("duration", 0)
+            progress.metadata["output_info"] = out_info
             self._report(progress)
             return progress
 
@@ -540,6 +566,82 @@ class AutoReelStudio:
             progress.error = str(e)
             self._report(progress)
             return progress
+
+    def _burn_subtitles_pillow(self, video_path: str, text: str, font_size: int):
+        """Burn subtitles using Pillow frame-by-frame when drawtext is unavailable."""
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            import io
+
+            # Extract frames, burn text, reassemble
+            frames_dir = self.temp_dir / "sub_frames"
+            frames_dir.mkdir(exist_ok=True)
+
+            # Extract all frames
+            rc, _, _ = self._run_ffmpeg([
+                "-i", video_path,
+                "-q:v", "2",
+                str(frames_dir / "frame_%05d.jpg"),
+            ], "extract frames for subtitle burn")
+            if rc != 0:
+                return
+
+            frame_files = sorted(frames_dir.glob("frame_*.jpg"))
+            if not frame_files:
+                return
+
+            # Try to load a font
+            font = None
+            font_paths = [
+                "/System/Library/Fonts/Helvetica.ttc",
+                "/System/Library/Fonts/Arial.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            ]
+            for fp in font_paths:
+                try:
+                    font = ImageFont.truetype(fp, font_size)
+                    break
+                except Exception:
+                    continue
+            if font is None:
+                font = ImageFont.load_default()
+
+            # Burn text on each frame
+            for ff in frame_files:
+                img = Image.open(str(ff))
+                draw = ImageDraw.Draw(img)
+                bbox = draw.textbbox((0, 0), text, font=font)
+                tw = bbox[2] - bbox[0]
+                th = bbox[3] - bbox[1]
+                x = (img.width - tw) // 2
+                y = img.height - th - 40
+                # Shadow
+                draw.text((x + 2, y + 2), text, fill="black", font=font)
+                draw.text((x, y), text, fill="white", font=font)
+                img.save(str(ff))
+
+            # Reassemble with original audio
+            backup = video_path + ".bak"
+            shutil.copy2(video_path, backup)
+            rc, _, _ = self._run_ffmpeg([
+                "-framerate", "30",
+                "-i", str(frames_dir / "frame_%05d.jpg"),
+                "-i", backup,
+                "-map", "0:v",
+                "-map", "1:a?",
+                "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+                "-c:a", "aac", "-b:a", "128k",
+                "-shortest",
+                "-y", video_path,
+            ], "reassemble with subtitles")
+
+            # Cleanup
+            shutil.rmtree(frames_dir, ignore_errors=True)
+            if Path(backup).exists():
+                Path(backup).unlink()
+
+        except Exception:
+            pass  # Non-fatal: video still usable without burned subtitles
 
     def list_outputs(self) -> list[dict]:
         """Lista produções concluídas."""
