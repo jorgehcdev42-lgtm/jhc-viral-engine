@@ -1975,3 +1975,21 @@ async def thumbnail_associate(job_id: str, publish_job_id: str):
     if not ok:
         return JSONResponse(status_code=404, content={"detail": "Job não encontrado"})
     return {"status": "ok", "associated": publish_job_id}
+
+# =============================================================================
+# ADVANCED ANALYZER — Análise profunda de ritmo, narrativa e destaques (MISSÃO F)
+# =============================================================================
+
+@app.post("/api/analyze/advanced")
+async def advanced_analyze(request: Request):
+    """Análise avançada de vídeo: ritmo, narrativa, destaques, legendas, formatos."""
+    from src.research.advanced_analyzer import AdvancedVideoAnalyzer
+
+    body = await request.json()
+    video_path = body.get("video_path", "")
+    if not video_path:
+        return JSONResponse(status_code=400, content={"detail": "video_path obrigatório"})
+
+    analyzer = AdvancedVideoAnalyzer(data_root=str(DATA_ROOT))
+    result = analyzer.analyze(video_path)
+    return result.to_dict()
