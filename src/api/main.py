@@ -1846,3 +1846,41 @@ async def ssd_update_category(request: Request):
     if not ok:
         return JSONResponse(status_code=404, content={"detail": "Vídeo não encontrado no índice"})
     return {"status": "ok", "category": category}
+
+# =============================================================================
+# DUAL MARKET — Geração simultânea BR + Global com identidade própria
+# =============================================================================
+
+@app.post("/api/dual-market/produce")
+async def dual_market_produce(request: Request):
+    """Produz versões BR e Global do mesmo vídeo fonte."""
+    from src.production.dual_market import DualMarketEngine
+
+    body = await request.json()
+    video_path = body.get("video_path", "")
+    topic = body.get("topic", "")
+    platform = body.get("platform", "reels")
+    base_subtitle = body.get("base_subtitle", "")
+
+    if not video_path or not topic:
+        return JSONResponse(status_code=400, content={"detail": "video_path e topic obrigatórios"})
+
+    engine = DualMarketEngine(data_root=str(DATA_ROOT))
+    result = engine.produce_dual(video_path, topic, platform, base_subtitle)
+    return result
+
+@app.get("/api/dual-market/jobs")
+async def dual_market_jobs():
+    """Lista jobs dual market anteriores."""
+    from src.production.dual_market import DualMarketEngine
+
+    engine = DualMarketEngine(data_root=str(DATA_ROOT))
+    return engine.list_jobs()
+
+@app.get("/api/dual-market/identity/{market}")
+async def dual_market_identity(market: str):
+    """Retorna configuração de identidade de um mercado."""
+    from src.production.dual_market import DualMarketEngine
+
+    engine = DualMarketEngine(data_root=str(DATA_ROOT))
+    return engine.get_identity(market)

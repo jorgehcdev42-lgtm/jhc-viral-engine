@@ -658,7 +658,8 @@ body::after {
  <div class="nav-item" data-page="autoreel"><span class="nav-icon">🎬</span> AutoReel Studio</div>
 <div class="nav-item" data-page="clipper"><span class="nav-icon">✂️</span> Smart Clipper</div>
  <div class="nav-item" data-page="stories"><span class="nav-icon">🎭</span> Story Studio</div>
- <div class="nav-item" data-page="ssd-library"><span class="nav-icon">💾</span> Biblioteca SSD</div>
+ <div class="nav-item" data-page="dual-market"><span class="nav-icon">🌐</span> Dual Market</div>
+<div class="nav-item" data-page="ssd-library"><span class="nav-icon">💾</span> Biblioteca SSD</div>
 <div class="nav-item" data-page="importer"><span class="nav-icon">📥</span> Importador</div>
  </div>
 
@@ -1165,6 +1166,47 @@ body::after {
 </div>
 
 <!-- ===== IMPORTADOR (MISSÃO 018) ===== -->
+<div id="page-dual-market" class="page">
+<div class="page-header"><div class="page-title">🌐 Dual Market — BR + Global</div></div>
+<div class="card">
+<div class="card-title">Produção Simultânea BR e Global</div>
+<div style="display:grid;gap:12px;">
+<label style="color:#a0aec0;font-size:13px;">Vídeo Fonte
+<input type="file" id="dm-video-input" accept="video/*" style="margin-top:4px;width:100%;padding:8px;background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;border-radius:6px;">
+</label>
+<div id="dm-upload-status" style="color:#718096;font-size:12px;"></div>
+<label style="color:#a0aec0;font-size:13px;">Tópico / Assunto
+<input type="text" id="dm-topic" placeholder="Ex: Novo trailer de GTA VI" style="margin-top:4px;width:100%;padding:8px;background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;border-radius:6px;">
+</label>
+<label style="color:#a0aec0;font-size:13px;">Plataforma
+<select id="dm-platform" style="margin-top:4px;width:100%;padding:8px;background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;border-radius:6px;">
+<option value="reels">Instagram Reels</option>
+<option value="shorts">YouTube Shorts</option>
+<option value="tiktok">TikTok</option>
+<option value="stories">Stories</option>
+<option value="feed">Feed</option>
+</select>
+</label>
+<label style="color:#a0aec0;font-size:13px;">Legenda Base (opcional, adaptada por mercado)
+<input type="text" id="dm-subtitle" placeholder="Texto base para adaptação editorial" style="margin-top:4px;width:100%;padding:8px;background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;border-radius:6px;">
+</label>
+<button onclick="produceDualMarket()" style="padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:#fff;font-weight:700;border-radius:8px;cursor:pointer;font-size:15px;">🌐 PRODUZIR BR + GLOBAL</button>
+</div>
+</div>
+<div id="dm-progress" class="card" style="display:none;">
+<div class="card-title">Progresso</div>
+<div id="dm-progress-text" style="color:#a0aec0;font-size:13px;"></div>
+</div>
+<div id="dm-result" class="card" style="display:none;">
+<div class="card-title">Resultado Dual Market</div>
+<div id="dm-result-content"></div>
+</div>
+<div class="card">
+<div class="card-title">Jobs Recentes</div>
+<div id="dm-jobs-list" style="color:#718096;font-size:13px;">Carregando...</div>
+</div>
+</div>
+
 <div id="page-ssd-library" class="page">
 <div class="page-header"><div class="page-title">💾 Biblioteca SSD</div></div>
 <div class="card">
@@ -1441,6 +1483,7 @@ function loadPageData(page) {
  if (page === 'diagnostics') loadDiagnostics();
  if (page === 'references') loadReferences();
  if (page === 'autoreel') loadAutoReelOutputs();
+ if (page === 'dual-market') loadDualMarketJobs();
  if (page === 'ssd-library') loadSSDStats();
  if (page === 'clipper') loadClips();
  if (page === 'stories') loadStories();
@@ -1469,6 +1512,76 @@ async function uploadFile(fileInputId, statusElId) {
  if (statusEl) statusEl.innerHTML = `<span style="color:#f44">❌ Upload: ${e.message}</span>`;
  return null;
  }
+}
+
+// === DUAL MARKET ===
+async function produceDualMarket() {
+ const videoPath = await uploadFile('dm-video-input', 'dm-upload-status');
+ if (!videoPath) {
+ if (!document.getElementById('dm-video-input').files.length) alert('Selecione um vídeo primeiro');
+ return;
+ }
+ const topic = document.getElementById('dm-topic').value;
+ if (!topic) { alert('Informe o tópico / assunto'); return; }
+
+ const progressCard = document.getElementById('dm-progress');
+ const resultCard = document.getElementById('dm-result');
+ progressCard.style.display = 'block';
+ resultCard.style.display = 'none';
+ document.getElementById('dm-progress-text').textContent = '🌐 Produzindo versões BR + Global... (pode levar alguns segundos)';
+
+ try {
+ const data = await apiPost('/api/dual-market/produce', {
+ video_path: videoPath,
+ topic,
+ platform: document.getElementById('dm-platform').value,
+ base_subtitle: document.getElementById('dm-subtitle').value || '',
+ });
+
+ progressCard.style.display = 'none';
+ resultCard.style.display = 'block';
+
+ const br = data.markets?.br || {};
+ const gl = data.markets?.global || {};
+ document.getElementById('dm-result-content').innerHTML = `
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+ <div style="padding:10px;background:#1a1a2e;border-radius:6px;border-left:3px solid #FFD700;">
+ <strong style="color:#FFD700;">🇧🇷 BR</strong><br>
+ Status: ${br.status === 'done' ? '✅' : '❌'} ${br.status}<br>
+ Título: ${br.title || 'N/A'}<br>
+ ${br.output_path ? '<span style="color:#4ade80;font-size:11px;">Output: '+br.output_path+'</span>' : ''}
+ ${br.error ? '<br><span style="color:#f44;font-size:11px;">'+br.error+'</span>' : ''}
+ </div>
+ <div style="padding:10px;background:#1a1a2e;border-radius:6px;border-left:3px solid #00BFFF;">
+ <strong style="color:#00BFFF;">🌍 Global</strong><br>
+ Status: ${gl.status === 'done' ? '✅' : '❌'} ${gl.status}<br>
+ Título: ${gl.title || 'N/A'}<br>
+ ${gl.output_path ? '<span style="color:#4ade80;font-size:11px;">Output: '+gl.output_path+'</span>' : ''}
+ ${gl.error ? '<br><span style="color:#f44;font-size:11px;">'+gl.error+'</span>' : ''}
+ </div>
+ </div>
+ <div style="margin-top:8px;font-size:11px;color:#718096;">Job ID: ${data.job_id}</div>
+ `;
+ loadDualMarketJobs();
+ } catch(e) {
+ progressCard.style.display = 'none';
+ resultCard.style.display = 'block';
+ document.getElementById('dm-result-content').innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
+ }
+}
+
+async function loadDualMarketJobs() {
+ const el = document.getElementById('dm-jobs-list');
+ try {
+ const data = await api('/api/dual-market/jobs');
+ if (!data || !data.length) { el.textContent = 'Nenhum job dual market ainda.'; return; }
+ el.innerHTML = data.map(j => `
+ <div style="padding:6px 0;border-bottom:1px solid #2d2d44;">
+ <strong style="color:#e2e8f0;">${j.topic}</strong> (${j.platform})<br>
+ <span style="font-size:11px;color:#718096;">BR: ${j.br_status} | Global: ${j.global_status} | ${j.created_at}</span>
+ </div>
+ `).join('');
+ } catch(e) { el.textContent = 'Erro: ' + e.message; }
 }
 
 // === SSD LIBRARY ===
