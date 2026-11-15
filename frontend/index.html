@@ -658,7 +658,8 @@ body::after {
  <div class="nav-item" data-page="autoreel"><span class="nav-icon">🎬</span> AutoReel Studio</div>
 <div class="nav-item" data-page="clipper"><span class="nav-icon">✂️</span> Smart Clipper</div>
  <div class="nav-item" data-page="stories"><span class="nav-icon">🎭</span> Story Studio</div>
- <div class="nav-item" data-page="dual-market"><span class="nav-icon">🌐</span> Dual Market</div>
+ <div class="nav-item" data-page="thumb-factory"><span class="nav-icon">🖼️</span> Thumbnail Factory</div>
+<div class="nav-item" data-page="dual-market"><span class="nav-icon">🌐</span> Dual Market</div>
 <div class="nav-item" data-page="ssd-library"><span class="nav-icon">💾</span> Biblioteca SSD</div>
 <div class="nav-item" data-page="importer"><span class="nav-icon">📥</span> Importador</div>
  </div>
@@ -1166,6 +1167,42 @@ body::after {
 </div>
 
 <!-- ===== IMPORTADOR (MISSÃO 018) ===== -->
+<div id="page-thumb-factory" class="page">
+<div class="page-header"><div class="page-title">🖼️ Thumbnail Factory 2.0</div></div>
+<div class="card">
+<div class="card-title">Gerar 3 Alternativas de Thumbnail</div>
+<div style="display:grid;gap:12px;">
+<label style="color:#a0aec0;font-size:13px;">Vídeo Fonte
+<input type="file" id="tf-video-input" accept="video/*" style="margin-top:4px;width:100%;padding:8px;background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;border-radius:6px;">
+</label>
+<div id="tf-upload-status" style="color:#718096;font-size:12px;"></div>
+<label style="color:#a0aec0;font-size:13px;">Mercado
+<select id="tf-market" style="margin-top:4px;width:100%;padding:8px;background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;border-radius:6px;">
+<option value="br">🇧🇷 BR — Leonida GTA VI Flash BR</option>
+<option value="global">🌍 Global — Leonida GTA VI Flash Global</option>
+</select>
+</label>
+<label style="color:#a0aec0;font-size:13px;">Título da Thumbnail
+<input type="text" id="tf-title" placeholder="Ex: NOVO TRAILER GTA VI" style="margin-top:4px;width:100%;padding:8px;background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;border-radius:6px;">
+</label>
+<button onclick="generateThumbnails()" style="padding:12px;background:linear-gradient(135deg,#f093fb,#f5576c);border:none;color:#fff;font-weight:700;border-radius:8px;cursor:pointer;font-size:15px;">🖼️ GERAR 3 THUMBNAILS</button>
+</div>
+</div>
+<div id="tf-progress" class="card" style="display:none;">
+<div class="card-title">Gerando...</div>
+<div id="tf-progress-text" style="color:#a0aec0;font-size:13px;">⏳ Extraindo frames e pontuando dinamismo visual...</div>
+</div>
+<div id="tf-result" class="card" style="display:none;">
+<div class="card-title">Escolha a Capa</div>
+<div id="tf-variants-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;"></div>
+<div id="tf-actions" style="margin-top:12px;display:flex;gap:8px;"></div>
+</div>
+<div class="card">
+<div class="card-title">Jobs Recentes</div>
+<div id="tf-jobs-list" style="color:#718096;font-size:13px;">Carregando...</div>
+</div>
+</div>
+
 <div id="page-dual-market" class="page">
 <div class="page-header"><div class="page-title">🌐 Dual Market — BR + Global</div></div>
 <div class="card">
@@ -1483,6 +1520,7 @@ function loadPageData(page) {
  if (page === 'diagnostics') loadDiagnostics();
  if (page === 'references') loadReferences();
  if (page === 'autoreel') loadAutoReelOutputs();
+ if (page === 'thumb-factory') loadThumbnailJobs();
  if (page === 'dual-market') loadDualMarketJobs();
  if (page === 'ssd-library') loadSSDStats();
  if (page === 'clipper') loadClips();
@@ -1512,6 +1550,102 @@ async function uploadFile(fileInputId, statusElId) {
  if (statusEl) statusEl.innerHTML = `<span style="color:#f44">❌ Upload: ${e.message}</span>`;
  return null;
  }
+}
+
+// === THUMBNAIL FACTORY 2.0 ===
+let currentThumbJobId = null;
+async function generateThumbnails() {
+ const videoPath = await uploadFile('tf-video-input', 'tf-upload-status');
+ if (!videoPath) {
+ if (!document.getElementById('tf-video-input').files.length) alert('Selecione um vídeo primeiro');
+ return;
+ }
+ const progressCard = document.getElementById('tf-progress');
+ const resultCard = document.getElementById('tf-result');
+ progressCard.style.display = 'block';
+ resultCard.style.display = 'none';
+ document.getElementById('tf-progress-text').textContent = '⏳ Extraindo frames e pontuando dinamismo visual...';
+
+ try {
+ const data = await apiPost('/api/thumbnails/generate', {
+ video_path: videoPath,
+ market: document.getElementById('tf-market').value,
+ title: document.getElementById('tf-title').value || '',
+ });
+
+ if (data.error || data.status === 'failed') {
+ progressCard.style.display = 'none';
+ alert('❌ ' + (data.error || 'Falha ao gerar thumbnails'));
+ return;
+ }
+
+ currentThumbJobId = data.job_id;
+ progressCard.style.display = 'none';
+ resultCard.style.display = 'block';
+
+ const grid = document.getElementById('tf-variants-grid');
+ grid.innerHTML = (data.variants || []).map(v => `
+ <div style="cursor:pointer;border:2px solid ${v.variant_id === data.selected_variant ? '#f5576c' : '#2d2d44'};border-radius:8px;overflow:hidden;transition:border-color 0.2s;" onclick="selectThumbnailVariant('${data.job_id}','${v.variant_id}',this)">
+ <img src="/api/filesystem/thumb/${v.path.split('/').pop()}" alt="${v.label}" style="width:100%;aspect-ratio:16/9;object-fit:cover;background:#1a1a2e;" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 320 180%22><rect fill=%22%231a1a2e%22 width=%22320%22 height=%22180%22/><text x=%2250%25%22 y=%2250%25%22 fill=%22%23718096%22 text-anchor=%22middle%22 dy=%22.3em%22>🖼️</text></svg>'">
+ <div style="padding:6px 8px;background:#1a1a2e;font-size:11px;">
+ <strong style="color:#e2e8f0;">${v.label}</strong><br>
+ <span style="color:#718096;">Score: ${v.score.toFixed(1)} | ${v.size_kb}KB</span>
+ </div>
+ </div>
+ `).join('');
+
+ document.getElementById('tf-actions').innerHTML = `
+ <button onclick="exportThumbnail('${data.job_id}')" style="flex:1;padding:10px;background:linear-gradient(135deg,#4ade80,#22c55e);border:none;color:#fff;font-weight:700;border-radius:6px;cursor:pointer;">📥 Exportar Selecionada</button>
+ <button onclick="updateThumbTitle('${data.job_id}')" style="flex:1;padding:10px;background:#2d2d44;border:none;color:#e2e8f0;font-weight:600;border-radius:6px;cursor:pointer;">✏️ Editar Título</button>
+ `;
+ loadThumbnailJobs();
+ } catch(e) {
+ progressCard.style.display = 'none';
+ alert('❌ Erro: ' + e.message);
+ }
+}
+
+async function selectThumbnailVariant(jobId, variantId, el) {
+ try {
+ await apiPost(`/api/thumbnails/select/${jobId}/${variantId}`, {});
+ document.querySelectorAll('#tf-variants-grid > div').forEach(d => d.style.borderColor = '#2d2d44');
+ if (el) el.style.borderColor = '#f5576c';
+ } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function exportThumbnail(jobId) {
+ try {
+ const data = await apiPost(`/api/thumbnails/export/${jobId}`, {});
+ if (data.exported_path) {
+ alert('✅ Thumbnail exportada: ' + data.exported_path);
+ } else {
+ alert('❌ Nenhuma variante selecionada');
+ }
+ } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function updateThumbTitle(jobId) {
+ const newTitle = prompt('Novo título para a thumbnail:');
+ if (!newTitle) return;
+ try {
+ await apiPost(`/api/thumbnails/title/${jobId}`, {title: newTitle});
+ alert('✅ Título atualizado. Variante editorial regenerada.');
+ generateThumbnails(); // Recarregar
+ } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function loadThumbnailJobs() {
+ const el = document.getElementById('tf-jobs-list');
+ try {
+ const data = await api('/api/thumbnails/jobs');
+ if (!data || !data.length) { el.textContent = 'Nenhum job de thumbnail ainda.'; return; }
+ el.innerHTML = data.map(j => `
+ <div style="padding:6px 0;border-bottom:1px solid #2d2d44;">
+ <strong style="color:#e2e8f0;">${j.title || 'Sem título'}</strong> (${j.market?.toUpperCase()})<br>
+ <span style="font-size:11px;color:#718096;">${j.variants_count} variantes | Status: ${j.status} | ${new Date(j.created_at*1000).toLocaleString()}</span>
+ </div>
+ `).join('');
+ } catch(e) { el.textContent = 'Erro: ' + e.message; }
 }
 
 // === DUAL MARKET ===

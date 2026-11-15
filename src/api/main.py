@@ -1884,3 +1884,94 @@ async def dual_market_identity(market: str):
 
     engine = DualMarketEngine(data_root=str(DATA_ROOT))
     return engine.get_identity(market)
+
+# =============================================================================
+# THUMBNAIL FACTORY 2.0 — 3 alternativas por vídeo com identidade BR/Global
+# =============================================================================
+
+@app.post("/api/thumbnails/generate")
+async def thumbnail_generate(request: Request):
+    """Gera 3 variantes de thumbnail para um vídeo."""
+    from src.production.thumbnail_factory import ThumbnailFactory
+
+    body = await request.json()
+    video_path = body.get("video_path", "")
+    if not video_path:
+        return JSONResponse(status_code=400, content={"detail": "video_path obrigatório"})
+
+    factory = ThumbnailFactory(data_root=str(DATA_ROOT))
+    job = factory.generate_variants(
+        video_path=video_path,
+        market=body.get("market", "br"),
+        title=body.get("title", ""),
+        associated_job_id=body.get("associated_job_id", ""),
+    )
+    return job.to_dict()
+
+@app.get("/api/thumbnails/jobs")
+async def thumbnail_jobs(limit: int = 20):
+    """Lista jobs de thumbnail recentes."""
+    from src.production.thumbnail_factory import ThumbnailFactory
+
+    factory = ThumbnailFactory(data_root=str(DATA_ROOT))
+    return factory.list_jobs(limit=limit)
+
+@app.get("/api/thumbnails/job/{job_id}")
+async def thumbnail_job_detail(job_id: str):
+    """Detalhes completos de um job de thumbnail."""
+    from src.production.thumbnail_factory import ThumbnailFactory
+
+    factory = ThumbnailFactory(data_root=str(DATA_ROOT))
+    result = factory.get_job(job_id)
+    if not result:
+        return JSONResponse(status_code=404, content={"detail": "Job não encontrado"})
+    return result
+
+@app.post("/api/thumbnails/select/{job_id}/{variant_id}")
+async def thumbnail_select_variant(job_id: str, variant_id: str):
+    """Seleciona qual variante usar como capa."""
+    from src.production.thumbnail_factory import ThumbnailFactory
+
+    factory = ThumbnailFactory(data_root=str(DATA_ROOT))
+    ok = factory.select_variant(job_id, variant_id)
+    if not ok:
+        return JSONResponse(status_code=404, content={"detail": "Job ou variante não encontrada"})
+    return {"status": "ok", "selected": variant_id}
+
+@app.post("/api/thumbnails/export/{job_id}")
+async def thumbnail_export(job_id: str):
+    """Exporta a variante selecionada em formato compatível."""
+    from src.production.thumbnail_factory import ThumbnailFactory
+
+    factory = ThumbnailFactory(data_root=str(DATA_ROOT))
+    path = factory.export_selected(job_id)
+    if not path:
+        return JSONResponse(status_code=400, content={"detail": "Nenhuma variante selecionada ou job não encontrado"})
+    return {"status": "ok", "exported_path": path}
+
+@app.put("/api/thumbnails/title/{job_id}")
+async def thumbnail_update_title(job_id: str, request: Request):
+    """Atualiza título e regenera variante editorial."""
+    from src.production.thumbnail_factory import ThumbnailFactory
+
+    body = await request.json()
+    title = body.get("title", "")
+    if not title:
+        return JSONResponse(status_code=400, content={"detail": "title obrigatório"})
+
+    factory = ThumbnailFactory(data_root=str(DATA_ROOT))
+    ok = factory.update_title(job_id, title)
+    if not ok:
+        return JSONResponse(status_code=404, content={"detail": "Job não encontrado"})
+    return {"status": "ok", "title": title}
+
+@app.post("/api/thumbnails/associate/{job_id}/{publish_job_id}")
+async def thumbnail_associate(job_id: str, publish_job_id: str):
+    """Associa thumbnail a um job de publicação."""
+    from src.production.thumbnail_factory import ThumbnailFactory
+
+    factory = ThumbnailFactory(data_root=str(DATA_ROOT))
+    ok = factory.associate_with_job(job_id, publish_job_id)
+    if not ok:
+        return JSONResponse(status_code=404, content={"detail": "Job não encontrado"})
+    return {"status": "ok", "associated": publish_job_id}
