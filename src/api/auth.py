@@ -104,12 +104,20 @@ def get_jwt_secret() -> str:
 
 
 def validate_dashboard_credentials(username: str, password: str) -> bool:
-    """Validate dashboard login credentials against env vars."""
+    """Validate dashboard login credentials against env vars.
+
+    SECURITY: In production, JHC_DASHBOARD_PASS MUST be explicitly set.
+    No fallback to JHC_API_KEY — that would expose the admin API key
+    as a web login password, defeating the purpose of separate credentials.
+    """
     expected_user = os.environ.get("JHC_DASHBOARD_USER", "admin")
     expected_pass = os.environ.get("JHC_DASHBOARD_PASS", "")
 
     if not expected_pass:
-        # Fallback: use API key as password if no dashboard password set
+        # In production, refuse login if no dashboard password is configured
+        if os.environ.get("JHC_ENV") == "production":
+            return False
+        # Dev/local only: allow API key as fallback for convenience
         expected_pass = os.environ.get("JHC_API_KEY", "")
 
     if not expected_pass:

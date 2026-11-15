@@ -53,8 +53,10 @@ API_KEY = os.environ.get("JHC_API_KEY", "")
 
 # Routes that never require authentication
 PUBLIC_PATHS = {"/", "/api/health", "/docs", "/openapi.json", "/redoc"}
-# Auth routes handle their own credential validation
-AUTH_PATHS = {"/api/auth/login", "/api/auth/logout", "/api/auth/me"}
+# Auth routes that do NOT require prior authentication (login/logout are self-validating)
+OPEN_AUTH_PATHS = {"/api/auth/login"}
+# Auth routes that DO require a valid JWT session (me, logout need authenticated user)
+SESSION_AUTH_PATHS = {"/api/auth/me", "/api/auth/logout"}
 
 
 class ApiKeyMiddleware(BaseHTTPMiddleware):
@@ -67,9 +69,30 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
         if path in PUBLIC_PATHS or not path.startswith("/api/"):
             return await call_next(request)
 
-        # Skip auth for auth endpoints (they validate credentials themselves)
-        if path in AUTH_PATHS:
+        # Open auth endpoints (login) — no prior auth needed
+        if path in OPEN_AUTH_PATHS:
             return await call_next(request)
+
+        # Session auth endpoints (/api/auth/me, /api/auth/logout) — MUST validate JWT
+        if path in SESSION_AUTH_PATHS:
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                token = auth_header[7:]
+                payload = verify_jwt(token, get_jwt_secret())
+                if payload:
+                    request.state.user = payload
+                    return await call_next(request)
+            # Also check httpOnly cookie as fallback
+            cookie_token = request.cookies.get("jhc_session")
+            if cookie_token:
+                payload = verify_jwt(cookie_token, get_jwt_secret())
+                if payload:
+                    request.state.user = payload
+                    return await call_next(request)
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Session expired or invalid. Please login again."},
+            )
 
         # Skip auth entirely if no key configured (local dev mode)
         if not API_KEY:
@@ -80,6 +103,14 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
         if auth_header.startswith("Bearer "):
             token = auth_header[7:]
             payload = verify_jwt(token, get_jwt_secret())
+            if payload:
+                request.state.user = payload
+                return await call_next(request)
+
+        # Also check httpOnly cookie for regular API routes
+        cookie_token = request.cookies.get("jhc_session")
+        if cookie_token:
+            payload = verify_jwt(cookie_token, get_jwt_secret())
             if payload:
                 request.state.user = payload
                 return await call_next(request)

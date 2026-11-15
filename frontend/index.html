@@ -1280,24 +1280,43 @@ function doLogout() {
 }
 
 async function checkAuth() {
+ // 1. Try sessionStorage first (fast path)
  const stored = sessionStorage.getItem('jhc_token');
  if (stored) {
  authToken = stored;
  try {
- const r = await fetch(API + '/api/auth/me', {headers: {'Authorization': 'Bearer ' + authToken}});
+ const r = await fetch(API + '/api/auth/me', {
+ headers: {'Authorization': 'Bearer ' + authToken},
+ credentials: 'include' // send httpOnly cookie too
+ });
  if (r.ok) return true;
  } catch(e) {}
  sessionStorage.removeItem('jhc_token');
  authToken = null;
  }
+ // 2. Fallback: try httpOnly cookie (survives tab close / session clear)
+ try {
+ const r = await fetch(API + '/api/auth/me', {credentials: 'include'});
+ if (r.ok) {
+ // Cookie is valid — server accepted it. We don't have the token in JS
+ // but the browser will send the cookie automatically on subsequent requests.
+ // Set a flag so api() knows to include credentials.
+ authToken = '__cookie_session__';
+ return true;
+ }
+ } catch(e) {}
  return false;
 }
 
 async function api(path, opts = {}) {
  try {
  const headers = {...(opts.headers || {})};
- if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
- const r = await fetch(API + path, {...opts, headers});
+ // Send JWT Bearer if we have it in JS memory
+ if (authToken && authToken !== '__cookie_session__') {
+ headers['Authorization'] = 'Bearer ' + authToken;
+ }
+ // Always include credentials so httpOnly cookie is sent automatically
+ const r = await fetch(API + path, {...opts, headers, credentials: 'include'});
  if (r.status === 401) {
  sessionStorage.removeItem('jhc_token');
  authToken = null;
