@@ -655,7 +655,8 @@ body::after {
  <div class="nav-section">
  <div class="nav-label">Laboratório</div>
  <div class="nav-item" data-page="references"><span class="nav-icon">🔬</span> Referências</div>
- <div class="nav-item" data-page="clipper"><span class="nav-icon">✂️</span> Smart Clipper</div>
+ <div class="nav-item" data-page="autoreel"><span class="nav-icon">🎬</span> AutoReel Studio</div>
+<div class="nav-item" data-page="clipper"><span class="nav-icon">✂️</span> Smart Clipper</div>
  <div class="nav-item" data-page="stories"><span class="nav-icon">🎭</span> Story Studio</div>
  <div class="nav-item" data-page="importer"><span class="nav-icon">📥</span> Importador</div>
  </div>
@@ -1053,6 +1054,52 @@ body::after {
 </div>
 
 <!-- ===== SMART CLIPPER (MISSÃO 015) ===== -->
+<div id="page-autoreel" class="page">
+<div class="page-header"><div class="page-title">🎬 AutoReel Studio</div></div>
+<div class="card">
+<div class="card-title">Produção Automática de Reels</div>
+<div style="display:grid;gap:12px;">
+<label style="color:#a0aec0;font-size:13px;">Vídeo Fonte
+<input type="file" id="ar-video-input" accept="video/*" style="margin-top:4px;width:100%;padding:8px;background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;border-radius:6px;">
+</label>
+<div id="ar-upload-status" style="color:#718096;font-size:12px;"></div>
+<label style="color:#a0aec0;font-size:13px;">Mercado
+<select id="ar-market" style="margin-top:4px;width:100%;padding:8px;background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;border-radius:6px;">
+<option value="br">🇧🇷 BR — Leonida GTA VI Flash BR</option>
+<option value="global">🌍 Global — Leonida GTA VI Flash Global</option>
+</select>
+</label>
+<label style="color:#a0aec0;font-size:13px;">Plataforma
+<select id="ar-platform" style="margin-top:4px;width:100%;padding:8px;background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;border-radius:6px;">
+<option value="reels">Instagram Reels (9:16, até 90s)</option>
+<option value="shorts">YouTube Shorts (9:16, até 60s)</option>
+<option value="tiktok">TikTok (9:16, até 180s)</option>
+<option value="stories">Stories (9:16, até 60s)</option>
+<option value="feed">Feed (1:1, até 60s)</option>
+</select>
+</label>
+<label style="color:#a0aec0;font-size:13px;">Legenda / Título
+<input type="text" id="ar-subtitle" placeholder="Texto opcional para legenda queimada" style="margin-top:4px;width:100%;padding:8px;background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;border-radius:6px;">
+</label>
+<button onclick="produceAutoReel()" style="padding:12px;background:linear-gradient(135deg,#f093fb,#f5576c);border:none;color:#fff;font-weight:700;border-radius:8px;cursor:pointer;font-size:15px;">🎬 PRODUZIR REEL</button>
+</div>
+</div>
+<div id="ar-progress" class="card" style="display:none;">
+<div class="card-title">Progresso</div>
+<div id="ar-progress-bar" style="height:8px;background:#2d2d44;border-radius:4px;overflow:hidden;margin:8px 0;"><div id="ar-progress-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#f093fb,#f5576c);transition:width 0.3s;"></div></div>
+<div id="ar-progress-text" style="color:#a0aec0;font-size:13px;"></div>
+<div id="ar-error" style="color:#fc8181;font-size:13px;margin-top:8px;display:none;"></div>
+</div>
+<div id="ar-result" class="card" style="display:none;">
+<div class="card-title">Resultado</div>
+<div id="ar-result-content"></div>
+</div>
+<div class="card">
+<div class="card-title">Produções Recentes</div>
+<div id="ar-outputs-list" style="color:#718096;font-size:13px;">Carregando...</div>
+</div>
+</div>
+
 <div id="page-clipper" class="page">
 <div class="page-header"><div class="page-title">✂️ Smart Clipper</div></div>
 <div class="card">
@@ -1363,6 +1410,7 @@ function loadPageData(page) {
  if (page === 'templates') loadTemplates();
  if (page === 'diagnostics') loadDiagnostics();
  if (page === 'references') loadReferences();
+ if (page === 'autoreel') loadAutoReelOutputs();
  if (page === 'clipper') loadClips();
  if (page === 'stories') loadStories();
  if (page === 'importer') loadImporter();
@@ -1390,6 +1438,87 @@ async function uploadFile(fileInputId, statusElId) {
  if (statusEl) statusEl.innerHTML = `<span style="color:#f44">❌ Upload: ${e.message}</span>`;
  return null;
  }
+}
+
+// === AUTOREEL STUDIO ===
+async function produceAutoReel() {
+ const videoPath = await uploadFile('ar-video-input', 'ar-upload-status');
+ if (!videoPath) {
+ if (!document.getElementById('ar-video-input').files.length) alert('Selecione um vídeo primeiro');
+ return;
+ }
+ const progressCard = document.getElementById('ar-progress');
+ const resultCard = document.getElementById('ar-result');
+ const errorEl = document.getElementById('ar-error');
+ progressCard.style.display = 'block';
+ resultCard.style.display = 'none';
+ errorEl.style.display = 'none';
+
+ const fill = document.getElementById('ar-progress-fill');
+ const text = document.getElementById('ar-progress-text');
+ fill.style.width = '10%';
+ text.textContent = '⏳ Enviando para produção...';
+
+ const body = {
+ video_path: videoPath,
+ market: document.getElementById('ar-market').value,
+ platform: document.getElementById('ar-platform').value,
+ subtitle_text: document.getElementById('ar-subtitle').value || '',
+ include_music: true,
+ };
+
+ try {
+ fill.style.width = '30%';
+ text.textContent = '🎬 Produzindo reel... (isso pode levar alguns segundos)';
+ const data = await apiPost('/api/autoreel/produce', body);
+ if (data.error || data.status === 'failed') {
+ fill.style.width = '100%';
+ fill.style.background = '#f44';
+ text.textContent = '❌ Falha na produção';
+ errorEl.style.display = 'block';
+ errorEl.textContent = data.error || 'Erro desconhecido';
+ return;
+ }
+ fill.style.width = '100%';
+ fill.style.background = 'linear-gradient(90deg,#0f0,#4ade80)';
+ text.textContent = '✅ Produção concluída!';
+ resultCard.style.display = 'block';
+ const info = data.metadata?.source_info || {};
+ const qg = data.metadata?.quality_gate || {};
+ document.getElementById('ar-result-content').innerHTML = `
+ <div style="color:#4ade80;font-size:14px;margin-bottom:8px;">✅ ${data.message || 'Reel produzido com sucesso'}</div>
+ <div style="font-size:12px;color:#a0aec0;">
+ Duração: ${(data.duration_seconds||0).toFixed(1)}s | Mercado: ${body.market.toUpperCase()} | Plataforma: ${body.platform}<br>
+ Output: ${data.output_path || 'N/A'}<br>
+ Thumbnail: ${data.thumbnail_path || 'N/A'}<br>
+ Quality Gate: ${qg.passed ? '✅ Aprovado' : '❌ Reprovado'}
+ </div>
+ ${data.output_path ? `<a href="/api/output/autoreel/${data.output_path.split('/').pop()}" target="_blank" style="display:inline-block;margin-top:8px;padding:6px 12px;background:#2d2d44;color:#e2e8f0;border-radius:4px;text-decoration:none;font-size:12px;">📥 Baixar MP4</a>` : ''}
+ `;
+ loadAutoReelOutputs();
+ } catch(e) {
+ fill.style.width = '100%';
+ fill.style.background = '#f44';
+ text.textContent = '❌ Erro de comunicação';
+ errorEl.style.display = 'block';
+ errorEl.textContent = e.message;
+ }
+}
+
+async function loadAutoReelOutputs() {
+ const el = document.getElementById('ar-outputs-list');
+ try {
+ const data = await api('/api/autoreel/outputs');
+ if (!data || !data.length) { el.textContent = 'Nenhuma produção ainda.'; return; }
+ el.innerHTML = data.map(o => `
+ <div style="padding:8px 0;border-bottom:1px solid #2d2d44;display:flex;justify-content:space-between;align-items:center;">
+ <div>
+ <strong style="color:#e2e8f0;">${o.filename}</strong><br>
+ <span style="font-size:11px;color:#718096;">${o.size_mb}MB | ${o.market?.toUpperCase()} | ${o.platform}</span>
+ </div>
+ </div>
+ `).join('');
+ } catch(e) { el.textContent = 'Erro ao carregar: ' + e.message; }
 }
 
 // === MISSÃO 014 — Referências ===

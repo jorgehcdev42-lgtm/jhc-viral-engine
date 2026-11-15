@@ -1682,3 +1682,66 @@ async def upload_media(request: Request):
         "size_mb": round(len(content) / (1024 * 1024), 2),
         "uploaded_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
     }
+
+
+# =============================================================================
+# AUTOREEL STUDIO — Pipeline automático de produção de vídeos virais
+# =============================================================================
+
+@app.post("/api/autoreel/produce")
+async def autoreel_produce(request: Request):
+    """Produz um reel viral automaticamente a partir de vídeo fonte."""
+    from src.production.auto_reel import AutoReelStudio, ReelRequest
+
+    body = await request.json()
+    video_path = body.get("video_path", "")
+    if not video_path:
+        return JSONResponse(status_code=400, content={"detail": "video_path obrigatório"})
+
+    reel_request = ReelRequest(
+        video_path=video_path,
+        market=body.get("market", "br"),
+        platform=body.get("platform", "reels"),
+        editorial_model=body.get("editorial_model", "viral_hook"),
+        include_narration=body.get("include_narration", False),
+        include_music=body.get("include_music", True),
+        custom_title=body.get("custom_title"),
+        subtitle_text=body.get("subtitle_text"),
+        logo_path=body.get("logo_path"),
+    )
+
+    studio = AutoReelStudio(data_root=str(DATA_ROOT))
+    result = studio.produce(reel_request)
+    return result.to_dict()
+
+
+@app.get("/api/autoreel/outputs")
+async def autoreel_outputs():
+    """Lista produções concluídas do AutoReel."""
+    from src.production.auto_reel import AutoReelStudio
+
+    studio = AutoReelStudio(data_root=str(DATA_ROOT))
+    return studio.list_outputs()
+
+
+@app.get("/api/autoreel/status/{job_id}")
+async def autoreel_status(job_id: str):
+    """Busca status de um job AutoReel por ID."""
+    from src.production.auto_reel import AutoReelStudio
+
+    studio = AutoReelStudio(data_root=str(DATA_ROOT))
+    result = studio.get_status(job_id)
+    if not result:
+        return JSONResponse(status_code=404, content={"detail": "Job não encontrado"})
+    return result
+
+
+@app.get("/api/autoreel/configs")
+async def autoreel_configs():
+    """Retorna configurações disponíveis de market e plataforma."""
+    from src.production.auto_reel import PLATFORM_CONFIGS, MARKET_CONFIGS
+
+    return {
+        "platforms": {k.value: v for k, v in PLATFORM_CONFIGS.items()},
+        "markets": {k.value: v for k, v in MARKET_CONFIGS.items()},
+    }
