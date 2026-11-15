@@ -1235,3 +1235,41 @@ async def list_clips():
     from src.media.smart_clipper import SmartClipper
     clipper = SmartClipper(DATA_ROOT)
     return clipper.list_clips()
+
+# =============================================================================
+# MISSÃO 016 — Story Studio (Histórias Animadas)
+# =============================================================================
+
+@app.post("/api/stories/create")
+async def create_story(request: Request):
+    """Cria e renderiza uma história animada a partir de roteiro JSON."""
+    from src.production.story_studio import StoryStudio
+    body = await request.json()
+    studio = StoryStudio(DATA_ROOT)
+    try:
+        story = studio.create_story(script=body.get("script"))
+        if body.get("save_script"):
+            studio.save_script(story, body.get("name"))
+        result = studio.render(
+            story,
+            platform=body.get("platform", "reels"),
+            output_name=body.get("name"),
+        )
+        from dataclasses import asdict
+        return asdict(result)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": f"Erro: {str(e)}"})
+
+@app.get("/api/stories/list")
+async def list_stories():
+    """Lista todas as histórias renderizadas."""
+    from src.production.story_studio import StoryStudio
+    studio = StoryStudio(DATA_ROOT)
+    return studio.list_stories()
+
+@app.get("/api/stories/scripts")
+async def list_scripts():
+    """Lista todos os roteiros salvos."""
+    from src.production.story_studio import StoryStudio
+    studio = StoryStudio(DATA_ROOT)
+    return studio.list_scripts()
