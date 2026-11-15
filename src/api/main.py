@@ -34,6 +34,7 @@ from src.production.reel_templates import (
 )
 from src.automation.media_director import MediaDirector, JobState
 from src.research.trend_hunter import TrendHunter
+from src.api.auth import create_jwt, verify_jwt, get_jwt_secret, validate_dashboard_credentials
 
 logger = logging.getLogger(__name__)
 
@@ -52,33 +53,48 @@ API_KEY = os.environ.get("JHC_API_KEY", "")
 
 # Routes that never require authentication
 PUBLIC_PATHS = {"/", "/api/health", "/docs", "/openapi.json", "/redoc"}
+# Auth routes handle their own credential validation
+AUTH_PATHS = {"/api/auth/login", "/api/auth/logout", "/api/auth/me"}
 
 
 class ApiKeyMiddleware(BaseHTTPMiddleware):
-    """Global middleware: rejects unauthenticated requests to protected /api/* routes."""
+    """Global middleware: accepts JWT Bearer token OR API key for /api/* routes."""
 
     async def dispatch(self, request: Request, call_next):
-        # Skip auth if no key configured (local dev mode)
-        if not API_KEY:
-            return await call_next(request)
-
-        # Skip auth for public routes
         path = request.url.path
+
+        # Skip auth for public routes and non-API paths
         if path in PUBLIC_PATHS or not path.startswith("/api/"):
             return await call_next(request)
 
-        # Check X-API-Key header only (query param disabled in production to prevent
-        # credential leakage via logs, browser history, and Referer headers)
+        # Skip auth for auth endpoints (they validate credentials themselves)
+        if path in AUTH_PATHS:
+            return await call_next(request)
+
+        # Skip auth entirely if no key configured (local dev mode)
+        if not API_KEY:
+            return await call_next(request)
+
+        # 1. Try JWT Bearer token first (dashboard sessions)
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+            payload = verify_jwt(token, get_jwt_secret())
+            if payload:
+                request.state.user = payload
+                return await call_next(request)
+
+        # 2. Fall back to API key header (programmatic access)
         provided = request.headers.get("X-API-Key")
         if os.environ.get("JHC_ENV") != "production":
             provided = provided or request.query_params.get("api_key")
-        if not provided or not secrets.compare_digest(provided, API_KEY):
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Invalid or missing API key. Set X-API-Key header."},
-            )
+        if provided and secrets.compare_digest(provided, API_KEY):
+            return await call_next(request)
 
-        return await call_next(request)
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Authentication required. Login via /api/auth/login or provide X-API-Key header."},
+        )
 
 
 app.add_middleware(ApiKeyMiddleware)
@@ -1524,3 +1540,114 @@ async def get_export_profiles():
     from src.production.multiformat_exporter import MultiFormatExporter
     exporter = MultiFormatExporter(DATA_ROOT)
     return exporter.get_available_profiles()
+
+# =============================================================================
+# MISSÃO 023 — Autenticação Dashboard + Upload de Mídia
+# =============================================================================
+
+@app.post("/api/auth/login")
+async def dashboard_login(request: Request):
+    """Login seguro do proprietário. Retorna JWT em httpOnly cookie + body."""
+    from src.api.auth import create_jwt, get_jwt_secret, validate_dashboard_credentials
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"detail": "JSON inválido"})
+
+    username = body.get("username", "")
+    password = body.get("password", "")
+
+    if not username or not password:
+        return JSONResponse(status_code=400, content={"detail": "username e password obrigatórios"})
+
+    if not validate_dashboard_credentials(username, password):
+        return JSONResponse(status_code=401, content={"detail": "Credenciais inválidas"})
+
+    secret = get_jwt_secret()
+    token = create_jwt({"sub": username, "role": "owner"}, secret, expires_in=86400)
+
+    response = JSONResponse(content={
+        "token": token,
+        "expires_in": 86400,
+        "user": username,
+    })
+    response.set_cookie(
+        key="jhc_session",
+        value=token,
+        httponly=True,
+        secure=os.environ.get("JHC_ENV") == "production",
+        samesite="lax",
+        max_age=86400,
+        path="/",
+    )
+    return response
+
+
+@app.get("/api/auth/me")
+async def auth_me(request: Request):
+    """Retorna informações do usuário autenticado."""
+    user = getattr(request.state, "user", None)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Não autenticado"})
+    return {"user": user.get("sub"), "role": user.get("role"), "exp": user.get("exp")}
+
+
+@app.post("/api/auth/logout")
+async def dashboard_logout():
+    """Limpa sessão do proprietário."""
+    response = JSONResponse(content={"detail": "Logout realizado"})
+    response.delete_cookie("jhc_session", path="/")
+    return response
+
+
+@app.post("/api/upload")
+async def upload_media(request: Request):
+    """Upload de arquivo de mídia via multipart/form-data.
+
+    Recebe o arquivo, salva em DATA_ROOT/uploads/ e retorna o caminho
+    para uso nos endpoints de processamento (clipper, stories, export, etc.).
+    """
+    content_type = request.headers.get("content-type", "")
+    if "multipart/form-data" not in content_type:
+        return JSONResponse(
+            status_code=400,
+            content={"detail": "Content-Type deve ser multipart/form-data"},
+        )
+
+    form = await request.form()
+    file = form.get("file")
+    if not file or not hasattr(file, "filename"):
+        return JSONResponse(status_code=400, content={"detail": "Campo 'file' obrigatório"})
+
+    uploads_dir = DATA_ROOT / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+
+    # Sanitiza nome do arquivo
+    import re
+    safe_name = re.sub(r'[^\w\-.]', '_', file.filename)
+    timestamp = int(time.time())
+    dest = uploads_dir / f"{timestamp}_{safe_name}"
+
+    # Evita sobrescrita
+    counter = 0
+    while dest.exists():
+        counter += 1
+        stem = dest.stem.rsplit("_", 1)[0] if "_" in dest.stem else dest.stem
+        dest = uploads_dir / f"{stem}_{counter}{dest.suffix}"
+
+    content = await file.read()
+    max_size = 500 * 1024 * 1024  # 500MB
+    if len(content) > max_size:
+        return JSONResponse(
+            status_code=413,
+            content={"detail": f"Arquivo muito grande ({len(content)//1024//1024}MB). Máximo: 500MB"},
+        )
+
+    dest.write_bytes(content)
+
+    return {
+        "path": str(dest),
+        "filename": dest.name,
+        "size_mb": round(len(content) / (1024 * 1024), 2),
+        "uploaded_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+    }
