@@ -1447,3 +1447,34 @@ async def publish_stats():
     from src.publishing.browser_publisher import BrowserPublisher
     publisher = BrowserPublisher(DATA_ROOT)
     return publisher.get_stats()
+
+# =============================================================================
+# MISSÃO 020 — Thumbnail Factory Integrada
+# =============================================================================
+
+@app.post("/api/thumbnails/auto-generate")
+async def auto_generate_thumbnail(request: Request):
+    """Gera thumbnails automaticamente para um vídeo (integração com publicação)."""
+    from src.production.thumbnail_engine import ThumbnailEngine, ThumbnailRequest
+    body = await request.json()
+    video_path = body.get("video_path", "")
+    profile_id = body.get("profile_id", "")
+    if not video_path:
+        return JSONResponse(status_code=400, content={"detail": "video_path é obrigatório"})
+    engine = ThumbnailEngine(DATA_ROOT)
+    try:
+        req = ThumbnailRequest(
+            profile_id=profile_id or "default",
+            platform=body.get("platform", "instagram"),
+            format_type=body.get("format_type", "reel"),
+            title=body.get("title", ""),
+            source_video_path=video_path,
+            template=body.get("template", "auto"),
+        )
+        results = await engine.generate_variants(req)
+        return {
+            "generated": len(results),
+            "thumbnails": [r.to_dict() for r in results],
+        }
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": f"Erro: {str(e)}"})
