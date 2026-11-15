@@ -40,9 +40,9 @@ class AudioAnalysis:
     """Análise básica da trilha sonora."""
     duration_sec: float
     has_audio: bool
-    estimated_bpm: int | None  # BPM estimado via pico de energia
+    estimated_bpm: int | None = None  # BPM estimado via pico de energia
+    silence_ratio: float = 0.0  # fração do tempo em silêncio (0-1)
     energy_peaks: list[float] = field(default_factory=list)  # timestamps de picos
-    silence_ratio: float  # fração do tempo em silêncio (0-1)
 
 
 @dataclass
