@@ -1745,3 +1745,104 @@ async def autoreel_configs():
         "platforms": {k.value: v for k, v in PLATFORM_CONFIGS.items()},
         "markets": {k.value: v for k, v in MARKET_CONFIGS.items()},
     }
+
+# =============================================================================
+# SSD LIBRARY — Worker local seguro para indexação de vídeos no SSD
+# =============================================================================
+
+@app.post("/api/ssd/validate")
+async def ssd_validate(request: Request):
+    """Valida se o caminho SSD existe e é acessível."""
+    from src.media.ssd_library import SSDLibraryWorker
+
+    body = await request.json()
+    ssd_path = body.get("path", "")
+    if not ssd_path:
+        return JSONResponse(status_code=400, content={"detail": "path obrigatório"})
+
+    worker = SSDLibraryWorker(ssd_root=ssd_path, data_root=str(DATA_ROOT))
+    return worker.validate_ssd_path()
+
+
+@app.post("/api/ssd/scan")
+async def ssd_scan(request: Request):
+    """Inicia indexação incremental de vídeos no SSD."""
+    from src.media.ssd_library import SSDLibraryWorker
+
+    body = await request.json()
+    ssd_path = body.get("path", "")
+    max_files = body.get("max_files", 50)
+
+    if not ssd_path:
+        return JSONResponse(status_code=400, content={"detail": "path obrigatório"})
+
+    worker = SSDLibraryWorker(ssd_root=ssd_path, data_root=str(DATA_ROOT))
+    result = worker.scan(max_files=max_files)
+    return result
+
+
+@app.get("/api/ssd/search")
+async def ssd_search(
+    q: str = "", tags: str = "", category: str = "",
+    min_dur: float = 0, max_dur: float = 0, limit: int = 50
+):
+    """Busca vídeos indexados com filtros editoriais."""
+    from src.media.ssd_library import SSDLibraryWorker
+
+    # Usa último path validado ou padrão
+    ssd_path = os.environ.get("JHC_SSD_PATH", "/Volumes/SSD EXT MACBOOK")
+    worker = SSDLibraryWorker(ssd_root=ssd_path, data_root=str(DATA_ROOT))
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
+    results = worker.search(
+        query=q, tags=tag_list, category=category,
+        min_duration=min_dur, max_duration=max_dur, limit=limit
+    )
+    return results
+
+
+@app.get("/api/ssd/stats")
+async def ssd_stats():
+    """Estatísticas da biblioteca SSD."""
+    from src.media.ssd_library import SSDLibraryWorker
+
+    ssd_path = os.environ.get("JHC_SSD_PATH", "/Volumes/SSD EXT MACBOOK")
+    worker = SSDLibraryWorker(ssd_root=ssd_path, data_root=str(DATA_ROOT))
+    return worker.get_stats()
+
+
+@app.put("/api/ssd/tags")
+async def ssd_update_tags(request: Request):
+    """Atualiza tags de um vídeo indexado."""
+    from src.media.ssd_library import SSDLibraryWorker
+
+    body = await request.json()
+    path = body.get("path", "")
+    tags = body.get("tags", [])
+    if not path:
+        return JSONResponse(status_code=400, content={"detail": "path obrigatório"})
+
+    ssd_path = os.environ.get("JHC_SSD_PATH", "/Volumes/SSD EXT MACBOOK")
+    worker = SSDLibraryWorker(ssd_root=ssd_path, data_root=str(DATA_ROOT))
+    ok = worker.update_tags(path, tags)
+    if not ok:
+        return JSONResponse(status_code=404, content={"detail": "Vídeo não encontrado no índice"})
+    return {"status": "ok", "tags": tags}
+
+
+@app.put("/api/ssd/category")
+async def ssd_update_category(request: Request):
+    """Atualiza categoria de um vídeo indexado."""
+    from src.media.ssd_library import SSDLibraryWorker
+
+    body = await request.json()
+    path = body.get("path", "")
+    category = body.get("category", "")
+    if not path or not category:
+        return JSONResponse(status_code=400, content={"detail": "path e category obrigatórios"})
+
+    ssd_path = os.environ.get("JHC_SSD_PATH", "/Volumes/SSD EXT MACBOOK")
+    worker = SSDLibraryWorker(ssd_root=ssd_path, data_root=str(DATA_ROOT))
+    ok = worker.update_category(path, category)
+    if not ok:
+        return JSONResponse(status_code=404, content={"detail": "Vídeo não encontrado no índice"})
+    return {"status": "ok", "category": category}

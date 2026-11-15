@@ -658,7 +658,8 @@ body::after {
  <div class="nav-item" data-page="autoreel"><span class="nav-icon">🎬</span> AutoReel Studio</div>
 <div class="nav-item" data-page="clipper"><span class="nav-icon">✂️</span> Smart Clipper</div>
  <div class="nav-item" data-page="stories"><span class="nav-icon">🎭</span> Story Studio</div>
- <div class="nav-item" data-page="importer"><span class="nav-icon">📥</span> Importador</div>
+ <div class="nav-item" data-page="ssd-library"><span class="nav-icon">💾</span> Biblioteca SSD</div>
+<div class="nav-item" data-page="importer"><span class="nav-icon">📥</span> Importador</div>
  </div>
 
  <div class="nav-section">
@@ -1164,6 +1165,35 @@ body::after {
 </div>
 
 <!-- ===== IMPORTADOR (MISSÃO 018) ===== -->
+<div id="page-ssd-library" class="page">
+<div class="page-header"><div class="page-title">💾 Biblioteca SSD</div></div>
+<div class="card">
+<div class="card-title">Indexação de Vídeos no SSD</div>
+<div style="display:grid;gap:12px;">
+<label style="color:#a0aec0;font-size:13px;">Caminho do SSD
+<input type="text" id="ssd-path-input" value="/Volumes/SSD EXT MACBOOK" placeholder="/Volumes/SSD EXT MACBOOK" style="margin-top:4px;width:100%;padding:8px;background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;border-radius:6px;">
+</label>
+<div style="display:flex;gap:8px;">
+<button onclick="validateSSD()" style="flex:1;padding:10px;background:#2d2d44;border:none;color:#e2e8f0;font-weight:600;border-radius:6px;cursor:pointer;">🔍 Validar</button>
+<button onclick="scanSSD()" style="flex:1;padding:10px;background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:#fff;font-weight:700;border-radius:6px;cursor:pointer;">📂 Indexar (50)</button>
+</div>
+<div id="ssd-validate-result" style="font-size:12px;color:#718096;"></div>
+</div>
+</div>
+<div class="card">
+<div class="card-title">Estatísticas</div>
+<div id="ssd-stats-content" style="color:#a0aec0;font-size:13px;">Clique em Validar para ver estatísticas.</div>
+</div>
+<div class="card">
+<div class="card-title">Busca</div>
+<div style="display:flex;gap:8px;margin-bottom:12px;">
+<input type="text" id="ssd-search-input" placeholder="Buscar por nome ou tag..." style="flex:1;padding:8px;background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;border-radius:6px;">
+<button onclick="searchSSD()" style="padding:8px 16px;background:#2d2d44;border:none;color:#e2e8f0;border-radius:6px;cursor:pointer;">🔎</button>
+</div>
+<div id="ssd-search-results" style="max-height:400px;overflow-y:auto;font-size:12px;color:#a0aec0;">Resultados aparecerão aqui.</div>
+</div>
+</div>
+
 <div id="page-importer" class="page">
 <div class="page-header"><div class="page-title">📥 Importador Social</div></div>
 <div class="card">
@@ -1411,6 +1441,7 @@ function loadPageData(page) {
  if (page === 'diagnostics') loadDiagnostics();
  if (page === 'references') loadReferences();
  if (page === 'autoreel') loadAutoReelOutputs();
+ if (page === 'ssd-library') loadSSDStats();
  if (page === 'clipper') loadClips();
  if (page === 'stories') loadStories();
  if (page === 'importer') loadImporter();
@@ -1438,6 +1469,66 @@ async function uploadFile(fileInputId, statusElId) {
  if (statusEl) statusEl.innerHTML = `<span style="color:#f44">❌ Upload: ${e.message}</span>`;
  return null;
  }
+}
+
+// === SSD LIBRARY ===
+async function validateSSD() {
+ const path = document.getElementById('ssd-path-input').value;
+ const el = document.getElementById('ssd-validate-result');
+ el.innerHTML = '<span style="color:#aaa">⏳ Validando...</span>';
+ try {
+ const data = await apiPost('/api/ssd/validate', {path});
+ if (data.error) { el.innerHTML = `<span style="color:#f44">❌ ${data.error}</span>`; return; }
+ el.innerHTML = data.valid
+ ? `<span style="color:#4ade80">✅ Caminho válido | ${data.video_files_found} vídeos encontrados</span>`
+ : `<span style="color:#f44">❌ Caminho não encontrado ou não é diretório</span>`;
+ loadSSDStats();
+ } catch(e) { el.innerHTML = `<span style="color:#f44">❌ ${e.message}</span>`; }
+}
+async function scanSSD() {
+ const path = document.getElementById('ssd-path-input').value;
+ const el = document.getElementById('ssd-validate-result');
+ el.innerHTML = '<span style="color:#aaa">⏳ Indexando (sequencial, seguro para M2 8GB)...</span>';
+ try {
+ const data = await apiPost('/api/ssd/scan', {path, max_files: 50});
+ if (data.error) { el.innerHTML = `<span style="color:#f44">❌ ${data.error}</span>`; return; }
+ el.innerHTML = `<span style="color:#4ade80">✅ Indexados: ${data.indexed} | Existentes: ${data.skipped_existing} | Duplicatas: ${data.skipped_duplicate} | Total: ${data.total_in_library}</span>`;
+ loadSSDStats();
+ } catch(e) { el.innerHTML = `<span style="color:#f44">❌ ${e.message}</span>`; }
+}
+async function loadSSDStats() {
+ const el = document.getElementById('ssd-stats-content');
+ try {
+ const data = await api('/api/ssd/stats');
+ if (!data || data.total_videos === undefined) { el.textContent = 'Sem dados. Valide o caminho primeiro.'; return; }
+ el.innerHTML = `
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+ <div>📹 Vídeos: <strong>${data.total_videos}</strong></div>
+ <div>💾 Tamanho: <strong>${data.total_size_mb.toFixed(1)} MB</strong></div>
+ <div>⏱️ Duração total: <strong>${(data.total_duration_sec/60).toFixed(1)} min</strong></div>
+ <div>🔗 Hashes únicos: <strong>${data.unique_hashes}</strong></div>
+ <div>♻️ Duplicatas: <strong>${data.duplicates_detected}</strong></div>
+ </div>
+ ${Object.keys(data.categories||{}).length ? '<div style="margin-top:8px;"><strong>Categorias:</strong> '+Object.entries(data.categories).map(([k,v])=>`${k}: ${v}`).join(', ')+'</div>' : ''}
+ `;
+ } catch(e) { el.textContent = 'Erro: ' + e.message; }
+}
+async function searchSSD() {
+ const q = document.getElementById('ssd-search-input').value;
+ const el = document.getElementById('ssd-search-results');
+ el.innerHTML = '<span style="color:#aaa">⏳ Buscando...</span>';
+ try {
+ const params = new URLSearchParams({q, limit: '50'});
+ const data = await api(`/api/ssd/search?${params}`);
+ if (!data || !data.length) { el.textContent = 'Nenhum resultado.'; return; }
+ el.innerHTML = data.map(v => `
+ <div style="padding:6px 0;border-bottom:1px solid #2d2d44;">
+ <strong style="color:#e2e8f0;">${v.filename}</strong><br>
+ <span style="font-size:11px;color:#718096;">${v.duration.toFixed(1)}s | ${v.width}x${v.height} | ${v.size_mb}MB | ${v.category}</span>
+ ${v.tags.length ? '<br><span style="font-size:10px;color:#667eea;">'+v.tags.join(', ')+'</span>' : ''}
+ </div>
+ `).join('');
+ } catch(e) { el.textContent = 'Erro: ' + e.message; }
 }
 
 // === AUTOREEL STUDIO ===
