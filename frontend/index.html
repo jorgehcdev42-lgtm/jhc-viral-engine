@@ -658,7 +658,8 @@ body::after {
  <div class="nav-item" data-page="autoreel"><span class="nav-icon">🎬</span> AutoReel Studio</div>
 <div class="nav-item" data-page="clipper"><span class="nav-icon">✂️</span> Smart Clipper</div>
  <div class="nav-item" data-page="stories"><span class="nav-icon">🎭</span> Story Studio</div>
- <div class="nav-item" data-page="thumb-factory"><span class="nav-icon">🖼️</span> Thumbnail Factory</div>
+ <div class="nav-item" data-page="bulk-import"><span class="nav-icon">📦</span> Central Importação</div>
+<div class="nav-item" data-page="thumb-factory"><span class="nav-icon">🖼️</span> Thumbnail Factory</div>
 <div class="nav-item" data-page="dual-market"><span class="nav-icon">🌐</span> Dual Market</div>
 <div class="nav-item" data-page="ssd-library"><span class="nav-icon">💾</span> Biblioteca SSD</div>
 <div class="nav-item" data-page="importer"><span class="nav-icon">📥</span> Importador</div>
@@ -1167,6 +1168,32 @@ body::after {
 </div>
 
 <!-- ===== IMPORTADOR (MISSÃO 018) ===== -->
+<div id="page-bulk-import" class="page">
+<div class="page-header"><div class="page-title">📦 Central de Importação</div></div>
+<div class="card">
+<div class="card-title">Importar Pack de Vídeos</div>
+<div style="display:grid;gap:12px;">
+<label style="color:#a0aec0;font-size:13px;">HTML do Catálogo (copie o source da página monetizegta6)
+<textarea id="bi-html-input" rows="4" placeholder="Cole o HTML da página /membros/pro/ aqui..." style="margin-top:4px;width:100%;padding:8px;background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;border-radius:6px;font-family:monospace;font-size:11px;"></textarea>
+</label>
+<button onclick="discoverPackVideos()" style="padding:10px;background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:#fff;font-weight:700;border-radius:6px;cursor:pointer;">🔍 Descobrir Vídeos</button>
+<div id="bi-discover-result" style="font-size:12px;color:#718096;"></div>
+</div>
+</div>
+<div class="card">
+<div class="card-title">Progresso da Importação</div>
+<div id="bi-progress-content" style="color:#a0aec0;font-size:13px;">Carregando...</div>
+<div style="margin-top:8px;display:flex;gap:8px;">
+<button onclick="processBatch()" style="flex:1;padding:8px;background:#2d2d44;border:none;color:#e2e8f0;font-weight:600;border-radius:6px;cursor:pointer;">▶ Processar Lote</button>
+<button onclick="retryFailed()" style="flex:1;padding:8px;background:#2d2d44;border:none;color:#e2e8f0;font-weight:600;border-radius:6px;cursor:pointer;">🔄 Retentar Falhas</button>
+</div>
+</div>
+<div class="card">
+<div class="card-title">Entradas Recentes</div>
+<div id="bi-entries-list" style="max-height:300px;overflow-y:auto;font-size:12px;color:#a0aec0;">Carregando...</div>
+</div>
+</div>
+
 <div id="page-thumb-factory" class="page">
 <div class="page-header"><div class="page-title">🖼️ Thumbnail Factory 2.0</div></div>
 <div class="card">
@@ -1520,6 +1547,7 @@ function loadPageData(page) {
  if (page === 'diagnostics') loadDiagnostics();
  if (page === 'references') loadReferences();
  if (page === 'autoreel') loadAutoReelOutputs();
+ if (page === 'bulk-import') { loadPackProgress(); loadPackEntries(); }
  if (page === 'thumb-factory') loadThumbnailJobs();
  if (page === 'dual-market') loadDualMarketJobs();
  if (page === 'ssd-library') loadSSDStats();
@@ -1550,6 +1578,71 @@ async function uploadFile(fileInputId, statusElId) {
  if (statusEl) statusEl.innerHTML = `<span style="color:#f44">❌ Upload: ${e.message}</span>`;
  return null;
  }
+}
+
+// === BULK IMPORT CENTRAL ===
+async function discoverPackVideos() {
+ const html = document.getElementById('bi-html-input').value;
+ if (!html || html.length < 100) { alert('Cole o HTML completo da página /membros/pro/'); return; }
+ const el = document.getElementById('bi-discover-result');
+ el.innerHTML = '<span style="color:#aaa">⏳ Analisando catálogo...</span>';
+ try {
+ const data = await apiPost('/api/import/pack/discover', {html});
+ el.innerHTML = `<span style="color:#4ade80">✅ ${data.discovered} vídeos descobertos | ${data.added} adicionados | ${data.duplicates} duplicatas | Total: ${data.total}</span>`;
+ loadPackProgress();
+ loadPackEntries();
+ } catch(e) { el.innerHTML = `<span style="color:#f44">❌ ${e.message}</span>`; }
+}
+async function processBatch() {
+ const el = document.getElementById('bi-progress-content');
+ el.innerHTML = '<span style="color:#aaa">⏳ Processando lote...</span>';
+ try {
+ const data = await apiPost('/api/import/pack/process', {batch_size: 3});
+ el.innerHTML = `<span style="color:#4ade80">✅ Processados: ${data.processed}</span>`;
+ loadPackProgress();
+ loadPackEntries();
+ } catch(e) { el.innerHTML = `<span style="color:#f44">❌ ${e.message}</span>`; }
+}
+async function retryFailed() {
+ try {
+ const data = await apiPost('/api/import/pack/retry', {});
+ alert(`🔄 ${data.retried} entradas reenfileiradas`);
+ loadPackProgress();
+ loadPackEntries();
+ } catch(e) { alert('Erro: ' + e.message); }
+}
+async function loadPackProgress() {
+ const el = document.getElementById('bi-progress-content');
+ try {
+ const d = await api('/api/import/pack/progress');
+ const pct = d.total_discovered > 0 ? Math.round((d.total_downloaded / d.total_discovered) * 100) : 0;
+ el.innerHTML = `
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+ <div>📦 Descobertos: <strong>${d.total_discovered}</strong></div>
+ <div>✅ Baixados: <strong>${d.total_downloaded}</strong></div>
+ <div>❌ Falhas: <strong>${d.total_failed}</strong></div>
+ <div>🔒 Auth bloqueado: <strong>${d.total_blocked_auth}</strong></div>
+ <div>♻️ Duplicatas: <strong>${d.total_duplicates}</strong></div>
+ <div>💾 SSD livre: <strong>${d.ssd_free_gb} GB</strong></div>
+ </div>
+ <div style="margin-top:8px;height:6px;background:#2d2d44;border-radius:3px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#667eea,#764ba2);transition:width 0.3s;"></div></div>
+ <div style="text-align:center;font-size:11px;color:#718096;margin-top:2px;">${pct}% concluído</div>
+ `;
+ } catch(e) { el.textContent = 'Erro: ' + e.message; }
+}
+async function loadPackEntries() {
+ const el = document.getElementById('bi-entries-list');
+ try {
+ const data = await api('/api/import/pack/entries?limit=50');
+ if (!data || !data.length) { el.textContent = 'Nenhuma entrada. Descubra vídeos acima.'; return; }
+ const stateColors = {COMPLETED:'#4ade80',DOWNLOADING:'#667eea',PENDING:'#a0aec0',FAILED:'#f44',BLOCKED_AUTH:'#f59e0b',VERIFYING:'#8b5cf6'};
+ el.innerHTML = data.map(e => `
+ <div style="padding:4px 0;border-bottom:1px solid #2d2d44;display:flex;justify-content:space-between;">
+ <span style="color:#e2e8f0;font-size:11px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.filename}</span>
+ <span style="color:${stateColors[e.state]||'#718096'};font-size:10px;font-weight:600;">${e.state}</span>
+ </div>
+ `).join('');
+ } catch(e) { el.textContent = 'Erro: ' + e.message; }
 }
 
 // === THUMBNAIL FACTORY 2.0 ===

@@ -2093,3 +2093,82 @@ async def publish_pipeline_valid_transitions(state: str):
     from src.publishing.publish_state_machine import PublishStateMachine
 
     return {"state": state, "valid_next": PublishStateMachine.get_valid_transitions(state)}
+
+# =============================================================================
+# PACK BULK IMPORTER — Importação massiva de packs de vídeos (MISSÃO 026)
+# =============================================================================
+
+@app.post("/api/import/pack/discover")
+async def pack_discover(request: Request):
+    """Descobre arquivos de um pack via HTML da plataforma."""
+    from src.media.pack_bulk_importer import PackBulkImporter
+
+    body = await request.json()
+    html = body.get("html", "")
+    if not html:
+        return JSONResponse(status_code=400, content={"detail": "html obrigatório"})
+
+    ssd_path = os.environ.get("JHC_SSD_PATH", "/Volumes/SSD EXT MACBOOK")
+    importer = PackBulkImporter(ssd_root=ssd_path, data_root=str(DATA_ROOT))
+    entries = importer.parse_monetizegta6_catalog(html)
+    result = importer.add_entries(entries)
+    return {"discovered": len(entries), **result}
+
+@app.post("/api/import/pack/add")
+async def pack_add_entries(request: Request):
+    """Adiciona entradas de download manualmente."""
+    from src.media.pack_bulk_importer import PackBulkImporter
+
+    body = await request.json()
+    entries = body.get("entries", [])
+    if not entries:
+        return JSONResponse(status_code=400, content={"detail": "entries obrigatório"})
+
+    ssd_path = os.environ.get("JHC_SSD_PATH", "/Volumes/SSD EXT MACBOOK")
+    importer = PackBulkImporter(ssd_root=ssd_path, data_root=str(DATA_ROOT))
+    return importer.add_entries(entries)
+
+@app.post("/api/import/pack/process")
+async def pack_process_batch(request: Request):
+    """Processa lote de downloads pendentes."""
+    from src.media.pack_bulk_importer import PackBulkImporter
+
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    batch_size = body.get("batch_size", 3)
+
+    ssd_path = os.environ.get("JHC_SSD_PATH", "/Volumes/SSD EXT MACBOOK")
+    importer = PackBulkImporter(ssd_root=ssd_path, data_root=str(DATA_ROOT))
+    results = importer.process_batch(batch_size=batch_size)
+    return {"processed": len(results), "results": results}
+
+@app.post("/api/import/pack/retry")
+async def pack_retry_failed():
+    """Reenfileira downloads falhados."""
+    from src.media.pack_bulk_importer import PackBulkImporter
+
+    ssd_path = os.environ.get("JHC_SSD_PATH", "/Volumes/SSD EXT MACBOOK")
+    importer = PackBulkImporter(ssd_root=ssd_path, data_root=str(DATA_ROOT))
+    count = importer.retry_failed()
+    return {"retried": count}
+
+@app.get("/api/import/pack/progress")
+async def pack_progress():
+    """Progresso atual da importação."""
+    from src.media.pack_bulk_importer import PackBulkImporter
+
+    ssd_path = os.environ.get("JHC_SSD_PATH", "/Volumes/SSD EXT MACBOOK")
+    importer = PackBulkImporter(ssd_root=ssd_path, data_root=str(DATA_ROOT))
+    return importer.get_progress()
+
+@app.get("/api/import/pack/entries")
+async def pack_entries(state: str = "", limit: int = 100):
+    """Lista entradas de download filtradas por estado."""
+    from src.media.pack_bulk_importer import PackBulkImporter
+
+    ssd_path = os.environ.get("JHC_SSD_PATH", "/Volumes/SSD EXT MACBOOK")
+    importer = PackBulkImporter(ssd_root=ssd_path, data_root=str(DATA_ROOT))
+    return importer.get_entries(state=state, limit=limit)
