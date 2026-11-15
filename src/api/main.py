@@ -1394,3 +1394,56 @@ async def import_stats():
     from src.media.social_importer import SocialImporter
     importer = SocialImporter(DATA_ROOT)
     return importer.get_import_stats()
+
+# =============================================================================
+# MISSÃO 019 — Browser Publisher (Publicação Automatizada)
+# =============================================================================
+
+@app.post("/api/publish/browser")
+async def browser_publish(request: Request):
+    """Publica vídeo em plataforma social via Playwright."""
+    from src.publishing.browser_publisher import BrowserPublisher, PublishRequest
+    body = await request.json()
+    video_path = body.get("video_path", "")
+    platform = body.get("platform", "")
+    if not video_path or not platform:
+        return JSONResponse(status_code=400, content={"detail": "video_path e platform são obrigatórios"})
+    publisher = BrowserPublisher(DATA_ROOT)
+    try:
+        req = PublishRequest(
+            platform=platform,
+            video_path=video_path,
+            title=body.get("title", ""),
+            description=body.get("description", ""),
+            tags=body.get("tags", []),
+            thumbnail_path=body.get("thumbnail_path", ""),
+            schedule_time=body.get("schedule_time", ""),
+            content_type=body.get("content_type", "reel"),
+            privacy=body.get("privacy", "public"),
+        )
+        result = await publisher.publish(req, max_retries=body.get("max_retries", 3))
+        from dataclasses import asdict
+        return asdict(result)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": f"Erro na publicação: {str(e)}"})
+
+@app.get("/api/publish/session/{platform}")
+async def check_publish_session(platform: str):
+    """Verifica se existe sessão ativa para a plataforma."""
+    from src.publishing.browser_publisher import BrowserPublisher
+    publisher = BrowserPublisher(DATA_ROOT)
+    return await publisher.check_session(platform)
+
+@app.get("/api/publish/history")
+async def publish_history(limit: int = Query(50, ge=1, le=200)):
+    """Retorna histórico de publicações."""
+    from src.publishing.browser_publisher import BrowserPublisher
+    publisher = BrowserPublisher(DATA_ROOT)
+    return publisher.get_history(limit=limit)
+
+@app.get("/api/publish/stats")
+async def publish_stats():
+    """Estatísticas de publicação."""
+    from src.publishing.browser_publisher import BrowserPublisher
+    publisher = BrowserPublisher(DATA_ROOT)
+    return publisher.get_stats()
