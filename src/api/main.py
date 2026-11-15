@@ -1156,3 +1156,46 @@ async def thumbnail_history(
     from src.production.thumbnail_engine import ThumbnailEngine
     engine = ThumbnailEngine(DATA_ROOT)
     return engine.get_history(profile_id=profile_id, limit=limit)
+
+
+# =============================================================================
+# MISSÃO 014 — Laboratório de Referências
+# =============================================================================
+
+@app.post("/api/references/analyze")
+async def analyze_reference_video(request: Request):
+    """Analisa um vídeo de referência e extrai padrões visuais/temporais."""
+    from src.research.reference_lab import ReferenceLab
+    body = await request.json()
+    video_path = body.get("video_path", "")
+    if not video_path:
+        return JSONResponse(status_code=400, content={"detail": "video_path é obrigatório"})
+    lab = ReferenceLab(DATA_ROOT)
+    try:
+        analysis = lab.analyze_video(video_path)
+        from dataclasses import asdict
+        return asdict(analysis)
+    except FileNotFoundError as e:
+        return JSONResponse(status_code=404, content={"detail": str(e)})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": f"Erro na análise: {str(e)}"})
+
+
+@app.get("/api/references/list")
+async def list_references():
+    """Lista todas as análises de referência salvas."""
+    from src.research.reference_lab import ReferenceLab
+    lab = ReferenceLab(DATA_ROOT)
+    return lab.list_analyses()
+
+
+@app.get("/api/references/blueprint/{name}")
+async def get_blueprint(name: str):
+    """Retorna o blueprint de uma referência analisada."""
+    from src.research.reference_lab import ReferenceLab
+    lab = ReferenceLab(DATA_ROOT)
+    bp_path = lab.blueprints_dir / f"{name}_blueprint.json"
+    if not bp_path.exists():
+        return JSONResponse(status_code=404, content={"detail": f"Blueprint '{name}' não encontrado"})
+    import json as _json
+    return _json.loads(bp_path.read_text(encoding="utf-8"))
