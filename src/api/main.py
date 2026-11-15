@@ -1339,3 +1339,58 @@ async def list_subtitles():
     from src.production.audiovisual_sync import AudioVisualSync
     sync = AudioVisualSync(DATA_ROOT)
     return sync.list_subtitles()
+
+# =============================================================================
+# MISSÃO 018 — Importador de Redes Sociais
+# =============================================================================
+
+@app.post("/api/import/video")
+async def import_social_video(request: Request):
+    """Importa vídeo de Instagram/YouTube/TikTok por URL."""
+    from src.media.social_importer import SocialImporter
+    body = await request.json()
+    url = body.get("url", "")
+    if not url:
+        return JSONResponse(status_code=400, content={"detail": "url é obrigatória"})
+    importer = SocialImporter(DATA_ROOT)
+    try:
+        result = importer.import_video(
+            url,
+            quality=body.get("quality", "best"),
+            use_cache=body.get("use_cache", True),
+        )
+        from dataclasses import asdict
+        return asdict(result)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": f"Erro na importação: {str(e)}"})
+
+@app.post("/api/import/batch")
+async def import_batch_videos(request: Request):
+    """Importa múltiplos vídeos em lote."""
+    from src.media.social_importer import SocialImporter
+    body = await request.json()
+    urls = body.get("urls", [])
+    if not urls:
+        return JSONResponse(status_code=400, content={"detail": "urls é obrigatório"})
+    importer = SocialImporter(DATA_ROOT)
+    return importer.import_batch(
+        urls,
+        quality=body.get("quality", "best"),
+        use_cache=body.get("use_cache", True),
+    )
+
+@app.get("/api/import/list")
+async def list_imports():
+    """Lista todos os vídeos importados."""
+    from src.media.social_importer import SocialImporter
+    importer = SocialImporter(DATA_ROOT)
+    return importer.list_imports()
+
+@app.get("/api/import/stats")
+async def import_stats():
+    """Estatísticas dos imports."""
+    from src.media.social_importer import SocialImporter
+    importer = SocialImporter(DATA_ROOT)
+    return importer.get_import_stats()
