@@ -1478,3 +1478,46 @@ async def auto_generate_thumbnail(request: Request):
         }
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": f"Erro: {str(e)}"})
+
+# =============================================================================
+# MISSÃO 021 — Distribuição Multiformato
+# =============================================================================
+
+@app.post("/api/export/multiformat")
+async def export_multiformat(request: Request):
+    """Exporta vídeo em múltiplos formatos para diferentes plataformas."""
+    from src.production.multiformat_exporter import MultiFormatExporter
+    body = await request.json()
+    video_path = body.get("video_path", "")
+    if not video_path:
+        return JSONResponse(status_code=400, content={"detail": "video_path é obrigatório"})
+    exporter = MultiFormatExporter(DATA_ROOT)
+    try:
+        result = exporter.export_all(
+            video_path,
+            platforms=body.get("platforms"),
+            profiles=body.get("profiles"),
+            watermark_text=body.get("watermark_text", ""),
+            subtitle_path=body.get("subtitle_path"),
+            output_prefix=body.get("output_prefix", ""),
+        )
+        from dataclasses import asdict
+        return asdict(result)
+    except FileNotFoundError as e:
+        return JSONResponse(status_code=404, content={"detail": str(e)})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": f"Erro na exportação: {str(e)}"})
+
+@app.get("/api/export/list")
+async def list_exports():
+    """Lista todas as exportações existentes."""
+    from src.production.multiformat_exporter import MultiFormatExporter
+    exporter = MultiFormatExporter(DATA_ROOT)
+    return exporter.list_exports()
+
+@app.get("/api/export/profiles")
+async def get_export_profiles():
+    """Retorna todos os perfis de formato disponíveis."""
+    from src.production.multiformat_exporter import MultiFormatExporter
+    exporter = MultiFormatExporter(DATA_ROOT)
+    return exporter.get_available_profiles()
