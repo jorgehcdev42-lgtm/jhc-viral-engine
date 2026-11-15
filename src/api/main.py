@@ -1993,3 +1993,103 @@ async def advanced_analyze(request: Request):
     analyzer = AdvancedVideoAnalyzer(data_root=str(DATA_ROOT))
     result = analyzer.analyze(video_path)
     return result.to_dict()
+
+# =============================================================================
+# PUBLISH STATE MACHINE — Verifiable job states (MISSÃO G)
+# =============================================================================
+
+@app.post("/api/publish-pipeline/create")
+async def publish_pipeline_create(request: Request):
+    """Create new publish pipeline job in PREPARING state."""
+    from src.publishing.publish_state_machine import PublishStateMachine
+
+    body = await request.json()
+    market = body.get("market", "br")
+    platform = body.get("platform", "")
+    if not platform:
+        return JSONResponse(status_code=400, content={"detail": "platform obrigatório"})
+
+    sm = PublishStateMachine(data_root=str(DATA_ROOT))
+    job = sm.create_job(
+        market=market,
+        platform=platform,
+        video_path=body.get("video_path", ""),
+        title=body.get("title", ""),
+        autoreel_job_id=body.get("autoreel_job_id", ""),
+        thumbnail_job_id=body.get("thumbnail_job_id", ""),
+    )
+    return job.to_dict()
+
+@app.post("/api/publish-pipeline/transition/{job_id}/{new_state}")
+async def publish_pipeline_transition(job_id: str, new_state: str, request: Request):
+    """Transition job state with validation. PUBLISHED requires confirmation."""
+    from src.publishing.publish_state_machine import PublishStateMachine
+
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    reason = body.get("reason", "")
+
+    sm = PublishStateMachine(data_root=str(DATA_ROOT))
+    result = sm.transition(job_id, new_state, reason)
+    if "error" in result:
+        return JSONResponse(status_code=400, content=result)
+    return result
+
+@app.post("/api/publish-pipeline/confirm/{job_id}")
+async def publish_pipeline_confirm(job_id: str, request: Request):
+    """Record verifiable platform confirmation. Required before PUBLISHED."""
+    from src.publishing.publish_state_machine import PublishStateMachine
+
+    body = await request.json()
+    post_id = body.get("post_id", "")
+    if not post_id:
+        return JSONResponse(status_code=400, content={"detail": "post_id obrigatório para confirmação verificável"})
+
+    sm = PublishStateMachine(data_root=str(DATA_ROOT))
+    result = sm.confirm_publish(
+        job_id=job_id,
+        post_id=post_id,
+        permalink=body.get("permalink", ""),
+        verification_method=body.get("verification_method", "api_response"),
+        metadata=body.get("metadata", {}),
+    )
+    if "error" in result:
+        return JSONResponse(status_code=400, content=result)
+    return result
+
+@app.get("/api/publish-pipeline/jobs")
+async def publish_pipeline_jobs(market: str = "", state: str = "", limit: int = 50):
+    """List pipeline jobs with optional filters."""
+    from src.publishing.publish_state_machine import PublishStateMachine
+
+    sm = PublishStateMachine(data_root=str(DATA_ROOT))
+    return sm.list_jobs(market=market, state=state, limit=limit)
+
+@app.get("/api/publish-pipeline/job/{job_id}")
+async def publish_pipeline_job_detail(job_id: str):
+    """Get full pipeline job details including state history."""
+    from src.publishing.publish_state_machine import PublishStateMachine
+
+    sm = PublishStateMachine(data_root=str(DATA_ROOT))
+    result = sm.get_job(job_id)
+    if not result:
+        return JSONResponse(status_code=404, content={"detail": "Job não encontrado"})
+    return result
+
+@app.get("/api/publish-pipeline/stats")
+async def publish_pipeline_stats():
+    """Pipeline stats by state and market."""
+    from src.publishing.publish_state_machine import PublishStateMachine
+
+    sm = PublishStateMachine(data_root=str(DATA_ROOT))
+    return sm.get_stats()
+
+@app.get("/api/publish-pipeline/valid-transitions/{state}")
+async def publish_pipeline_valid_transitions(state: str):
+    """Return valid next states for a given state."""
+    from src.publishing.publish_state_machine import PublishStateMachine
+
+    return {"state": state, "valid_next": PublishStateMachine.get_valid_transitions(state)}
