@@ -670,6 +670,7 @@ body::after {
  <div class="nav-section">
  <div class="nav-label">Sistema</div>
  <div class="nav-item" data-page="diagnostics"><span class="nav-icon">🔧</span> Diagnóstico</div>
+ <div class="nav-item" onclick="doLogout()" style="color:#f44;cursor:pointer;margin-top:8px"><span class="nav-icon">🚪</span> Sair</div>
  </div>
 </nav>
 
@@ -1038,7 +1039,7 @@ body::after {
 <div class="card">
 <div class="card-header"><span class="card-icon">🎬</span><div class="card-title">Analisar Vídeo de Referência</div></div>
 <div class="input-row">
-<input type="text" id="ref-video-path" class="gta-input" placeholder="Caminho absoluto do vídeo no servidor">
+<input type="file" id="ref-video-file" class="gta-input" accept="video/*">
 </div>
 <div class="input-row">
 <button class="btn btn-primary" onclick="analyzeReference()">🔬 Analisar</button>
@@ -1057,7 +1058,7 @@ body::after {
 <div class="card">
 <div class="card-header"><span class="card-icon">🎞️</span><div class="card-title">Extrair Clipes Virais</div></div>
 <div class="input-row">
-<input type="text" id="clip-video-path" class="gta-input" placeholder="Caminho do vídeo fonte">
+<input type="file" id="clip-video-file" class="gta-input" accept="video/*">
 </div>
 <div class="input-row">
 <select id="clip-platform" class="gta-select">
@@ -1171,7 +1172,7 @@ body::after {
 <div class="card">
 <div class="card-header"><span class="card-icon">🔄</span><div class="card-title">Exportar para Múltiplas Plataformas</div></div>
 <div class="input-row">
-<input type="text" id="export-video-path" class="gta-input" placeholder="Caminho do vídeo fonte">
+<input type="file" id="export-video-file" class="gta-input" accept="video/*">
 </div>
 <div class="input-row">
 <label style="color:#aaa;font-size:0.85rem">Plataformas:</label>
@@ -1213,7 +1214,7 @@ body::after {
 </select>
 </div>
 <div class="input-row">
-<input type="text" id="bp-video-path" class="gta-input" placeholder="Caminho do vídeo no servidor">
+<input type="file" id="bp-video-file" class="gta-input" accept="video/*">
 </div>
 <div class="input-row">
 <input type="text" id="bp-title" class="gta-input" placeholder="Título">
@@ -1234,16 +1235,96 @@ body::after {
 
 <script>
 const API = window.location.origin;
+let authToken = null;
 
-async function api(path) {
+// === AUTH SYSTEM ===
+function showLoginScreen() {
+ document.querySelector('.sidebar').style.display = 'none';
+ document.querySelector('main').innerHTML = `
+ <div style="display:flex;align-items:center;justify-content:center;height:100vh;width:100%">
+ <div style="background:#0a0a1a;border:1px solid #333;border-radius:12px;padding:40px;width:360px;text-align:center">
+ <h1 style="color:#00ff88;font-size:1.5rem;margin-bottom:8px">🎮 JHC Viral Engine</h1>
+ <p style="color:#888;margin-bottom:24px">Faça login para acessar o dashboard</p>
+ <input type="text" id="login-user" class="gta-input" placeholder="Usuário" style="width:100%;margin-bottom:12px">
+ <input type="password" id="login-pass" class="gta-input" placeholder="Senha" style="width:100%;margin-bottom:16px">
+ <button class="btn btn-primary" onclick="doLogin()" style="width:100%">Entrar</button>
+ <div id="login-error" style="color:#f44;margin-top:12px;display:none"></div>
+ </div>
+ </div>`;
+}
+
+async function doLogin() {
+ const user = document.getElementById('login-user').value.trim();
+ const pass = document.getElementById('login-pass').value;
+ const errEl = document.getElementById('login-error');
+ if (!user || !pass) { errEl.textContent = 'Preencha usuário e senha'; errEl.style.display = 'block'; return; }
  try {
- const r = await fetch(API + path);
+ const r = await fetch(API + '/api/auth/login', {
+ method: 'POST',
+ headers: {'Content-Type': 'application/json'},
+ body: JSON.stringify({username: user, password: pass})
+ });
+ const data = await r.json();
+ if (!r.ok) { errEl.textContent = data.detail || 'Erro no login'; errEl.style.display = 'block'; return; }
+ authToken = data.token;
+ sessionStorage.setItem('jhc_token', data.token);
+ location.reload();
+ } catch(e) { errEl.textContent = 'Erro de conexão: ' + e.message; errEl.style.display = 'block'; }
+}
+
+function doLogout() {
+ authToken = null;
+ sessionStorage.removeItem('jhc_token');
+ fetch(API + '/api/auth/logout', {method: 'POST'}).catch(() => {});
+ showLoginScreen();
+}
+
+async function checkAuth() {
+ const stored = sessionStorage.getItem('jhc_token');
+ if (stored) {
+ authToken = stored;
+ try {
+ const r = await fetch(API + '/api/auth/me', {headers: {'Authorization': 'Bearer ' + authToken}});
+ if (r.ok) return true;
+ } catch(e) {}
+ sessionStorage.removeItem('jhc_token');
+ authToken = null;
+ }
+ return false;
+}
+
+async function api(path, opts = {}) {
+ try {
+ const headers = {...(opts.headers || {})};
+ if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+ const r = await fetch(API + path, {...opts, headers});
+ if (r.status === 401) {
+ sessionStorage.removeItem('jhc_token');
+ authToken = null;
+ showLoginScreen();
+ return {error: 'Sessão expirada. Faça login novamente.'};
+ }
  if (!r.ok) throw new Error('HTTP ' + r.status);
  return await r.json();
  } catch (e) {
  return { error: e.message };
  }
 }
+
+async function apiPost(path, body) {
+ return api(path, {
+ method: 'POST',
+ headers: {'Content-Type': 'application/json'},
+ body: JSON.stringify(body)
+ });
+}
+
+// Check auth on load, show login if not authenticated
+(async () => {
+ const ok = await checkAuth();
+ if (!ok) { showLoginScreen(); return; }
+ // Auth OK — initialize dashboard normally
+})();
 
 // Navigation
 document.querySelectorAll('.nav-item').forEach(item => {
@@ -1271,21 +1352,36 @@ function loadPageData(page) {
  if (page === 'browser-pub') loadBrowserPub();
 }
 
+// === UPLOAD HELPER ===
+async function uploadFile(fileInputId, statusElId) {
+ const fileInput = document.getElementById(fileInputId);
+ if (!fileInput || !fileInput.files.length) return null;
+ const statusEl = document.getElementById(statusElId);
+ if (statusEl) statusEl.innerHTML = '<span style="color:#aaa">⏳ Fazendo upload...</span>';
+ const formData = new FormData();
+ formData.append('file', fileInput.files[0]);
+ try {
+ const headers = {};
+ if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+ const r = await fetch(API + '/api/upload', { method: 'POST', headers, body: formData });
+ const data = await r.json();
+ if (!r.ok) throw new Error(data.detail || 'Upload falhou');
+ return data.path;
+ } catch(e) {
+ if (statusEl) statusEl.innerHTML = `<span style="color:#f44">❌ Upload: ${e.message}</span>`;
+ return null;
+ }
+}
+
 // === MISSÃO 014 — Referências ===
 async function analyzeReference() {
- const path = document.getElementById('ref-video-path').value.trim();
- if (!path) { alert('Informe o caminho do vídeo'); return; }
  const el = document.getElementById('ref-result');
+ const videoPath = await uploadFile('ref-video-file', 'ref-result');
+ if (!videoPath) { if (!document.getElementById('ref-video-file').files.length) alert('Selecione um vídeo'); return; }
  el.innerHTML = '<span style="color:#aaa">⏳ Analisando...</span>';
- try {
- const r = await fetch(API + '/api/references/analyze', {
- method: 'POST', headers: {'Content-Type':'application/json'},
- body: JSON.stringify({video_path: path})
- });
- const data = await r.json();
- if (!r.ok) { el.innerHTML = `<span style="color:#f44">${data.detail || 'Erro'}</span>`; return; }
+ const data = await apiPost('/api/references/analyze', {video_path: videoPath});
+ if (data.error) { el.innerHTML = `<span style="color:#f44">${data.error}</span>`; return; }
  el.innerHTML = `<div style="color:#0f0">✅ Análise concluída<br>Duração: ${data.blueprint?.total_duration_sec}s | Segmentos: ${data.segment_count || data.segments?.length}<br>Pacing: ${data.blueprint?.pacing_profile} | Cores: ${(data.blueprint?.color_palette||[]).slice(0,3).join(', ')}</div>`;
- } catch(e) { el.innerHTML = `<span style="color:#f44">❌ ${e.message}</span>`; }
 }
 async function loadReferences() {
  const el = document.getElementById('ref-list');
@@ -1297,23 +1393,17 @@ async function loadReferences() {
 
 // === MISSÃO 015 — Smart Clipper ===
 async function extractClips() {
- const path = document.getElementById('clip-video-path').value.trim();
- if (!path) { alert('Informe o caminho do vídeo'); return; }
+ const el = document.getElementById('clip-result');
+ const videoPath = await uploadFile('clip-video-file', 'clip-result');
+ if (!videoPath) { if (!document.getElementById('clip-video-file').files.length) alert('Selecione um vídeo'); return; }
  const platform = document.getElementById('clip-platform').value;
  const maxClips = parseInt(document.getElementById('clip-max').value) || 5;
- const el = document.getElementById('clip-result');
  el.innerHTML = '<span style="color:#aaa">⏳ Extraindo clipes...</span>';
- try {
- const r = await fetch(API + '/api/clips/extract', {
- method: 'POST', headers: {'Content-Type':'application/json'},
- body: JSON.stringify({video_path: path, platform, max_clips: maxClips})
- });
- const data = await r.json();
- if (!r.ok) { el.innerHTML = `<span style="color:#f44">${data.detail || 'Erro'}</span>`; return; }
+ const data = await apiPost('/api/clips/extract', {video_path: videoPath, platform, max_clips: maxClips});
+ if (data.error) { el.innerHTML = `<span style="color:#f44">${data.error}</span>`; return; }
  const clips = data.selected_clips || [];
  el.innerHTML = `<div style="color:#0f0">✅ ${clips.length} clipes extraídos de ${data.total_candidates} candidatos<br>Fonte: ${data.source_duration_sec}s</div>` +
  clips.map((c,i) => `<div style="padding:4px 0;color:#ccc">#${i+1} ${c.start_sec}s–${c.end_sec}s score:${c.score} motion:${c.avg_motion}</div>`).join('');
- } catch(e) { el.innerHTML = `<span style="color:#f44">❌ ${e.message}</span>`; }
 }
 async function loadClips() {
  const el = document.getElementById('clip-list');
@@ -1333,15 +1423,9 @@ async function createStory() {
  if (!title || !scenes.length) { alert('Título e cenas são obrigatórios'); return; }
  const el = document.getElementById('story-result');
  el.innerHTML = '<span style="color:#aaa">⏳ Renderizando história...</span>';
- try {
- const r = await fetch(API + '/api/stories/create', {
- method: 'POST', headers: {'Content-Type':'application/json'},
- body: JSON.stringify({script: {title, scenes, style_preset: style, aspect_ratio: ratio}, save_script: true, platform: 'reels'})
- });
- const data = await r.json();
- if (!r.ok) { el.innerHTML = `<span style="color:#f44">${data.detail || 'Erro'}</span>`; return; }
+ const data = await apiPost('/api/stories/create', {script: {title, scenes, style_preset: style, aspect_ratio: ratio}, save_script: true, platform: 'reels'});
+ if (data.error) { el.innerHTML = `<span style="color:#f44">${data.error}</span>`; return; }
  el.innerHTML = `<div style="color:#0f0">✅ História renderizada!<br>${data.scene_count} cenas | ${data.duration_sec}s | ${data.resolution[0]}x${data.resolution[1]}<br>Arquivo: ${data.output_path} (${data.file_size_mb}MB)<br>Tempo: ${data.render_time_sec}s</div>`;
- } catch(e) { el.innerHTML = `<span style="color:#f44">❌ ${e.message}</span>`; }
 }
 async function loadStories() {
  const el = document.getElementById('story-list');
@@ -1363,16 +1447,10 @@ async function importVideo() {
  if (!url) { alert('Informe a URL'); return; }
  const el = document.getElementById('import-result');
  el.innerHTML = '<span style="color:#aaa">⏳ Importando...</span>';
- try {
- const r = await fetch(API + '/api/import/video', {
- method: 'POST', headers: {'Content-Type':'application/json'},
- body: JSON.stringify({url})
- });
- const data = await r.json();
- if (!r.ok) { el.innerHTML = `<span style="color:#f44">${data.detail || 'Erro'}</span>`; return; }
+ const data = await apiPost('/api/import/video', {url});
+ if (data.error) { el.innerHTML = `<span style="color:#f44">${data.error}</span>`; return; }
  const m = data.metadata || {};
  el.innerHTML = `<div style="color:#0f0">✅ Importado!<br>${m.title || 'Sem título'} — ${m.author || '?'}<br>${m.duration_sec}s | ${m.width}x${m.height} | ${m.file_size_mb}MB<br>Plataforma: ${m.platform} | Cache: ${data.was_cached ? 'sim' : 'não'}</div>`;
- } catch(e) { el.innerHTML = `<span style="color:#f44">❌ ${e.message}</span>`; }
 }
 async function loadImporter() {
  const statsEl = document.getElementById('import-stats');
@@ -1395,15 +1473,9 @@ async function generateSubtitles() {
  try { segments = JSON.parse(document.getElementById('sub-segments').value); } catch(e) { alert('JSON de segmentos inválido'); return; }
  if (!name || !segments.length) { alert('Nome e segmentos são obrigatórios'); return; }
  const el = document.getElementById('sub-result');
- try {
- const r = await fetch(API + '/api/subtitles/generate', {
- method: 'POST', headers: {'Content-Type':'application/json'},
- body: JSON.stringify({segments, output_name: name, format: fmt})
- });
- const data = await r.json();
- if (!r.ok) { el.innerHTML = `<span style="color:#f44">${data.detail || 'Erro'}</span>`; return; }
+ const data = await apiPost('/api/subtitles/generate', {segments, output_name: name, format: fmt});
+ if (data.error) { el.innerHTML = `<span style="color:#f44">${data.error}</span>`; return; }
  el.innerHTML = `<div style="color:#0f0">✅ Legenda gerada!<br>Formato: ${data.format} | Segmentos: ${data.segment_count}<br>Arquivo: ${data.path}</div>`;
- } catch(e) { el.innerHTML = `<span style="color:#f44">❌ ${e.message}</span>`; }
 }
 async function loadAudioVisual() {
  const subEl = document.getElementById('sub-list');
@@ -1415,23 +1487,17 @@ async function loadAudioVisual() {
 
 // === MISSÃO 021 — Multi-Formato ===
 async function exportMultiformat() {
- const path = document.getElementById('export-video-path').value.trim();
- if (!path) { alert('Informe o caminho do vídeo'); return; }
+ const el = document.getElementById('export-result');
+ const videoPath = await uploadFile('export-video-file', 'export-result');
+ if (!videoPath) { if (!document.getElementById('export-video-file').files.length) alert('Selecione um vídeo'); return; }
  const platforms = [...document.querySelectorAll('.export-plat:checked')].map(c => c.value);
  if (!platforms.length) { alert('Selecione ao menos uma plataforma'); return; }
- const el = document.getElementById('export-result');
  el.innerHTML = '<span style="color:#aaa">⏳ Exportando para múltiplos formatos...</span>';
- try {
- const r = await fetch(API + '/api/export/multiformat', {
- method: 'POST', headers: {'Content-Type':'application/json'},
- body: JSON.stringify({video_path: path, platforms})
- });
- const data = await r.json();
- if (!r.ok) { el.innerHTML = `<span style="color:#f44">${data.detail || 'Erro'}</span>`; return; }
+ const data = await apiPost('/api/export/multiformat', {video_path: videoPath, platforms});
+ if (data.error) { el.innerHTML = `<span style="color:#f44">${data.error}</span>`; return; }
  const exports = data.exports || [];
  el.innerHTML = `<div style="color:#0f0">✅ ${data.successful_count}/${exports.length} exportações OK | Total: ${data.total_size_mb}MB | Tempo: ${data.total_render_time_sec}s</div>` +
  exports.map(e => `<div style="padding:4px 0;color:${e.success?'#ccc':'#f44'}">${e.profile_name}: ${e.success ? `${e.duration_sec}s ${e.file_size_mb}MB ${e.resolution[0]}x${e.resolution[1]}` : e.error}</div>`).join('');
- } catch(e) { el.innerHTML = `<span style="color:#f44">❌ ${e.message}</span>`; }
 }
 async function loadExportProfiles() {
  const el = document.getElementById('export-profiles');
@@ -1444,25 +1510,19 @@ async function loadExportProfiles() {
 async function browserPublish() {
  const platform = document.getElementById('bp-platform').value;
  const contentType = document.getElementById('bp-type').value;
- const videoPath = document.getElementById('bp-video-path').value.trim();
+ const el = document.getElementById('bp-result');
+ const videoPath = await uploadFile('bp-video-file', 'bp-result');
+ if (!videoPath) { if (!document.getElementById('bp-video-file').files.length) alert('Selecione um vídeo'); return; }
  const title = document.getElementById('bp-title').value.trim();
  const desc = document.getElementById('bp-desc').value.trim();
- if (!videoPath) { alert('Informe o caminho do vídeo'); return; }
- const el = document.getElementById('bp-result');
  el.innerHTML = '<span style="color:#aaa">⏳ Publicando via browser...</span>';
- try {
- const r = await fetch(API + '/api/publish/browser', {
- method: 'POST', headers: {'Content-Type':'application/json'},
- body: JSON.stringify({platform, content_type: contentType, video_path: videoPath, title, description: desc})
- });
- const data = await r.json();
- if (!r.ok) { el.innerHTML = `<span style="color:#f44">${data.detail || 'Erro'}</span>`; return; }
+ const data = await apiPost('/api/publish/browser', {platform, content_type: contentType, video_path: videoPath, title, description: desc});
+ if (data.error) { el.innerHTML = `<span style="color:#f44">${data.error}</span>`; return; }
  if (data.success) {
  el.innerHTML = `<div style="color:#0f0">✅ Publicado com sucesso!<br>URL: ${data.post_url || 'N/A'}<br>Tentativas: ${data.retry_count} | Tempo: ${data.duration_sec}s</div>`;
  } else {
  el.innerHTML = `<div style="color:#f44">❌ Falha na publicação<br>${data.error}<br>Tentativas: ${data.retry_count}</div>`;
  }
- } catch(e) { el.innerHTML = `<span style="color:#f44">❌ ${e.message}</span>`; }
 }
 async function loadBrowserPub() {
  const el = document.getElementById('bp-stats');
