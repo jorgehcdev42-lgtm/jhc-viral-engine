@@ -1273,3 +1273,69 @@ async def list_scripts():
     from src.production.story_studio import StoryStudio
     studio = StoryStudio(DATA_ROOT)
     return studio.list_scripts()
+
+# =============================================================================
+# MISSÃO 017 — Integração Audiovisual
+# =============================================================================
+
+@app.post("/api/audio/mix")
+async def mix_audio(request: Request):
+    """Mixa música e/ou narração com o áudio original do vídeo."""
+    from src.production.audiovisual_sync import AudioVisualSync
+    body = await request.json()
+    video_path = body.get("video_path", "")
+    if not video_path:
+        return JSONResponse(status_code=400, content={"detail": "video_path é obrigatório"})
+    sync = AudioVisualSync(DATA_ROOT)
+    try:
+        result = sync.mix_audio(
+            video_path,
+            music_path=body.get("music_path"),
+            narration_path=body.get("narration_path"),
+            music_volume=body.get("music_volume", 0.3),
+            narration_volume=body.get("narration_volume", 1.0),
+            ducking=body.get("ducking", True),
+            output_name=body.get("output_name"),
+        )
+        from dataclasses import asdict
+        return asdict(result)
+    except FileNotFoundError as e:
+        return JSONResponse(status_code=404, content={"detail": str(e)})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": f"Erro na mixagem: {str(e)}"})
+
+@app.post("/api/subtitles/generate")
+async def generate_subtitles(request: Request):
+    """Gera arquivo de legenda (SRT/VTT/ASS) a partir de segmentos temporizados."""
+    from src.production.audiovisual_sync import AudioVisualSync
+    body = await request.json()
+    segments = body.get("segments", [])
+    output_name = body.get("output_name", "subtitles")
+    if not segments:
+        return JSONResponse(status_code=400, content={"detail": "segments é obrigatório"})
+    sync = AudioVisualSync(DATA_ROOT)
+    try:
+        result = sync.generate_subtitles(
+            segments,
+            output_name=output_name,
+            fmt=body.get("format", "srt"),
+            language=body.get("language", "pt-BR"),
+        )
+        from dataclasses import asdict
+        return asdict(result)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": f"Erro: {str(e)}"})
+
+@app.get("/api/audio/list")
+async def list_mixed_audio():
+    """Lista todos os arquivos de áudio mixados."""
+    from src.production.audiovisual_sync import AudioVisualSync
+    sync = AudioVisualSync(DATA_ROOT)
+    return sync.list_mixed()
+
+@app.get("/api/subtitles/list")
+async def list_subtitles():
+    """Lista todos os arquivos de legenda."""
+    from src.production.audiovisual_sync import AudioVisualSync
+    sync = AudioVisualSync(DATA_ROOT)
+    return sync.list_subtitles()
