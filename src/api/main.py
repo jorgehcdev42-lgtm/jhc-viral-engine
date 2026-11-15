@@ -1199,3 +1199,39 @@ async def get_blueprint(name: str):
         return JSONResponse(status_code=404, content={"detail": f"Blueprint '{name}' não encontrado"})
     import json as _json
     return _json.loads(bp_path.read_text(encoding="utf-8"))
+
+# =============================================================================
+# MISSÃO 015 — Smart Clipper
+# =============================================================================
+
+@app.post("/api/clips/extract")
+async def extract_clips(request: Request):
+    """Extrai clipes virais de um vídeo longo."""
+    from src.media.smart_clipper import SmartClipper
+    body = await request.json()
+    video_path = body.get("video_path", "")
+    if not video_path:
+        return JSONResponse(status_code=400, content={"detail": "video_path é obrigatório"})
+    clipper = SmartClipper(DATA_ROOT)
+    try:
+        result = clipper.extract_clips(
+            video_path,
+            target_duration=body.get("target_duration", 30),
+            max_clips=body.get("max_clips", 5),
+            platform=body.get("platform", "reels"),
+            min_score=body.get("min_score", 0.3),
+        )
+        from dataclasses import asdict
+        return asdict(result)
+    except FileNotFoundError as e:
+        return JSONResponse(status_code=404, content={"detail": str(e)})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": f"Erro na extração: {str(e)}"})
+
+
+@app.get("/api/clips/list")
+async def list_clips():
+    """Lista todos os clipes extraídos."""
+    from src.media.smart_clipper import SmartClipper
+    clipper = SmartClipper(DATA_ROOT)
+    return clipper.list_clips()
