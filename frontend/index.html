@@ -653,6 +653,21 @@ body::after {
  </div>
 
  <div class="nav-section">
+ <div class="nav-label">Laboratório</div>
+ <div class="nav-item" data-page="references"><span class="nav-icon">🔬</span> Referências</div>
+ <div class="nav-item" data-page="clipper"><span class="nav-icon">✂️</span> Smart Clipper</div>
+ <div class="nav-item" data-page="stories"><span class="nav-icon">🎭</span> Story Studio</div>
+ <div class="nav-item" data-page="importer"><span class="nav-icon">📥</span> Importador</div>
+ </div>
+
+ <div class="nav-section">
+ <div class="nav-label">Distribuição</div>
+ <div class="nav-item" data-page="audiovisual"><span class="nav-icon">🎵</span> Audiovisual</div>
+ <div class="nav-item" data-page="export"><span class="nav-icon">📦</span> Multi-Formato</div>
+ <div class="nav-item" data-page="browser-pub"><span class="nav-icon">🌐</span> Browser Pub</div>
+ </div>
+
+ <div class="nav-section">
  <div class="nav-label">Sistema</div>
  <div class="nav-item" data-page="diagnostics"><span class="nav-icon">🔧</span> Diagnóstico</div>
  </div>
@@ -1017,6 +1032,204 @@ body::after {
  </div>
  </div>
 
+<!-- ===== REFERÊNCIAS (MISSÃO 014) ===== -->
+<div id="page-references" class="page">
+<div class="page-header"><div class="page-title">🔬 Laboratório de Referências</div></div>
+<div class="card">
+<div class="card-header"><span class="card-icon">🎬</span><div class="card-title">Analisar Vídeo de Referência</div></div>
+<div class="input-row">
+<input type="text" id="ref-video-path" class="gta-input" placeholder="Caminho absoluto do vídeo no servidor">
+</div>
+<div class="input-row">
+<button class="btn btn-primary" onclick="analyzeReference()">🔬 Analisar</button>
+</div>
+<div id="ref-result"></div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-icon">📋</span><div class="card-title">Análises Salvas</div></div>
+<div id="ref-list">Carregando...</div>
+</div>
+</div>
+
+<!-- ===== SMART CLIPPER (MISSÃO 015) ===== -->
+<div id="page-clipper" class="page">
+<div class="page-header"><div class="page-title">✂️ Smart Clipper</div></div>
+<div class="card">
+<div class="card-header"><span class="card-icon">🎞️</span><div class="card-title">Extrair Clipes Virais</div></div>
+<div class="input-row">
+<input type="text" id="clip-video-path" class="gta-input" placeholder="Caminho do vídeo fonte">
+</div>
+<div class="input-row">
+<select id="clip-platform" class="gta-select">
+<option value="reels">Instagram Reels (15-90s)</option>
+<option value="shorts">YouTube Shorts (15-60s)</option>
+<option value="tiktok">TikTok (15-180s)</option>
+<option value="stories">Stories (5-15s)</option>
+</select>
+<input type="number" id="clip-max" class="gta-input" value="5" min="1" max="20" style="width:80px" placeholder="Qtd">
+</div>
+<div class="input-row">
+<button class="btn btn-primary" onclick="extractClips()">✂️ Extrair Clipes</button>
+</div>
+<div id="clip-result"></div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-icon">📁</span><div class="card-title">Clipes Extraídos</div></div>
+<div id="clip-list">Carregando...</div>
+</div>
+</div>
+
+<!-- ===== STORY STUDIO (MISSÃO 016) ===== -->
+<div id="page-stories" class="page">
+<div class="page-header"><div class="page-title">🎭 Story Studio</div></div>
+<div class="card">
+<div class="card-header"><span class="card-icon">📝</span><div class="card-title">Criar História Animada</div></div>
+<div class="input-row">
+<input type="text" id="story-title" class="gta-input" placeholder="Título da história">
+</div>
+<div class="input-row">
+<select id="story-style" class="gta-select">
+<option value="default">Default</option>
+<option value="dramatic">Dramático</option>
+<option value="educational">Educativo</option>
+<option value="humor">Humor</option>
+<option value="news">News</option>
+</select>
+<select id="story-ratio" class="gta-select">
+<option value="9:16">9:16 (Vertical)</option>
+<option value="16:9">16:9 (Horizontal)</option>
+<option value="1:1">1:1 (Quadrado)</option>
+</select>
+</div>
+<div class="input-row">
+<textarea id="story-scenes" class="gta-input" rows="4" placeholder='[{"duration_sec":3,"text":"Primeira cena"},{"duration_sec":3,"text":"Segunda cena"}]'></textarea>
+</div>
+<div class="input-row">
+<button class="btn btn-primary" onclick="createStory()">🎭 Criar História</button>
+</div>
+<div id="story-result"></div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-icon">📚</span><div class="card-title">Histórias & Roteiros</div></div>
+<div id="story-list">Carregando...</div>
+</div>
+</div>
+
+<!-- ===== IMPORTADOR (MISSÃO 018) ===== -->
+<div id="page-importer" class="page">
+<div class="page-header"><div class="page-title">📥 Importador Social</div></div>
+<div class="card">
+<div class="card-header"><span class="card-icon">🔗</span><div class="card-title">Importar por URL</div></div>
+<div class="input-row">
+<input type="text" id="import-url" class="gta-input" placeholder="https://instagram.com/reel/... ou youtube.com/...">
+</div>
+<div class="input-row">
+<button class="btn btn-primary" onclick="importVideo()">📥 Importar</button>
+</div>
+<div id="import-result"></div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-icon">📊</span><div class="card-title">Estatísticas</div></div>
+<div id="import-stats">Carregando...</div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-icon">📁</span><div class="card-title">Vídeos Importados</div></div>
+<div id="import-list">Carregando...</div>
+</div>
+</div>
+
+<!-- ===== AUDIOVISUAL (MISSÃO 017) ===== -->
+<div id="page-audiovisual" class="page">
+<div class="page-header"><div class="page-title">🎵 Integração Audiovisual</div></div>
+<div class="card">
+<div class="card-header"><span class="card-icon">🎤</span><div class="card-title">Gerar Legendas</div></div>
+<div class="input-row">
+<input type="text" id="sub-name" class="gta-input" placeholder="Nome do arquivo de legenda">
+</div>
+<div class="input-row">
+<textarea id="sub-segments" class="gta-input" rows="3" placeholder='[{"start_sec":0,"end_sec":3,"text":"Olá mundo"}]'></textarea>
+</div>
+<div class="input-row">
+<select id="sub-format" class="gta-select">
+<option value="srt">SRT</option>
+<option value="vtt">WebVTT</option>
+<option value="ass">ASS</option>
+</select>
+<button class="btn btn-primary" onclick="generateSubtitles()">📝 Gerar Legenda</button>
+</div>
+<div id="sub-result"></div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-icon">📋</span><div class="card-title">Legendas Geradas</div></div>
+<div id="sub-list">Carregando...</div>
+</div>
+</div>
+
+<!-- ===== MULTI-FORMATO (MISSÃO 021) ===== -->
+<div id="page-export" class="page">
+<div class="page-header"><div class="page-title">📦 Distribuição Multi-Formato</div></div>
+<div class="card">
+<div class="card-header"><span class="card-icon">🔄</span><div class="card-title">Exportar para Múltiplas Plataformas</div></div>
+<div class="input-row">
+<input type="text" id="export-video-path" class="gta-input" placeholder="Caminho do vídeo fonte">
+</div>
+<div class="input-row">
+<label style="color:#aaa;font-size:0.85rem">Plataformas:</label>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+<label style="color:#ccc;font-size:0.8rem"><input type="checkbox" class="export-plat" value="reels" checked> Reels</label>
+<label style="color:#ccc;font-size:0.8rem"><input type="checkbox" class="export-plat" value="shorts" checked> Shorts</label>
+<label style="color:#ccc;font-size:0.8rem"><input type="checkbox" class="export-plat" value="tiktok" checked> TikTok</label>
+<label style="color:#ccc;font-size:0.8rem"><input type="checkbox" class="export-plat" value="youtube"> YouTube</label>
+<label style="color:#ccc;font-size:0.8rem"><input type="checkbox" class="export-plat" value="feed"> Feed</label>
+</div>
+</div>
+<div class="input-row">
+<button class="btn btn-primary" onclick="exportMultiformat()">📦 Exportar</button>
+</div>
+<div id="export-result"></div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-icon">📋</span><div class="card-title">Perfis Disponíveis</div></div>
+<div id="export-profiles">Carregando...</div>
+</div>
+</div>
+
+<!-- ===== BROWSER PUBLISHER (MISSÃO 019) ===== -->
+<div id="page-browser-pub" class="page">
+<div class="page-header"><div class="page-title">🌐 Browser Publisher</div></div>
+<div class="card">
+<div class="card-header"><span class="card-icon">📡</span><div class="card-title">Publicar via Browser</div></div>
+<div class="input-row">
+<select id="bp-platform" class="gta-select">
+<option value="instagram">Instagram</option>
+<option value="youtube">YouTube</option>
+<option value="tiktok">TikTok</option>
+</select>
+<select id="bp-type" class="gta-select">
+<option value="reel">Reel / Short</option>
+<option value="story">Story</option>
+<option value="feed">Feed Post</option>
+<option value="video">Vídeo Longo</option>
+</select>
+</div>
+<div class="input-row">
+<input type="text" id="bp-video-path" class="gta-input" placeholder="Caminho do vídeo no servidor">
+</div>
+<div class="input-row">
+<input type="text" id="bp-title" class="gta-input" placeholder="Título">
+<input type="text" id="bp-desc" class="gta-input" placeholder="Descrição / caption">
+</div>
+<div class="input-row">
+<button class="btn btn-primary" onclick="browserPublish()">🌐 Publicar</button>
+</div>
+<div id="bp-result"></div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-icon">📊</span><div class="card-title">Status & Histórico</div></div>
+<div id="bp-stats">Carregando...</div>
+</div>
+</div>
+
 </main>
 
 <script>
@@ -1049,6 +1262,220 @@ function loadPageData(page) {
  if (page === 'media') loadMediaStats();
  if (page === 'templates') loadTemplates();
  if (page === 'diagnostics') loadDiagnostics();
+ if (page === 'references') loadReferences();
+ if (page === 'clipper') loadClips();
+ if (page === 'stories') loadStories();
+ if (page === 'importer') loadImporter();
+ if (page === 'audiovisual') loadAudioVisual();
+ if (page === 'export') loadExportProfiles();
+ if (page === 'browser-pub') loadBrowserPub();
+}
+
+// === MISSÃO 014 — Referências ===
+async function analyzeReference() {
+ const path = document.getElementById('ref-video-path').value.trim();
+ if (!path) { alert('Informe o caminho do vídeo'); return; }
+ const el = document.getElementById('ref-result');
+ el.innerHTML = '<span style="color:#aaa">⏳ Analisando...</span>';
+ try {
+ const r = await fetch(API + '/api/references/analyze', {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({video_path: path})
+ });
+ const data = await r.json();
+ if (!r.ok) { el.innerHTML = `<span style="color:#f44">${data.detail || 'Erro'}</span>`; return; }
+ el.innerHTML = `<div style="color:#0f0">✅ Análise concluída<br>Duração: ${data.blueprint?.total_duration_sec}s | Segmentos: ${data.segment_count || data.segments?.length}<br>Pacing: ${data.blueprint?.pacing_profile} | Cores: ${(data.blueprint?.color_palette||[]).slice(0,3).join(', ')}</div>`;
+ } catch(e) { el.innerHTML = `<span style="color:#f44">❌ ${e.message}</span>`; }
+}
+async function loadReferences() {
+ const el = document.getElementById('ref-list');
+ const data = await api('/api/references/list');
+ if (data.error) { el.textContent = 'Offline'; return; }
+ if (!data.length) { el.textContent = 'Nenhuma análise salva ainda.'; return; }
+ el.innerHTML = data.map(r => `<div style="padding:6px 0;border-bottom:1px solid #222"><strong>${r.name}</strong> — ${r.duration}s, ${r.segments} segmentos</div>`).join('');
+}
+
+// === MISSÃO 015 — Smart Clipper ===
+async function extractClips() {
+ const path = document.getElementById('clip-video-path').value.trim();
+ if (!path) { alert('Informe o caminho do vídeo'); return; }
+ const platform = document.getElementById('clip-platform').value;
+ const maxClips = parseInt(document.getElementById('clip-max').value) || 5;
+ const el = document.getElementById('clip-result');
+ el.innerHTML = '<span style="color:#aaa">⏳ Extraindo clipes...</span>';
+ try {
+ const r = await fetch(API + '/api/clips/extract', {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({video_path: path, platform, max_clips: maxClips})
+ });
+ const data = await r.json();
+ if (!r.ok) { el.innerHTML = `<span style="color:#f44">${data.detail || 'Erro'}</span>`; return; }
+ const clips = data.selected_clips || [];
+ el.innerHTML = `<div style="color:#0f0">✅ ${clips.length} clipes extraídos de ${data.total_candidates} candidatos<br>Fonte: ${data.source_duration_sec}s</div>` +
+ clips.map((c,i) => `<div style="padding:4px 0;color:#ccc">#${i+1} ${c.start_sec}s–${c.end_sec}s score:${c.score} motion:${c.avg_motion}</div>`).join('');
+ } catch(e) { el.innerHTML = `<span style="color:#f44">❌ ${e.message}</span>`; }
+}
+async function loadClips() {
+ const el = document.getElementById('clip-list');
+ const data = await api('/api/clips/list');
+ if (data.error) { el.textContent = 'Offline'; return; }
+ if (!data.length) { el.textContent = 'Nenhum clipe extraído ainda.'; return; }
+ el.innerHTML = data.map(c => `<div style="padding:6px 0;border-bottom:1px solid #222"><strong>${c.name}</strong> — ${c.duration_sec}s, ${c.size_mb}MB</div>`).join('');
+}
+
+// === MISSÃO 016 — Story Studio ===
+async function createStory() {
+ const title = document.getElementById('story-title').value.trim();
+ const style = document.getElementById('story-style').value;
+ const ratio = document.getElementById('story-ratio').value;
+ let scenes;
+ try { scenes = JSON.parse(document.getElementById('story-scenes').value); } catch(e) { alert('JSON de cenas inválido'); return; }
+ if (!title || !scenes.length) { alert('Título e cenas são obrigatórios'); return; }
+ const el = document.getElementById('story-result');
+ el.innerHTML = '<span style="color:#aaa">⏳ Renderizando história...</span>';
+ try {
+ const r = await fetch(API + '/api/stories/create', {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({script: {title, scenes, style_preset: style, aspect_ratio: ratio}, save_script: true, platform: 'reels'})
+ });
+ const data = await r.json();
+ if (!r.ok) { el.innerHTML = `<span style="color:#f44">${data.detail || 'Erro'}</span>`; return; }
+ el.innerHTML = `<div style="color:#0f0">✅ História renderizada!<br>${data.scene_count} cenas | ${data.duration_sec}s | ${data.resolution[0]}x${data.resolution[1]}<br>Arquivo: ${data.output_path} (${data.file_size_mb}MB)<br>Tempo: ${data.render_time_sec}s</div>`;
+ } catch(e) { el.innerHTML = `<span style="color:#f44">❌ ${e.message}</span>`; }
+}
+async function loadStories() {
+ const el = document.getElementById('story-list');
+ const stories = await api('/api/stories/list');
+ const scripts = await api('/api/stories/scripts');
+ let html = '';
+ if (!stories.error && stories.length) {
+ html += '<div style="margin-bottom:8px;color:#0f0">📹 Histórias:</div>' + stories.map(s => `<div style="padding:4px 0;border-bottom:1px solid #222">${s.name} — ${s.duration_sec}s, ${s.size_mb}MB</div>`).join('');
+ } else { html += '<div style="color:#aaa">Nenhuma história renderizada.</div>'; }
+ if (!scripts.error && scripts.length) {
+ html += '<div style="margin-top:12px;margin-bottom:8px;color:#0f0">📝 Roteiros:</div>' + scripts.map(s => `<div style="padding:4px 0;border-bottom:1px solid #222">${s.title} — ${s.scenes} cenas, estilo: ${s.style}</div>`).join('');
+ }
+ el.innerHTML = html;
+}
+
+// === MISSÃO 018 — Importador ===
+async function importVideo() {
+ const url = document.getElementById('import-url').value.trim();
+ if (!url) { alert('Informe a URL'); return; }
+ const el = document.getElementById('import-result');
+ el.innerHTML = '<span style="color:#aaa">⏳ Importando...</span>';
+ try {
+ const r = await fetch(API + '/api/import/video', {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({url})
+ });
+ const data = await r.json();
+ if (!r.ok) { el.innerHTML = `<span style="color:#f44">${data.detail || 'Erro'}</span>`; return; }
+ const m = data.metadata || {};
+ el.innerHTML = `<div style="color:#0f0">✅ Importado!<br>${m.title || 'Sem título'} — ${m.author || '?'}<br>${m.duration_sec}s | ${m.width}x${m.height} | ${m.file_size_mb}MB<br>Plataforma: ${m.platform} | Cache: ${data.was_cached ? 'sim' : 'não'}</div>`;
+ } catch(e) { el.innerHTML = `<span style="color:#f44">❌ ${e.message}</span>`; }
+}
+async function loadImporter() {
+ const statsEl = document.getElementById('import-stats');
+ const listEl = document.getElementById('import-list');
+ const stats = await api('/api/import/stats');
+ if (!stats.error) {
+ statsEl.innerHTML = `Total: ${stats.total_imports} | Tamanho: ${stats.total_size_mb}MB | Duração: ${stats.total_duration_sec}s<br>Por plataforma: ${Object.entries(stats.by_platform||{}).map(([k,v])=>`${k}:${v}`).join(', ') || 'nenhum'}`;
+ } else { statsEl.textContent = 'Offline'; }
+ const list = await api('/api/import/list');
+ if (!list.error && list.length) {
+ listEl.innerHTML = list.map(i => `<div style="padding:6px 0;border-bottom:1px solid #222"><strong>${i.title || i.name}</strong> — ${i.platform} | ${i.duration_sec}s | ${i.size_mb}MB</div>`).join('');
+ } else { listEl.textContent = 'Nenhum vídeo importado.'; }
+}
+
+// === MISSÃO 017 — Audiovisual ===
+async function generateSubtitles() {
+ const name = document.getElementById('sub-name').value.trim();
+ const fmt = document.getElementById('sub-format').value;
+ let segments;
+ try { segments = JSON.parse(document.getElementById('sub-segments').value); } catch(e) { alert('JSON de segmentos inválido'); return; }
+ if (!name || !segments.length) { alert('Nome e segmentos são obrigatórios'); return; }
+ const el = document.getElementById('sub-result');
+ try {
+ const r = await fetch(API + '/api/subtitles/generate', {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({segments, output_name: name, format: fmt})
+ });
+ const data = await r.json();
+ if (!r.ok) { el.innerHTML = `<span style="color:#f44">${data.detail || 'Erro'}</span>`; return; }
+ el.innerHTML = `<div style="color:#0f0">✅ Legenda gerada!<br>Formato: ${data.format} | Segmentos: ${data.segment_count}<br>Arquivo: ${data.path}</div>`;
+ } catch(e) { el.innerHTML = `<span style="color:#f44">❌ ${e.message}</span>`; }
+}
+async function loadAudioVisual() {
+ const subEl = document.getElementById('sub-list');
+ const subs = await api('/api/subtitles/list');
+ if (!subs.error && subs.length) {
+ subEl.innerHTML = subs.map(s => `<div style="padding:6px 0;border-bottom:1px solid #222">${s.name}.${s.format} — ${s.lines} linhas</div>`).join('');
+ } else { subEl.textContent = 'Nenhuma legenda gerada.'; }
+}
+
+// === MISSÃO 021 — Multi-Formato ===
+async function exportMultiformat() {
+ const path = document.getElementById('export-video-path').value.trim();
+ if (!path) { alert('Informe o caminho do vídeo'); return; }
+ const platforms = [...document.querySelectorAll('.export-plat:checked')].map(c => c.value);
+ if (!platforms.length) { alert('Selecione ao menos uma plataforma'); return; }
+ const el = document.getElementById('export-result');
+ el.innerHTML = '<span style="color:#aaa">⏳ Exportando para múltiplos formatos...</span>';
+ try {
+ const r = await fetch(API + '/api/export/multiformat', {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({video_path: path, platforms})
+ });
+ const data = await r.json();
+ if (!r.ok) { el.innerHTML = `<span style="color:#f44">${data.detail || 'Erro'}</span>`; return; }
+ const exports = data.exports || [];
+ el.innerHTML = `<div style="color:#0f0">✅ ${data.successful_count}/${exports.length} exportações OK | Total: ${data.total_size_mb}MB | Tempo: ${data.total_render_time_sec}s</div>` +
+ exports.map(e => `<div style="padding:4px 0;color:${e.success?'#ccc':'#f44'}">${e.profile_name}: ${e.success ? `${e.duration_sec}s ${e.file_size_mb}MB ${e.resolution[0]}x${e.resolution[1]}` : e.error}</div>`).join('');
+ } catch(e) { el.innerHTML = `<span style="color:#f44">❌ ${e.message}</span>`; }
+}
+async function loadExportProfiles() {
+ const el = document.getElementById('export-profiles');
+ const data = await api('/api/export/profiles');
+ if (data.error) { el.textContent = 'Offline'; return; }
+ el.innerHTML = data.map(p => `<div style="padding:6px 0;border-bottom:1px solid #222"><strong>${p.name}</strong> — ${p.platform} | ${p.resolution} @ ${p.fps}fps${p.max_duration_sec ? ' | máx '+p.max_duration_sec+'s' : ''}</div>`).join('');
+}
+
+// === MISSÃO 019 — Browser Publisher ===
+async function browserPublish() {
+ const platform = document.getElementById('bp-platform').value;
+ const contentType = document.getElementById('bp-type').value;
+ const videoPath = document.getElementById('bp-video-path').value.trim();
+ const title = document.getElementById('bp-title').value.trim();
+ const desc = document.getElementById('bp-desc').value.trim();
+ if (!videoPath) { alert('Informe o caminho do vídeo'); return; }
+ const el = document.getElementById('bp-result');
+ el.innerHTML = '<span style="color:#aaa">⏳ Publicando via browser...</span>';
+ try {
+ const r = await fetch(API + '/api/publish/browser', {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({platform, content_type: contentType, video_path: videoPath, title, description: desc})
+ });
+ const data = await r.json();
+ if (!r.ok) { el.innerHTML = `<span style="color:#f44">${data.detail || 'Erro'}</span>`; return; }
+ if (data.success) {
+ el.innerHTML = `<div style="color:#0f0">✅ Publicado com sucesso!<br>URL: ${data.post_url || 'N/A'}<br>Tentativas: ${data.retry_count} | Tempo: ${data.duration_sec}s</div>`;
+ } else {
+ el.innerHTML = `<div style="color:#f44">❌ Falha na publicação<br>${data.error}<br>Tentativas: ${data.retry_count}</div>`;
+ }
+ } catch(e) { el.innerHTML = `<span style="color:#f44">❌ ${e.message}</span>`; }
+}
+async function loadBrowserPub() {
+ const el = document.getElementById('bp-stats');
+ const stats = await api('/api/publish/stats');
+ const history = await api('/api/publish/history');
+ let html = '';
+ if (!stats.error) {
+ html += `<div style="margin-bottom:8px">Total: ${stats.total_publications} | Sucesso: ${stats.total_success} | Falhas: ${stats.total_fail} | Taxa: ${stats.success_rate}%</div>`;
+ } else { html += '<div style="color:#f44">Offline</div>'; }
+ if (!history.error && history.length) {
+ html += '<div style="margin-top:8px;border-top:1px solid #333;padding-top:8px">' + history.slice(0,10).map(h => `<div style="padding:4px 0;border-bottom:1px solid #222;color:${h.success?'#0f0':'#f44'}">${h.platform} — ${h.success?'✅':'❌'} ${h.published_at||''} ${h.error||''}</div>`).join('') + '</div>';
+ }
+ el.innerHTML = html;
 }
 
 // Dashboard
