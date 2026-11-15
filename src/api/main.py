@@ -67,8 +67,11 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
         if path in PUBLIC_PATHS or not path.startswith("/api/"):
             return await call_next(request)
 
-        # Check X-API-Key header or ?api_key= query param
-        provided = request.headers.get("X-API-Key") or request.query_params.get("api_key")
+        # Check X-API-Key header only (query param disabled in production to prevent
+        # credential leakage via logs, browser history, and Referer headers)
+        provided = request.headers.get("X-API-Key")
+        if os.environ.get("JHC_ENV") != "production":
+            provided = provided or request.query_params.get("api_key")
         if not provided or not secrets.compare_digest(provided, API_KEY):
             return JSONResponse(
                 status_code=401,
