@@ -2202,6 +2202,32 @@ async def pack_fetch_catalog(request: Request):
     return result
 
 
+@app.post("/api/import/pack/load-catalog")
+async def pack_load_catalog(request: Request):
+    """Carrega catálogo JSON local (pro_catalog.json) na fila do PackBulkImporter.
+
+    Body: {"catalog_path": "data/auth/pro_catalog.json", "target_dir": "VIDEOS CORTES", "max_entries": 0}
+    max_entries=0 carrega todas as entradas. Use valor pequeno para teste inicial.
+    """
+    body = await request.json()
+    catalog_path = body.get("catalog_path", "data/auth/pro_catalog.json")
+    target_dir = body.get("target_dir", "VIDEOS CORTES")
+    max_entries = body.get("max_entries", 0)
+
+    ssd_path = os.environ.get("JHC_SSD_PATH", "/Volumes/SSD EXT MACBOOK")
+    importer = PackBulkImporter(ssd_root=ssd_path, data_root=str(DATA_ROOT))
+    result = importer.load_catalog_from_file(
+        catalog_path=catalog_path,
+        target_dir=target_dir,
+        max_entries=max_entries,
+    )
+
+    if result.get("error"):
+        return JSONResponse(status_code=400, content=result)
+
+    return result
+
+
 @app.post("/api/auth/session/login")
 async def auth_session_login(request: Request):
     """Inicia login interativo via Playwright para monetizegta6.

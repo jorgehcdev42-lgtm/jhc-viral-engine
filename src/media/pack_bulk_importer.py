@@ -207,6 +207,107 @@ class PackBulkImporter:
         except Exception as e:
             return False, str(e)
 
+    def load_catalog_from_file(self, catalog_path: str, target_dir: str = "", max_entries: int = 0) -> dict:
+        """Carrega catálogo JSON local (pro_catalog.json) e adiciona à fila.
+
+        Args:
+            catalog_path: Caminho para arquivo JSON com lista de entradas
+            target_dir: Subpasta dentro de downloads_dir (ex: 'VIDEOS CORTES')
+            max_entries: Limite de entradas a carregar (0 = todas)
+
+        Returns:
+            {"loaded": int, "videos": int, "images": int, "skipped": int}
+        """
+        path = Path(catalog_path)
+        if not path.exists():
+            return {"error": f"Arquivo não encontrado: {catalog_path}", "loaded": 0}
+
+        try:
+            data = json.loads(path.read_text())
+        except json.JSONDecodeError as e:
+            return {"error": f"JSON inválido: {e}", "loaded": 0}
+
+        if not isinstance(data, list):
+            return {"error": "Catálogo deve ser uma lista JSON", "loaded": 0}
+
+        # Determinar diretório de destino
+        if target_dir:
+            dest_base = self.ssd_root / target_dir
+        else:
+            dest_base = self.downloads_dir / "monetizegta6_pack"
+        dest_base.mkdir(parents=True, exist_ok=True)
+
+        loaded = 0
+        videos = 0
+        images = 0
+        skipped = 0
+
+        for item in data:
+            if max_entries > 0 and loaded >= max_entries:
+                break
+
+            drive_id = item.get("drive", "")
+            title = item.get("t", "untitled")
+            item_type = item.get("type", "v")
+            is_hd = item.get("hd", 0)
+
+            if not drive_id:
+                skipped += 1
+                continue
+
+            # Construir URL de download autenticada
+            download_url = f"https://drive.usercontent.google.com/download?id={drive_id}&export=download&confirm=t"
+
+            # Verificar duplicata por drive_id (não por URL completa)
+            existing_keys = [k for k in self._entries.keys() if drive_id in k]
+            if existing_keys:
+                skipped += 1
+                continue
+
+            # Determinar extensão e nome do arquivo
+            safe_title = "".join(c if c.isalnum() or c in " _-" else "_" for c in title).strip()
+            if item_type == "img":
+                ext = ".jpg"
+                images += 1
+            else:
+                ext = ".mp4"
+                videos += 1
+
+            filename = f"{safe_title}{ext}"
+            dest_path = dest_base / filename
+
+            # Evitar colisão de nomes
+            counter = 1
+            while dest_path.exists() or any(e.dest_path == str(dest_path) for e in self._entries.values()):
+                filename = f"{safe_title}_{counter:03d}{ext}"
+                dest_path = dest_base / filename
+                counter += 1
+
+            entry = DownloadEntry(
+                url=download_url,
+                filename=filename,
+                dest_path=str(dest_path),
+                tags=[f"hd={is_hd}", f"type={item_type}"] if is_hd else [f"type={item_type}"],
+                category="cortes" if item_type != "img" else "imagens",
+                source_pack="monetizegta6_gta6",
+                created_at=time.time(),
+            )
+            self._entries[download_url] = entry
+            loaded += 1
+
+        self._progress.total_discovered = len(self._entries)
+        self._progress.total_duplicates += skipped
+        self._save_state()
+
+        return {
+            "loaded": loaded,
+            "videos": videos,
+            "images": images,
+            "skipped": skipped,
+            "total_in_queue": len(self._entries),
+            "dest_dir": str(dest_base),
+        }
+
     def add_entries(self, entries: list[dict]) -> dict:
         """Adiciona entradas de download ao queue."""
         added = 0
