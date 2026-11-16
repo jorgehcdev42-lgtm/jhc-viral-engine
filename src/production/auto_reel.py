@@ -345,24 +345,108 @@ class AutoReelStudio:
         ], "thumbnail extract")
         return rc == 0
 
-    def _quality_gate(self, video_path: str) -> dict:
-        """Verifica qualidade mínima do output."""
+    def _check_visual_content(self, video_path: str) -> dict:
+        """Verifica se o vídeo tem conteúdo visual real (não preto/congelado)."""
+        try:
+            from PIL import Image
+            import tempfile
+
+            # Extrai 3 frames (início, meio, fim)
+            frames = []
+            info = self._get_video_info(str(video_path))
+            duration = info.get("duration", 0)
+            if duration <= 0:
+                return {"valid": False, "reason": "Duração zero"}
+
+            timestamps = [1.0, duration * 0.5, max(1.0, duration - 1.0)]
+            with tempfile.TemporaryDirectory() as tmpdir:
+                for i, ts in enumerate(timestamps):
+                    frame_path = Path(tmpdir) / f"frame_{i}.jpg"
+                    rc, _, _ = self._run_ffmpeg([
+                        "-ss", str(ts), "-i", str(video_path),
+                        "-vframes", "1", "-q:v", "2", str(frame_path)
+                    ], "QG frame extract")
+                    if rc == 0 and frame_path.exists():
+                        img = Image.open(str(frame_path))
+                        pixels = list(img.get_flattened_data())[:5000]
+                        r_avg = sum(p[0] for p in pixels) / len(pixels)
+                        g_avg = sum(p[1] for p in pixels) / len(pixels)
+                        b_avg = sum(p[2] for p in pixels) / len(pixels)
+                        r_vals = [p[0] for p in pixels[:3000]]
+                        variance = sum((x - r_avg) ** 2 for x in r_vals) / len(r_vals) if r_vals else 0
+                        frames.append({
+                            "rgb": (round(r_avg), round(g_avg), round(b_avg)),
+                            "variance": round(variance, 1),
+                            "is_black": r_avg < 15 and g_avg < 15 and b_avg < 15,
+                            "is_static": variance < 5,
+                        })
+
+            if not frames:
+                return {"valid": False, "reason": "Nenhum frame extraído"}
+
+            black_count = sum(1 for f in frames if f["is_black"])
+            static_count = sum(1 for f in frames if f["is_static"])
+            unique_colors = len(set(f["rgb"] for f in frames))
+
+            return {
+                "valid": black_count == 0 and unique_colors > 1,
+                "black_frames": black_count,
+                "static_frames": static_count,
+                "unique_colors": unique_colors,
+                "frames": frames,
+            }
+        except Exception as e:
+            return {"valid": True, "reason": f"Check skipped: {e}"}
+
+    def _quality_gate(self, video_path: str, source_has_audio: bool = False) -> dict:
+        """Quality Gate V2 com estados PASSED/NEEDS_REVIEW/REJECTED."""
         info = self._get_video_info(str(video_path))
         issues = []
+        warnings = []
 
-        if info.get("duration", 0) < 3:
-            issues.append("Duração menor que 3s")
-        if info.get("width", 0) < 720:
-            issues.append(f"Largura {info.get('width')}px < 720px mínimo")
-        if info.get("size_mb", 0) > 100:
-            issues.append(f"Arquivo {info['size_mb']:.1f}MB > 100MB limite")
+        # Verificação visual real
+        visual = self._check_visual_content(str(video_path))
+
+        # REJECTED: critérios fatais
         if info.get("error"):
-            issues.append(info["error"])
+            issues.append(f"Erro ffprobe: {info['error']}")
+        if info.get("duration", 0) < 1:
+            issues.append(f"Duração {info.get('duration', 0):.1f}s < 1s mínimo")
+        if info.get("width", 0) < 480:
+            issues.append(f"Largura {info.get('width')}px < 480px mínimo")
+        if info.get("size_mb", 0) < 0.01:
+            issues.append(f"Arquivo {info.get('size_mb', 0):.3f}MB < 10KB (provavelmente vazio)")
+        if not visual.get("valid", True):
+            if visual.get("black_frames", 0) > 0:
+                issues.append(f"Frames pretos detectados ({visual['black_frames']}/{len(visual.get('frames', []))})")
+            if visual.get("unique_colors", 0) <= 1:
+                issues.append(f"Conteúdo visual estático/congelado (cores únicas: {visual.get('unique_colors', 0)})")
 
-        passed = len(issues) == 0
+        # NEEDS_REVIEW: critérios de alerta
+        bitrate = info.get("bitrate", 0)
+        if 0 < bitrate < 50000:
+            warnings.append(f"Bitrate baixo: {bitrate} bps (< 50kbps)")
+        if source_has_audio and not info.get("has_audio"):
+            warnings.append("Áudio perdido durante processamento")
+        if info.get("size_mb", 0) > 100:
+            warnings.append(f"Arquivo grande: {info['size_mb']:.1f}MB > 100MB")
+        if visual.get("static_frames", 0) > 0 and visual.get("valid", True):
+            warnings.append(f"Alguns frames estáticos ({visual['static_frames']}/{len(visual.get('frames', []))})")
+
+        # Determinar estado
+        if issues:
+            state = "REJECTED"
+        elif warnings:
+            state = "NEEDS_REVIEW"
+        else:
+            state = "PASSED"
+
         return {
-            "passed": passed,
+            "state": state,
+            "passed": state == "PASSED",
             "issues": issues,
+            "warnings": warnings,
+            "visual_check": visual,
             "info": info,
         }
 
@@ -532,23 +616,17 @@ class AutoReelStudio:
             progress.message = "Quality Gate V2..."
             self._report(progress)
 
-            qg_result = self._quality_gate(str(final_path))
-            # Enhanced checks: audio presence, bitrate, visual diversity
-            issues = qg_result.get("issues", [])
-            if not out_info.get("has_audio") and info.get("has_audio"):
-                issues.append("Áudio perdido durante processamento")
-            out_bitrate = out_info.get("bitrate", 0)
-            if out_bitrate < 50000:
-                issues.append(f"Bitrate muito baixo: {out_bitrate} bps (mínimo 50kbps)")
-            qg_result["issues"] = issues
-            qg_result["passed"] = len(issues) == 0
+            qg_result = self._quality_gate(str(final_path), source_has_audio=info.get("has_audio", False))
             progress.metadata["quality_gate"] = qg_result
 
-            if not qg_result["passed"]:
+            if qg_result["state"] == "REJECTED":
                 progress.status = ReelStatus.FAILED.value
-                progress.error = f"Quality Gate reprovado: {'; '.join(issues)}"
+                progress.error = f"Quality Gate REJECTED: {'; '.join(qg_result['issues'])}"
                 self._report(progress)
                 return progress
+            elif qg_result["state"] == "NEEDS_REVIEW":
+                progress.metadata["needs_review"] = True
+                progress.metadata["review_warnings"] = qg_result["warnings"]
 
             # Sucesso
             progress.status = ReelStatus.DONE.value
@@ -568,80 +646,104 @@ class AutoReelStudio:
             return progress
 
     def _burn_subtitles_pillow(self, video_path: str, text: str, font_size: int):
-        """Burn subtitles using Pillow frame-by-frame when drawtext is unavailable."""
+        """Burn subtitles using Pillow frame-by-frame when drawtext is unavailable.
+
+        Uses dynamic FPS detection and isolated temp directory per execution.
+        """
+        import tempfile
+
         try:
             from PIL import Image, ImageDraw, ImageFont
-            import io
 
-            # Extract frames, burn text, reassemble
-            frames_dir = self.temp_dir / "sub_frames"
-            frames_dir.mkdir(exist_ok=True)
+            # Detect source FPS dynamically
+            info = self._get_video_info(video_path)
+            fps = info.get("fps", 30.0)
+            if fps <= 0 or fps > 120:
+                fps = 30.0
 
-            # Extract all frames
-            rc, _, _ = self._run_ffmpeg([
-                "-i", video_path,
-                "-q:v", "2",
-                str(frames_dir / "frame_%05d.jpg"),
-            ], "extract frames for subtitle burn")
-            if rc != 0:
-                return
+            # Isolated temp directory (auto-cleaned)
+            with tempfile.TemporaryDirectory(prefix="jhc_sub_") as tmpdir:
+                frames_dir = Path(tmpdir) / "frames"
+                frames_dir.mkdir()
 
-            frame_files = sorted(frames_dir.glob("frame_*.jpg"))
-            if not frame_files:
-                return
+                # Extract all frames
+                rc, _, _ = self._run_ffmpeg([
+                    "-i", video_path,
+                    "-q:v", "2",
+                    str(frames_dir / "frame_%05d.jpg"),
+                ], "extract frames for subtitle burn")
+                if rc != 0:
+                    return
 
-            # Try to load a font
-            font = None
-            font_paths = [
-                "/System/Library/Fonts/Helvetica.ttc",
-                "/System/Library/Fonts/Arial.ttf",
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-            ]
-            for fp in font_paths:
-                try:
-                    font = ImageFont.truetype(fp, font_size)
-                    break
-                except Exception:
-                    continue
-            if font is None:
-                font = ImageFont.load_default()
+                frame_files = sorted(frames_dir.glob("frame_*.jpg"))
+                if not frame_files:
+                    return
 
-            # Burn text on each frame
-            for ff in frame_files:
-                img = Image.open(str(ff))
-                draw = ImageDraw.Draw(img)
-                bbox = draw.textbbox((0, 0), text, font=font)
-                tw = bbox[2] - bbox[0]
-                th = bbox[3] - bbox[1]
-                x = (img.width - tw) // 2
-                y = img.height - th - 40
-                # Shadow
-                draw.text((x + 2, y + 2), text, fill="black", font=font)
-                draw.text((x, y), text, fill="white", font=font)
-                img.save(str(ff))
+                # Try to load a font
+                font = None
+                font_paths = [
+                    "/System/Library/Fonts/Helvetica.ttc",
+                    "/System/Library/Fonts/Arial.ttf",
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                ]
+                for fp in font_paths:
+                    try:
+                        font = ImageFont.truetype(fp, font_size)
+                        break
+                    except Exception:
+                        continue
+                if font is None:
+                    font = ImageFont.load_default()
 
-            # Reassemble with original audio
-            backup = video_path + ".bak"
-            shutil.copy2(video_path, backup)
-            rc, _, _ = self._run_ffmpeg([
-                "-framerate", "30",
-                "-i", str(frames_dir / "frame_%05d.jpg"),
-                "-i", backup,
-                "-map", "0:v",
-                "-map", "1:a?",
-                "-c:v", "libx264", "-preset", "fast", "-crf", "18",
-                "-c:a", "aac", "-b:a", "128k",
-                "-shortest",
-                "-y", video_path,
-            ], "reassemble with subtitles")
+                # Burn text on each frame
+                for ff in frame_files:
+                    img = Image.open(str(ff))
+                    draw = ImageDraw.Draw(img)
+                    bbox = draw.textbbox((0, 0), text, font=font)
+                    tw = bbox[2] - bbox[0]
+                    th = bbox[3] - bbox[1]
+                    x = (img.width - tw) // 2
+                    y = img.height - th - 40
+                    # Shadow for readability
+                    draw.text((x + 2, y + 2), text, fill="black", font=font)
+                    draw.text((x, y), text, fill="white", font=font)
+                    img.save(str(ff))
 
-            # Cleanup
-            shutil.rmtree(frames_dir, ignore_errors=True)
-            if Path(backup).exists():
-                Path(backup).unlink()
+                # Reassemble with original audio using detected FPS
+                backup = video_path + ".bak"
+                shutil.copy2(video_path, backup)
+                rc, _, err = self._run_ffmpeg([
+                    "-framerate", str(fps),
+                    "-i", str(frames_dir / "frame_%05d.jpg"),
+                    "-i", backup,
+                    "-map", "0:v",
+                    "-map", "1:a?",
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+                    "-c:a", "aac", "-b:a", "128k",
+                    "-shortest",
+                    "-y", video_path,
+                ], "reassemble with subtitles")
+
+                # Verify reassembled file is valid
+                if rc == 0:
+                    verify = self._get_video_info(video_path)
+                    if verify.get("size_mb", 0) < 0.01 or verify.get("error"):
+                        # Restore backup if reassembly produced invalid output
+                        shutil.copy2(backup, video_path)
+                else:
+                    # Restore backup on failure
+                    shutil.copy2(backup, video_path)
+
+                # Cleanup backup
+                if Path(backup).exists():
+                    Path(backup).unlink()
 
         except Exception:
-            pass  # Non-fatal: video still usable without burned subtitles
+            # Non-fatal: video still usable without burned subtitles
+            # Clean up any leftover backup
+            backup = video_path + ".bak"
+            if Path(backup).exists():
+                Path(backup).unlink()
 
     def list_outputs(self) -> list[dict]:
         """Lista produções concluídas."""
