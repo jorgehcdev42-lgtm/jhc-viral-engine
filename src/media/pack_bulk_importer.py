@@ -452,12 +452,45 @@ class PackBulkImporter:
                 entry.size_bytes = dest.stat().st_size
                 entry.sha256 = self._file_hash(dest)
 
-                # Verificar integridade básica
+                # Verificar integridade básica + ffprobe para vídeos
                 if entry.size_bytes < 1024:
                     entry.state = DownloadState.FAILED.value
                     entry.error = "Arquivo muito pequeno (<1KB)"
                     self._progress.total_failed += 1
+                elif dest.suffix.lower() in (".mp4", ".mov", ".avi", ".mkv", ".webm"):
+                    # Validação ffprobe para vídeos antes de marcar COMPLETED
+                    try:
+                        probe = subprocess.run(
+                            ["ffprobe", "-v", "error", "-show_entries",
+                             "format=duration,size", "-of", "csv=p=0", str(dest)],
+                            capture_output=True, text=True, timeout=15
+                        )
+                        if probe.returncode == 0 and probe.stdout.strip():
+                            parts = probe.stdout.strip().split(",")
+                            dur = float(parts[0]) if parts[0] else 0
+                            if dur > 0.5:
+                                entry.state = DownloadState.COMPLETED.value
+                                entry.completed_at = time.time()
+                                self._progress.total_downloaded += 1
+                                self._progress.bytes_downloaded += entry.size_bytes
+                            else:
+                                entry.state = DownloadState.FAILED.value
+                                entry.error = f"Duração inválida ({dur:.1f}s)"
+                                self._progress.total_failed += 1
+                        else:
+                            entry.state = DownloadState.FAILED.value
+                            entry.error = "ffprobe falhou na validação"
+                            self._progress.total_failed += 1
+                    except subprocess.TimeoutExpired:
+                        entry.state = DownloadState.FAILED.value
+                        entry.error = "ffprobe timeout"
+                        self._progress.total_failed += 1
+                    except Exception as e:
+                        entry.state = DownloadState.FAILED.value
+                        entry.error = f"Validação falhou: {e}"
+                        self._progress.total_failed += 1
                 else:
+                    # Imagens e outros arquivos: apenas tamanho mínimo
                     entry.state = DownloadState.COMPLETED.value
                     entry.completed_at = time.time()
                     self._progress.total_downloaded += 1
@@ -521,9 +554,12 @@ class PackBulkImporter:
         by_state = {}
         for e in self._entries.values():
             by_state[e.state] = by_state.get(e.state, 0) + 1
+        # Derivar total_pending de by_state para compatibilidade com dashboard
+        pending_count = by_state.get("PENDING", 0) + by_state.get("pending", 0)
         return {
             **self._progress.to_dict(),
             "by_state": by_state,
+            "total_pending": pending_count,
             "ssd_free_gb": round(self._progress.ssd_free_bytes / (1024**3), 2),
         }
 
