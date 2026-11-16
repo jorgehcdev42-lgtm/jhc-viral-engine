@@ -42,14 +42,14 @@ Autenticação real via Playwright persistent context confirmada. Catálogo comp
 - Thumbnails: `https://drive.google.com/thumbnail?id={drive_id}&sz=w640`
 
 ### FASE 3 — Primeiro Download Real ✅
-- **Vídeo piloto:** Vídeo 0001 (drive=10WjEv1NMCW3Tklbimd1NVTIorwviLaby)
-  - URL: `https://drive.usercontent.google.com/download?id=...&export=download&confirm=t`
+- **Vídeo piloto:** Vídeo 0001 (drive=`[REDACTED]`)
+  - URL: `https://drive.usercontent.google.com/download?id=[DRIVE_ID]&export=download&confirm=t`
   - Tamanho: 11,511,549 bytes (11.5MB)
   - Codec: h264, 576×1024, 30fps, 63.37s
   - Áudio: AAC presente
   - Formato: MP4 válido (magic bytes `ftyp`)
-- **Imagem piloto:** Post 0001 (drive=140O5JOkXzNpvfTz_FA5kyS_OghF_LGfZ)
-  - URL: `https://drive.google.com/thumbnail?id=...&sz=w1000`
+- **Imagem piloto:** Post 0001 (drive=`[REDACTED]`)
+  - URL: `https://drive.google.com/thumbnail?id=[DRIVE_ID]&sz=w1000`
   - Tamanho: 117,056 bytes (117KB)
   - Resolução: 1000×562, RGB
   - Formato: JPEG válido (magic bytes FF D8)
