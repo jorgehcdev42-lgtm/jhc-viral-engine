@@ -13,6 +13,7 @@ import time
 import hashlib
 import shutil
 import subprocess
+import threading
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Optional
@@ -82,13 +83,17 @@ class PackBulkImporter:
     MANIFEST_FILE = "pack_manifest.json"
     IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
 
-    def __init__(self, ssd_root: str, data_root: str = "data", cookies: str = ""):
+    MIN_SSD_FREE_BYTES = 2 * 1024 * 1024 * 1024  # 2GB reserva segura
+
+    def __init__(self, ssd_root: str, data_root: str = "data", cookies: str = "", max_concurrent: int = 2):
         self.ssd_root = Path(ssd_root)
         self.data_root = Path(data_root)
         self.import_dir = self.data_root / "bulk_import"
         self.downloads_dir = self.ssd_root / "JHC-VIRAL-IMPORTS"
         self.state_dir = self.import_dir / "state"
         self.cookies = cookies  # Cookie header string for authenticated requests
+        self.max_concurrent = max_concurrent
+        self._semaphore = threading.Semaphore(max_concurrent)
 
         for d in [self.import_dir, self.downloads_dir, self.state_dir]:
             d.mkdir(parents=True, exist_ok=True)
@@ -346,13 +351,26 @@ class PackBulkImporter:
         self._save_state()
         return {"added": added, "duplicates": duplicates, "total": len(self._entries)}
 
+    def _backoff_delay(self, retries: int) -> float:
+        """Backoff exponencial: 2^retries segundos, max 60s."""
+        return min(2 ** retries, 60)
+
     def process_next(self) -> Optional[dict]:
         """Processa próxima entrada pendente. Retorna resultado ou None se fila vazia."""
         self._progress.ssd_free_bytes = self._compute_ssd_free()
 
-        # Verificar espaço mínimo (1GB)
-        if self._progress.ssd_free_bytes < 1024 * 1024 * 1024:
-            return {"error": "Espaço insuficiente no SSD", "free_gb": self._progress.ssd_free_bytes / (1024**3)}
+        # Verificar espaço mínimo com reserva segura (2GB)
+        if self._progress.ssd_free_bytes < self.MIN_SSD_FREE_BYTES:
+            free_gb = self._progress.ssd_free_bytes / (1024**3)
+            return {
+                "error": f"Espaço insuficiente no SSD ({free_gb:.1f}GB livres, mínimo {self.MIN_SSD_FREE_BYTES // (1024**3)}GB)",
+                "free_gb": free_gb,
+                "paused": True,
+            }
+
+        # Pausa verificada
+        if self._progress.is_paused:
+            return {"error": "Importação pausada", "paused": True}
 
         # Encontrar próxima entrada pendente
         pending = [
@@ -363,62 +381,73 @@ class PackBulkImporter:
             return None
 
         entry = pending[0]
-        entry.state = DownloadState.DOWNLOADING.value
-        entry.started_at = time.time()
-        entry.retries += 1
-        self._save_state()
 
-        # Determinar tipo de download
-        success = False
-        error = ""
+        # Backoff antes de retry
+        if entry.retries > 0:
+            delay = self._backoff_delay(entry.retries)
+            time.sleep(delay)
 
-        if "drive.google.com" in entry.url:
-            # Extrair file ID
-            file_id = entry.url
-            for pattern in ["/d/", "/file/d/", "id="]:
-                if pattern in file_id:
-                    idx = file_id.index(pattern) + len(pattern)
-                    end = file_id[idx:].find("/")
-                    if end == -1:
-                        end = file_id[idx:].find("&")
-                    if end == -1:
-                        file_id = file_id[idx:]
-                    else:
-                        file_id = file_id[idx:idx+end]
-                    break
-            success, error = self._download_gdrive(file_id, Path(entry.dest_path))
-        elif self._is_image_url(entry.url):
-            success, error = self._download_image(entry.url, Path(entry.dest_path))
-        else:
-            success, error = self._download_direct(entry.url, Path(entry.dest_path))
+        # Adquire semaphore para limitar concorrência
+        self._semaphore.acquire()
+        try:
+            entry.state = DownloadState.DOWNLOADING.value
+            entry.started_at = time.time()
+            entry.retries += 1
+            self._save_state()
 
-        if success:
-            entry.state = DownloadState.VERIFYING.value
-            dest = Path(entry.dest_path)
-            entry.size_bytes = dest.stat().st_size
-            entry.sha256 = self._file_hash(dest)
+            # Determinar tipo de download
+            success = False
+            error = ""
 
-            # Verificar integridade básica
-            if entry.size_bytes < 1024:
-                entry.state = DownloadState.FAILED.value
-                entry.error = "Arquivo muito pequeno (<1KB)"
-                self._progress.total_failed += 1
+            if "drive.usercontent.google.com" in entry.url or "drive.google.com" in entry.url:
+                # Extrair file ID da URL autenticada ou padrão
+                file_id = entry.url
+                for pattern in ["id=", "/d/", "/file/d/"]:
+                    if pattern in file_id:
+                        idx = file_id.index(pattern) + len(pattern)
+                        end = file_id[idx:].find("/")
+                        if end == -1:
+                            end = file_id[idx:].find("&")
+                        if end == -1:
+                            file_id = file_id[idx:]
+                        else:
+                            file_id = file_id[idx:idx+end]
+                        break
+                success, error = self._download_gdrive(file_id, Path(entry.dest_path))
+            elif self._is_image_url(entry.url):
+                success, error = self._download_image(entry.url, Path(entry.dest_path))
             else:
-                entry.state = DownloadState.COMPLETED.value
-                entry.completed_at = time.time()
-                self._progress.total_downloaded += 1
-                self._progress.bytes_downloaded += entry.size_bytes
-        else:
-            if "auth" in error.lower() or "confirmação" in error.lower():
-                entry.state = DownloadState.BLOCKED_AUTH.value
-                self._progress.total_blocked_auth += 1
-            elif entry.retries >= entry.max_retries:
-                entry.state = DownloadState.FAILED.value
-                entry.error = error
-                self._progress.total_failed += 1
+                success, error = self._download_direct(entry.url, Path(entry.dest_path))
+
+            if success:
+                entry.state = DownloadState.VERIFYING.value
+                dest = Path(entry.dest_path)
+                entry.size_bytes = dest.stat().st_size
+                entry.sha256 = self._file_hash(dest)
+
+                # Verificar integridade básica
+                if entry.size_bytes < 1024:
+                    entry.state = DownloadState.FAILED.value
+                    entry.error = "Arquivo muito pequeno (<1KB)"
+                    self._progress.total_failed += 1
+                else:
+                    entry.state = DownloadState.COMPLETED.value
+                    entry.completed_at = time.time()
+                    self._progress.total_downloaded += 1
+                    self._progress.bytes_downloaded += entry.size_bytes
             else:
-                entry.state = DownloadState.PENDING.value  # Retry
-                entry.error = error
+                if "auth" in error.lower() or "confirmação" in error.lower():
+                    entry.state = DownloadState.BLOCKED_AUTH.value
+                    self._progress.total_blocked_auth += 1
+                elif entry.retries >= entry.max_retries:
+                    entry.state = DownloadState.FAILED.value
+                    entry.error = error
+                    self._progress.total_failed += 1
+                else:
+                    entry.state = DownloadState.PENDING.value  # Retry
+                    entry.error = error
+        finally:
+            self._semaphore.release()
 
         self._save_state()
         return entry.to_dict()
@@ -443,6 +472,20 @@ class PackBulkImporter:
                 count += 1
         self._save_state()
         return count
+
+    def pause(self) -> dict:
+        """Pausa importação. Downloads em andamento terminam, novos não iniciam."""
+        self._progress.is_paused = True
+        self._progress.is_running = False
+        self._save_state()
+        return {"paused": True, "message": "Importação pausada. Use resume() para continuar."}
+
+    def resume(self) -> dict:
+        """Retoma importação pausada."""
+        self._progress.is_paused = False
+        self._progress.is_running = True
+        self._save_state()
+        return {"paused": False, "message": "Importação retomada."}
 
     def get_progress(self) -> dict:
         """Retorna progresso atual."""
