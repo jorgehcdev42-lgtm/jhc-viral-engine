@@ -1,0 +1,47 @@
+{
+  "job_id": "038d75d98a98",
+  "video_path": "data/autoreel/output/25355af37560_br_reels.mp4",
+  "market": "br",
+  "title": "GTA VI LEONIDA FLASH BR",
+  "variants": [
+    {
+      "variant_id": "038d75d98a98_v1",
+      "label": "\ud83d\udd25 Mais Din\u00e2mico",
+      "path": "data/thumbnails/factory/038d75d98a98_v1_dynamic.jpg",
+      "timestamp_sec": 4.0,
+      "score": 0.10641832190666667,
+      "width": 1080,
+      "height": 1920,
+      "size_kb": 253.2,
+      "created_at": 1794730964.98332
+    },
+    {
+      "variant_id": "038d75d98a98_v2",
+      "label": "\ud83c\udfaf Alternativa",
+      "path": "data/thumbnails/factory/038d75d98a98_v2_alt.jpg",
+      "timestamp_sec": 5.28,
+      "score": 0.09384626809333334,
+      "width": 1080,
+      "height": 1920,
+      "size_kb": 253.5,
+      "created_at": 1794730964.983433
+    },
+    {
+      "variant_id": "038d75d98a98_v3",
+      "label": "\ud83c\udfa8 Editorial",
+      "path": "data/thumbnails/factory/038d75d98a98_v3_editorial.jpg",
+      "timestamp_sec": 2.64,
+      "score": 0.05247691319,
+      "width": 1080,
+      "height": 1920,
+      "size_kb": 264.5,
+      "created_at": 1794730965.014194
+    }
+  ],
+  "selected_variant": "038d75d98a98_v1",
+  "exported_path": null,
+  "associated_job_id": null,
+  "status": "done",
+  "error": null,
+  "created_at": 1794730962.054163
+}

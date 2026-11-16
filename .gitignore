@@ -76,3 +76,5 @@ htmlcov/
 node_modules/
 .next/
 out/
+# Local Netlify folder
+.netlify

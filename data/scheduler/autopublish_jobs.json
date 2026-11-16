@@ -1,0 +1,31 @@
+[
+  {
+    "job_id": "e794a6db",
+    "profile_id": "gta6-br",
+    "platform": "instagram",
+    "video_path": "/tmp/test.mp4",
+    "title": "Test",
+    "description": "",
+    "hashtags": [],
+    "thumbnail_path": null,
+    "scheduled_at": null,
+    "timezone": "America/Sao_Paulo",
+    "privacy": "public",
+    "state": "pending",
+    "quality_gate_passed": false,
+    "quality_gate_score": 0.0,
+    "auth_state": "not_checked",
+    "content_hash": "ab61a0aba4952465",
+    "idempotency_key": "fd1a0485ba34",
+    "retry_count": 0,
+    "max_retries": 5,
+    "next_retry_at": 0.0,
+    "last_error": "",
+    "platform_post_id": null,
+    "permalink": null,
+    "published_at": null,
+    "created_at": 1794692598.3206642,
+    "updated_at": 1794692598.3206642,
+    "approved_at": null
+  }
+]
