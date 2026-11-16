@@ -2200,3 +2200,75 @@ async def pack_fetch_catalog(request: Request):
     # Don't return raw HTML in response (too large)
     result.pop("html", None)
     return result
+
+
+@app.post("/api/auth/session/login")
+async def auth_session_login(request: Request):
+    """Inicia login interativo via Playwright para monetizegta6.
+
+    Abre navegador visível, aguarda usuário fazer login (até 5 min),
+    salva storage_state e cookies localmente. Nunca expõe credenciais.
+    """
+    import asyncio
+    from src.media.auth_session import AuthSession
+
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    headless = body.get("headless", False)
+
+    session = AuthSession(headless=headless)
+    try:
+        result = await session.ensure_authenticated(interactive=True)
+        return result
+    finally:
+        await session.close()
+
+
+@app.get("/api/auth/session/status")
+async def auth_session_status():
+    """Verifica status da sessão autenticada sem abrir navegador."""
+    import asyncio
+    from src.media.auth_session import AuthSession
+
+    session = AuthSession(headless=True)
+    try:
+        if not session.has_saved_state():
+            return {"authenticated": False, "method": "none", "error": "Nenhuma sessão salva"}
+
+        await session._start_browser()
+        valid = await session._is_session_valid()
+        cookies = await session._context.cookies() if session._context else []
+        await session.close()
+
+        return {
+            "authenticated": valid,
+            "method": "saved_state" if valid else "expired",
+            "cookies_count": len(cookies),
+            "has_saved_state": True,
+        }
+    except Exception as e:
+        return {"authenticated": False, "error": str(e)}
+
+
+@app.post("/api/auth/session/discover")
+async def auth_session_discover(request: Request):
+    """Descobre catálogo completo usando sessão autenticada via Playwright."""
+    import asyncio
+    from src.media.auth_session import AuthSession
+
+    session = AuthSession(headless=True)
+    try:
+        auth_result = await session.ensure_authenticated(interactive=False)
+        if not auth_result["authenticated"]:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Sessão não autenticada. Use /api/auth/session/login primeiro.", **auth_result}
+            )
+
+        catalog = await session.discover_catalog()
+        return catalog
+    finally:
+        await session.close()
