@@ -81,12 +81,13 @@ class PackBulkImporter:
     ENTRIES_FILE = "download_entries.json"
     MANIFEST_FILE = "pack_manifest.json"
 
-    def __init__(self, ssd_root: str, data_root: str = "data"):
+    def __init__(self, ssd_root: str, data_root: str = "data", cookies: str = ""):
         self.ssd_root = Path(ssd_root)
         self.data_root = Path(data_root)
         self.import_dir = self.data_root / "bulk_import"
         self.downloads_dir = self.ssd_root / "JHC-VIRAL-IMPORTS"
         self.state_dir = self.import_dir / "state"
+        self.cookies = cookies  # Cookie header string for authenticated requests
 
         for d in [self.import_dir, self.downloads_dir, self.state_dir]:
             d.mkdir(parents=True, exist_ok=True)
@@ -382,6 +383,39 @@ class PackBulkImporter:
         path = self.state_dir / f"manifest_{pack_name}.json"
         path.write_text(json.dumps(manifest, indent=2))
         return str(path)
+
+    def fetch_authenticated_catalog(self, url: str = "https://monetizegta6.vercel.app/membros/pro/") -> dict:
+        """Busca catálogo autenticado via curl com cookies de sessão.
+
+        Returns dict with 'html', 'entries', 'error' keys.
+        Cookies must be set via self.cookies before calling.
+        """
+        if not self.cookies:
+            return {"html": "", "entries": [], "error": "Cookies não configurados. Forneça cookies de sessão autenticada."}
+
+        try:
+            result = subprocess.run(
+                ["curl", "-s", "-S", "-L", "--max-time", "30",
+                 "-H", f"Cookie: {self.cookies}",
+                 "-H", "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+                 url],
+                capture_output=True, text=True, timeout=45
+            )
+            html = result.stdout
+            if not html or len(html) < 1000:
+                return {"html": html, "entries": [], "error": f"Resposta vazia ou muito curta ({len(html)} bytes). Cookies podem estar expirados."}
+
+            # Check for login redirect or auth failure
+            if "sign in" in html.lower()[:2000] or "login" in html.lower()[:2000]:
+                return {"html": html, "entries": [], "error": "Redirecionado para login. Cookies expirados ou inválidos."}
+
+            entries = self.parse_monetizegta6_catalog(html)
+            return {"html": html, "entries": entries, "error": None}
+
+        except subprocess.TimeoutExpired:
+            return {"html": "", "entries": [], "error": "Timeout ao acessar plataforma"}
+        except Exception as e:
+            return {"html": "", "entries": [], "error": str(e)}
 
     def parse_monetizegta6_catalog(self, html: str) -> list[dict]:
         """Extrai entradas de catálogo da plataforma monetizegta6."""

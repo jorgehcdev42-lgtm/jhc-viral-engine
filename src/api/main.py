@@ -2172,3 +2172,31 @@ async def pack_entries(state: str = "", limit: int = 100):
     ssd_path = os.environ.get("JHC_SSD_PATH", "/Volumes/SSD EXT MACBOOK")
     importer = PackBulkImporter(ssd_root=ssd_path, data_root=str(DATA_ROOT))
     return importer.get_entries(state=state, limit=limit)
+
+@app.post("/api/import/pack/fetch-catalog")
+async def pack_fetch_catalog(request: Request):
+    """Busca catálogo autenticado da plataforma monetizegta6 via cookies de sessão."""
+    from src.media.pack_bulk_importer import PackBulkImporter
+
+    body = await request.json()
+    cookies = body.get("cookies", "")
+    url = body.get("url", "https://monetizegta6.vercel.app/membros/pro/")
+
+    if not cookies:
+        return JSONResponse(status_code=400, content={"detail": "cookies obrigatório (header Cookie completo da sessão autenticada)"})
+
+    ssd_path = os.environ.get("JHC_SSD_PATH", "/Volumes/SSD EXT MACBOOK")
+    importer = PackBulkImporter(ssd_root=ssd_path, data_root=str(DATA_ROOT), cookies=cookies)
+    result = importer.fetch_authenticated_catalog(url=url)
+
+    if result.get("error"):
+        return JSONResponse(status_code=400, content=result)
+
+    # Auto-add discovered entries
+    if result["entries"]:
+        add_result = importer.add_entries(result["entries"])
+        result["add_result"] = add_result
+
+    # Don't return raw HTML in response (too large)
+    result.pop("html", None)
+    return result
