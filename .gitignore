@@ -78,3 +78,6 @@ node_modules/
 out/
 # Local Netlify folder
 .netlify
+data/auth/browser_profile/
+data/auth/monetizegta6_cookies.json
+data/auth/monetizegta6_state.json
