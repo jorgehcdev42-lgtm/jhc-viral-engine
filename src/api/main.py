@@ -2385,3 +2385,29 @@ async def auth_session_discover(request: Request):
         return catalog
     finally:
         await session.close()
+
+
+# --- Analytics / Inteligência de Crescimento ---
+
+@app.get("/api/analytics/report")
+async def get_analytics_report():
+    """Relatório consolidado de analytics multiplataforma."""
+    from src.analytics import generate_report
+    report = generate_report(data_root="data")
+    return report.to_dict()
+
+
+@app.get("/api/analytics/platforms")
+async def get_platform_stats():
+    """Estatísticas por plataforma (TikTok, Instagram, YouTube)."""
+    from src.analytics import collect_platform_stats
+    stats = collect_platform_stats(data_root="data")
+    return {k: v.to_dict() for k, v in stats.items()}
+
+
+@app.get("/api/analytics/suggestions")
+async def get_optimization_suggestions():
+    """Sugestões fundamentadas de otimização baseadas em métricas."""
+    from src.analytics import generate_report
+    report = generate_report(data_root="data")
+    return {"suggestions": report.suggestions}
