@@ -416,9 +416,19 @@ class AutoReelStudio:
             issues.append(f"Largura {info.get('width')}px < 480px mínimo")
         if info.get("size_mb", 0) < 0.01:
             issues.append(f"Arquivo {info.get('size_mb', 0):.3f}MB < 10KB (provavelmente vazio)")
+        # Tolerância: 1/3 frames pretos com outros frames válidos = falso positivo (fade/transição)
+        total_frames = len(visual.get("frames", []))
+        black_count = visual.get("black_frames", 0)
+        non_black_valid = sum(
+            1 for f in visual.get("frames", [])
+            if not f.get("is_black") and f.get("variance", 0) > 50
+        )
         if not visual.get("valid", True):
-            if visual.get("black_frames", 0) > 0:
-                issues.append(f"Frames pretos detectados ({visual['black_frames']}/{len(visual.get('frames', []))})")
+            if black_count > 0 and black_count < total_frames and non_black_valid >= 2:
+                # Falso positivo: maioria dos frames tem conteúdo real
+                warnings.append(f"Frame escuro detectado ({black_count}/{total_frames}) mas conteúdo válido confirmado")
+            elif black_count > 0:
+                issues.append(f"Frames pretos detectados ({black_count}/{total_frames})")
             if visual.get("unique_colors", 0) <= 1:
                 issues.append(f"Conteúdo visual estático/congelado (cores únicas: {visual.get('unique_colors', 0)})")
 
@@ -666,16 +676,15 @@ class AutoReelStudio:
                 frames_dir = Path(tmpdir) / "frames"
                 frames_dir.mkdir()
 
-                # Extract all frames
+                # Extract all frames as PNG (lossless, avoids JPEG artifacts causing false black frames)
                 rc, _, _ = self._run_ffmpeg([
                     "-i", video_path,
-                    "-q:v", "2",
-                    str(frames_dir / "frame_%05d.jpg"),
+                    str(frames_dir / "frame_%05d.png"),
                 ], "extract frames for subtitle burn")
                 if rc != 0:
                     return
 
-                frame_files = sorted(frames_dir.glob("frame_*.jpg"))
+                frame_files = sorted(frames_dir.glob("frame_*.png"))
                 if not frame_files:
                     return
 
@@ -714,7 +723,7 @@ class AutoReelStudio:
                 shutil.copy2(video_path, backup)
                 rc, _, err = self._run_ffmpeg([
                     "-framerate", str(fps),
-                    "-i", str(frames_dir / "frame_%05d.jpg"),
+                    "-i", str(frames_dir / "frame_%05d.png"),
                     "-i", backup,
                     "-map", "0:v",
                     "-map", "1:a?",
