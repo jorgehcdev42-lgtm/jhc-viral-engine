@@ -740,6 +740,12 @@ body::after {
  <div id="media-stats"><div class="loading-state"><div class="loading-spinner"></div>Carregando...</div></div>
  </div>
 
+ <!-- Analytics Dashboard -->
+ <div class="card" id="analytics-card">
+ <div class="card-header"><span class="card-icon">📈</span><div class="card-title">Analytics Multiplataforma</div><button class="btn btn-sm" onclick="loadAnalytics()" style="margin-left:auto;font-size:0.75rem;">↻ Atualizar</button></div>
+ <div id="analytics-content"><div class="loading-state"><div class="loading-spinner"></div>Carregando métricas...</div></div>
+ </div>
+
  <div class="card">
  <div class="card-header"><span class="card-icon">🔍</span><div class="card-title">Buscar Vídeos</div></div>
  <div class="input-row">
@@ -2688,8 +2694,75 @@ document.querySelectorAll('.nav-item').forEach(item => {
  item.addEventListener('click', item._thumbHandler);
 });
 
+// ===== ANALYTICS DASHBOARD =====
+async function loadAnalytics() {
+ const container = document.getElementById('analytics-content');
+ if (!container) return;
+ container.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div>Carregando métricas...</div>';
+ try {
+  const report = await api('/api/analytics/report');
+  if (report.error) { container.innerHTML = '<div class="error-box">' + report.error + '</div>'; return; }
+  let html = '';
+  // Summary row
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px;">';
+  html += '<div style="background:rgba(0,255,170,0.08);border:1px solid rgba(0,255,170,0.2);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:1.4rem;font-weight:800;color:var(--gta-neon-green)">' + (report.total_videos_published || 0) + '</div><div style="font-size:0.7rem;opacity:0.7">Publicados</div></div>';
+  html += '<div style="background:rgba(0,200,255,0.08);border:1px solid rgba(0,200,255,0.2);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:1.4rem;font-weight:800;color:var(--gta-neon-cyan)">' + (report.total_views_all_platforms || 0).toLocaleString() + '</div><div style="font-size:0.7rem;opacity:0.7">Views Total</div></div>';
+  html += '<div style="background:rgba(255,0,170,0.08);border:1px solid rgba(255,0,170,0.2);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:1.4rem;font-weight:800;color:var(--gta-neon-pink)">' + (report.best_performing_platform || '—') + '</div><div style="font-size:0.7rem;opacity:0.7">Melhor Plataforma</div></div>';
+  html += '</div>';
+  // Platform cards
+  const platforms = report.platforms || {};
+  const platKeys = Object.keys(platforms);
+  if (platKeys.length) {
+   html += '<div style="font-weight:700;margin:10px 0 6px;font-size:0.85rem;">Desempenho por Plataforma</div>';
+   html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-bottom:12px;">';
+   for (const k of platKeys) {
+    const p = platforms[k];
+    const srcColor = p.data_source === 'unavailable' ? '#666' : 'var(--gta-neon-green)';
+    const engRate = p.engagement_rate !== undefined ? p.engagement_rate.toFixed(2) + '%' : '—';
+    html += '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:10px;">';
+    html += '<div style="font-weight:700;text-transform:uppercase;font-size:0.8rem;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;"><span>' + k + '</span><span style="font-size:0.6rem;color:' + srcColor + '">' + p.data_source + '</span></div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:0.75rem;">';
+    html += '<div>Posts: <b>' + p.total_posts + '</b></div>';
+    html += '<div>Views: <b>' + (p.total_views || 0).toLocaleString() + '</b></div>';
+    html += '<div>Likes: <b>' + (p.total_likes || 0).toLocaleString() + '</b></div>';
+    html += '<div>Eng.: <b>' + engRate + '</b></div>';
+    html += '</div></div>';
+   }
+   html += '</div>';
+  }
+  // Top videos
+  const vids = report.top_videos || [];
+  if (vids.length) {
+   html += '<div style="font-weight:700;margin:10px 0 6px;font-size:0.85rem;">Top Vídeos</div>';
+   html += '<table class="data-table"><thead><tr><th>Título</th><th>Plataforma</th><th>Views</th><th>Likes</th><th>Eng.</th></tr></thead><tbody>';
+   for (const v of vids.slice(0, 5)) {
+    const vEng = v.engagement_rate !== undefined ? v.engagement_rate.toFixed(2) + '%' : '—';
+    html += '<tr><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + (v.title||'').replace(/"/g,'&quot;') + '">' + (v.title || v.video_id || '?') + '</td><td>' + v.platform + '</td><td>' + (v.views||0).toLocaleString() + '</td><td>' + (v.likes||0).toLocaleString() + '</td><td>' + vEng + '</td></tr>';
+   }
+   html += '</tbody></table>';
+  }
+  // Suggestions
+  const sugs = report.suggestions || [];
+  if (sugs.length) {
+   html += '<div style="font-weight:700;margin:10px 0 6px;font-size:0.85rem;">Sugestões de Otimização</div>';
+   html += '<div style="display:flex;flex-direction:column;gap:4px;">';
+   for (const s of sugs) {
+    html += '<div style="background:rgba(255,200,0,0.06);border-left:3px solid var(--gta-neon-yellow,#ffc800);padding:6px 10px;border-radius:0 6px 6px 0;font-size:0.78rem;line-height:1.3;">' + s + '</div>';
+   }
+   html += '</div>';
+  }
+  if (!platKeys.length && !vids.length && !sugs.length) {
+   html += '<div class="empty-state">Nenhum dado disponível. Publique vídeos para ver métricas.</div>';
+  }
+  container.innerHTML = html;
+ } catch (e) {
+  container.innerHTML = '<div class="error-box">Erro ao carregar analytics: ' + e.message + '</div>';
+ }
+}
+
 // Init
 loadDashboard();
+loadAnalytics();
 </script>
 </body>
 </html>
