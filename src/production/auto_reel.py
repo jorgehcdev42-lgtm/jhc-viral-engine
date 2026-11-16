@@ -421,7 +421,7 @@ class AutoReelStudio:
         black_count = visual.get("black_frames", 0)
         non_black_valid = sum(
             1 for f in visual.get("frames", [])
-            if not f.get("is_black") and f.get("variance", 0) > 50
+            if not f.get("is_black") and f.get("variance", 0) > 10
         )
         if not visual.get("valid", True):
             if black_count > 0 and black_count < total_frames and non_black_valid >= 2:
