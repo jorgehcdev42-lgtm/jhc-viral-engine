@@ -75,11 +75,12 @@ class ImportProgress:
 
 
 class PackBulkImporter:
-    """Importador massivo reutilizável para packs de vídeos."""
+    """Importador massivo reutilizável para packs de vídeos e imagens."""
 
     PROGRESS_FILE = "import_progress.json"
     ENTRIES_FILE = "download_entries.json"
     MANIFEST_FILE = "pack_manifest.json"
+    IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
 
     def __init__(self, ssd_root: str, data_root: str = "data", cookies: str = ""):
         self.ssd_root = Path(ssd_root)
@@ -285,6 +286,8 @@ class PackBulkImporter:
                         file_id = file_id[idx:idx+end]
                     break
             success, error = self._download_gdrive(file_id, Path(entry.dest_path))
+        elif self._is_image_url(entry.url):
+            success, error = self._download_image(entry.url, Path(entry.dest_path))
         else:
             success, error = self._download_direct(entry.url, Path(entry.dest_path))
 
@@ -417,8 +420,45 @@ class PackBulkImporter:
         except Exception as e:
             return {"html": "", "entries": [], "error": str(e)}
 
+    def _is_image_url(self, url: str) -> bool:
+        """Verifica se URL aponta para imagem baseada na extensão."""
+        lower = url.lower().split("?")[0]
+        return any(lower.endswith(ext) for ext in self.IMAGE_EXTS)
+
+    def _download_image(self, url: str, dest: Path) -> tuple[bool, str]:
+        """Baixa imagem via curl com validação de formato."""
+        try:
+            result = subprocess.run(
+                ["curl", "-L", "-o", str(dest), "-s", "-S",
+                 "--max-time", "120", "--retry", "2", url],
+                capture_output=True, text=True, timeout=140
+            )
+            if dest.exists() and dest.stat().st_size > 512:
+                # Verificar magic bytes para confirmar que é imagem
+                with open(dest, "rb") as f:
+                    header = f.read(16)
+                is_jpg = header[:2] == b"\xff\xd8"
+                is_png = header[:8] == b"\x89PNG\r\n\x1a\n"
+                is_webp = header[:4] == b"RIFF" and header[8:12] == b"WEBP"
+                is_gif = header[:3] in (b"GIF", b"GIF")
+                if is_jpg or is_png or is_webp or is_gif:
+                    return True, ""
+                else:
+                    # Pode ser SVG ou outro formato válido; aceita se > 1KB
+                    if dest.stat().st_size > 1024:
+                        return True, ""
+                    dest.unlink(missing_ok=True)
+                    return False, "Arquivo não é imagem válida"
+            else:
+                dest.unlink(missing_ok=True)
+                return False, "Download falhou ou arquivo muito pequeno"
+        except subprocess.TimeoutExpired:
+            return False, "Timeout"
+        except Exception as e:
+            return False, str(e)
+
     def parse_monetizegta6_catalog(self, html: str) -> list[dict]:
-        """Extrai entradas de catálogo da plataforma monetizegta6."""
+        """Extrai entradas de catálogo da plataforma monetizegta6 (vídeos + imagens)."""
         import re
         entries = []
         seen_ids = set()
@@ -453,6 +493,44 @@ class PackBulkImporter:
                 "source_pack": "monetizegta6_gta6",
                 "category": "gta6",
                 "tags": ["gta6"],
+            })
+
+        # Extrair URLs de imagens (thumbnails, banners, etc.)
+        img_re = r'https?://[^"\'<>\s]*?\.(jpg|jpeg|png|webp|gif)(?:[^"\'<>\s]*)?'
+        for match in re.finditer(img_re, html, re.IGNORECASE):
+            url = match.group(0)
+            if url in seen_ids:
+                continue
+            # Skip tiny icons and tracking pixels
+            if any(x in url.lower() for x in ['icon', 'pixel', 'tracking', '1x1', 'spacer']):
+                continue
+            seen_ids.add(url)
+            fname = url.split("/")[-1].split("?")[0]
+            ext = "." + match.group(1).lower()
+            if not fname.endswith(ext):
+                fname = f"img_{len(entries)}{ext}"
+            entries.append({
+                "url": url,
+                "filename": fname,
+                "source_pack": "monetizegta6_gta6",
+                "category": "images",
+                "tags": ["gta6", "image"],
+            })
+
+        # Extrair thumbnails do Google Drive (thumbnail?id=...)
+        thumb_re = r'https://drive\.google\.com/thumbnail\?id=([a-zA-Z0-9_-]+)'
+        for match in re.finditer(thumb_re, html):
+            file_id = match.group(1)
+            key = f"gdrive_thumb_{file_id}"
+            if key in seen_ids:
+                continue
+            seen_ids.add(key)
+            entries.append({
+                "url": f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000",
+                "filename": f"gta6_thumb_{file_id[:8]}.jpg",
+                "source_pack": "monetizegta6_gta6",
+                "category": "images",
+                "tags": ["gta6", "thumbnail"],
             })
 
         return entries
