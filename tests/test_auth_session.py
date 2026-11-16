@@ -29,27 +29,42 @@ def session(tmp_path, auth_dir):
     mod.STORAGE_STATE_PATH = auth_dir / "state.json"
     mod.COOKIES_CACHE_PATH = auth_dir / "cookies.json"
     mod.AUTH_DIR = auth_dir
+    mod.USER_DATA_DIR = auth_dir / "browser_profile"
+    mod.USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
     yield s
     # Restaura caminhos originais
     mod.STORAGE_STATE_PATH = Path("data/auth/monetizegta6_state.json")
     mod.COOKIES_CACHE_PATH = Path("data/auth/monetizegta6_cookies.json")
     mod.AUTH_DIR = Path("data/auth")
+    mod.USER_DATA_DIR = Path("data/auth/browser_profile")
 
 
 class TestAuthSessionUnit:
     """Testes unitários sem browser."""
 
-    def test_has_saved_state_false_when_missing(self, session):
+    def test_has_saved_state_false_when_missing(self, session, auth_dir):
+        # USER_DATA_DIR existe mas sem Cookies file nem storage_state válido
+        import src.media.auth_session as mod
+        # Garante que não há Cookies file nem state válido
+        cookies_db = mod.USER_DATA_DIR / "Default" / "Cookies"
+        if cookies_db.exists():
+            cookies_db.unlink()
+        mod.STORAGE_STATE_PATH.write_text("")
         assert session.has_saved_state() is False
 
     def test_has_saved_state_true_when_exists(self, session, auth_dir):
         import src.media.auth_session as mod
-        mod.STORAGE_STATE_PATH.write_text('{"cookies": []}')
+        # Cria storage_state com conteúdo válido (>10 bytes)
+        mod.STORAGE_STATE_PATH.write_text('{"cookies": [{"name":"x"}]}')
         assert session.has_saved_state() is True
 
     def test_has_saved_state_false_when_empty(self, session, auth_dir):
         import src.media.auth_session as mod
         mod.STORAGE_STATE_PATH.write_text("")
+        # Garante que não há Cookies file no perfil persistente
+        cookies_db = mod.USER_DATA_DIR / "Default" / "Cookies"
+        if cookies_db.exists():
+            cookies_db.unlink()
         assert session.has_saved_state() is False
 
     def test_get_cached_cookies_none_when_missing(self, session):
@@ -95,7 +110,16 @@ class TestAuthSessionAsync:
     """Testes async com mocks do Playwright."""
 
     @pytest.mark.asyncio
-    async def test_ensure_authenticated_no_state_non_interactive(self, session):
+    async def test_ensure_authenticated_no_state_non_interactive(self, session, auth_dir):
+        import src.media.auth_session as mod
+        # Garante que não há estado salvo nem Cookies file
+        cookies_db = mod.USER_DATA_DIR / "Default" / "Cookies"
+        if cookies_db.exists():
+            cookies_db.unlink()
+        mod.STORAGE_STATE_PATH.write_text("")
+        # Mock _start_browser para evitar Playwright real em teste unitário
+        from unittest.mock import AsyncMock
+        session._start_browser = AsyncMock()
         result = await session.ensure_authenticated(interactive=False)
         assert result["authenticated"] is False
         assert result["method"] == "none"
