@@ -83,7 +83,7 @@ class PackBulkImporter:
     MANIFEST_FILE = "pack_manifest.json"
     IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
 
-    MIN_SSD_FREE_BYTES = 2 * 1024 * 1024 * 1024  # 2GB reserva segura
+    MIN_SSD_FREE_BYTES = int(os.environ.get("JHC_SSD_RESERVE_GB", "10")) * 1024 * 1024 * 1024  # 10GB default, configurável via env
 
     def __init__(self, ssd_root: str, data_root: str = "data", cookies: str = "", max_concurrent: int = 2):
         self.ssd_root = Path(ssd_root)
@@ -195,17 +195,44 @@ class PackBulkImporter:
             return False, str(e)
 
     def _download_direct(self, url: str, dest: Path) -> tuple[bool, str]:
-        """Baixa arquivo via URL direta com curl."""
+        """Baixa arquivo via URL direta com curl, suportando HTTP Range resume."""
         try:
-            result = subprocess.run(
-                ["curl", "-L", "-o", str(dest), "-s", "-S",
-                 "--max-time", "600", "--retry", "2", url],
-                capture_output=True, text=True, timeout=620
-            )
-            if dest.exists() and dest.stat().st_size > 1024:
+            # Verificar se existe parcial para retomar via HTTP Range
+            partial = dest.with_suffix(dest.suffix + ".part")
+            existing_bytes = 0
+            range_header = ""
+            if partial.exists():
+                existing_bytes = partial.stat().st_size
+                if existing_bytes > 0:
+                    range_header = f"-r {existing_bytes}-"
+
+            # Usar -C - (resume automático do curl) se houver parcial
+            curl_args = ["curl", "-L", "-s", "-S",
+                         "--max-time", "600", "--retry", "2"]
+            if existing_bytes > 0:
+                curl_args.extend(["-C", "-", "-o", str(partial)])
+            else:
+                curl_args.extend(["-o", str(partial)])
+            curl_args.append(url)
+
+            result = subprocess.run(curl_args, capture_output=True, text=True, timeout=620)
+
+            # Renomear parcial para destino final se download completou
+            if partial.exists() and partial.stat().st_size > 1024:
+                # Verificar se não é página HTML de erro
+                with open(partial, "rb") as f:
+                    header = f.read(200)
+                if b"<html" in header.lower() and existing_bytes == 0:
+                    partial.unlink(missing_ok=True)
+                    return False, "URL retornou página HTML (possível auth/expirado)"
+                partial.rename(dest)
+                return True, ""
+            elif dest.exists() and dest.stat().st_size > 1024:
                 return True, ""
             else:
-                dest.unlink(missing_ok=True)
+                # Manter parcial para próxima tentativa de resume
+                if not partial.exists() or partial.stat().st_size < 1024:
+                    partial.unlink(missing_ok=True)
                 return False, "Download falhou ou arquivo vazio"
         except subprocess.TimeoutExpired:
             return False, "Timeout"
