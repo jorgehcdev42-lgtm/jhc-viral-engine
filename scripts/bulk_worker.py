@@ -129,6 +129,47 @@ def cmd_start(logger: logging.Logger):
     logger.info("Worker parado.")
 
 
+STALL_THRESHOLD_MIN = 10  # minutos sem progresso para considerar stalled
+
+
+def _check_stalled_downloads(imp, logger: logging.Logger) -> None:
+    """Watchdog: detecta downloads DOWNLOADING com >10min e size=0, reseta para PENDING."""
+    import json as _json
+
+    entries_file = STATE_DIR / "download_entries.json"
+    if not entries_file.exists():
+        return
+    try:
+        with open(entries_file) as f:
+            entries = _json.load(f)
+    except Exception:
+        return
+
+    now = time.time()
+    changed = False
+    for e in entries:
+        if e.get("state") != "DOWNLOADING":
+            continue
+        started = e.get("started_at", 0)
+        if not started:
+            continue
+        age_min = (now - started) / 60
+        size = e.get("size_bytes", 0)
+        if age_min > STALL_THRESHOLD_MIN and size == 0:
+            fn = e.get("filename", "?")
+            logger.warning(f"WATCHDOG: {fn} stalled ({age_min:.0f}min, 0 bytes) → PENDING")
+            e["state"] = "PENDING"
+            e["retries"] = max(0, e.get("retries", 0) - 1)  # não conta como retry falho
+            e["error"] = ""
+            e["started_at"] = None
+            changed = True
+
+    if changed:
+        with open(entries_file, "w") as f:
+            _json.dump(entries, f, indent=2, default=str)
+        logger.info("WATCHDOG: checkpoint atualizado após reset de stalled")
+
+
 def run_loop(logger: logging.Logger):
     """Loop principal: processa lotes até stop/pause ou tudo concluído."""
     from src.media.pack_bulk_importer import PackBulkImporter
@@ -179,6 +220,9 @@ def run_loop(logger: logging.Logger):
             f"{by_state.get('FAILED', 0)} fail | "
             f"SSD: {progress.get('ssd_free_gb', '?')}GB"
         )
+
+        # Watchdog: detectar downloads stalled (>10min sem progresso)
+        _check_stalled_downloads(imp, logger)
 
         # Se lote vazio, verificar se acabou
         if len(results) == 0:
