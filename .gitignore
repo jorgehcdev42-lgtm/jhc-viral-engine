@@ -81,3 +81,9 @@ out/
 # Auth & catalog data — NEVER commit credentials or drive IDs
 data/auth/
 VIDEOS CORTES/
+
+# Bulk import operational state — NEVER commit runtime data
+data/bulk_import/state/
+data/bulk_import/logs/
+data/bulk_import/worker.pid
+*.part
