@@ -239,13 +239,14 @@ class PackBulkImporter:
         except Exception as e:
             return False, str(e)
 
-    def load_catalog_from_file(self, catalog_path: str, target_dir: str = "", max_entries: int = 0) -> dict:
+    def load_catalog_from_file(self, catalog_path: str, target_dir: str = "", max_entries: int = 0, filter_type: str = "") -> dict:
         """Carrega catálogo JSON local (pro_catalog.json) e adiciona à fila.
 
         Args:
             catalog_path: Caminho para arquivo JSON com lista de entradas
             target_dir: Subpasta dentro de downloads_dir (ex: 'VIDEOS CORTES')
             max_entries: Limite de entradas a carregar (0 = todas)
+            filter_type: Filtrar por tipo — "video" (type=v), "image" (type=img), "" (todos)
 
         Returns:
             {"loaded": int, "videos": int, "images": int, "skipped": int}
@@ -274,6 +275,10 @@ class PackBulkImporter:
         images = 0
         skipped = 0
 
+        # Mapear filter_type para valores do catálogo
+        type_filter_map = {"video": "v", "image": "img"}
+        target_type = type_filter_map.get(filter_type, "")
+
         for item in data:
             if max_entries > 0 and loaded >= max_entries:
                 break
@@ -287,12 +292,17 @@ class PackBulkImporter:
                 skipped += 1
                 continue
 
+            # Filtrar por tipo se solicitado
+            if target_type and item_type != target_type:
+                skipped += 1
+                continue
+
             # Construir URL de download autenticada
             download_url = f"https://drive.usercontent.google.com/download?id={drive_id}&export=download&confirm=t"
 
-            # Verificar duplicata por drive_id (não por URL completa)
-            existing_keys = [k for k in self._entries.keys() if drive_id in k]
-            if existing_keys:
+            # Verificar duplicata por URL exata (construída deterministicamente)
+            download_url_check = f"https://drive.usercontent.google.com/download?id={drive_id}&export=download&confirm=t"
+            if download_url_check in self._entries:
                 skipped += 1
                 continue
 
