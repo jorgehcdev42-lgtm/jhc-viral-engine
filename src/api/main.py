@@ -2164,6 +2164,93 @@ async def pack_progress():
     importer = PackBulkImporter(ssd_root=ssd_path, data_root=str(DATA_ROOT))
     return importer.get_progress()
 
+@app.get("/api/import/pack/dashboard")
+async def pack_dashboard():
+    """Dashboard completo do acervo — MISSÃO 032 FASE 2.
+
+    Retorna dados reais: breakdown por tipo, velocidade, worker status,
+    histórico de downloads, últimos erros. Nunca valores simulados.
+    """
+    from src.media.pack_bulk_importer import PackBulkImporter
+
+    ssd_path = os.environ.get("JHC_SSD_PATH", "/Volumes/SSD EXT MACBOOK")
+    importer = PackBulkImporter(ssd_root=ssd_path, data_root=str(DATA_ROOT))
+    return importer.get_dashboard_data()
+
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+@app.post("/api/import/pack/worker/start")
+async def worker_start():
+    """Inicia worker persistente em background — MISSÃO 032 FASE 3."""
+    import subprocess
+    result = subprocess.run(
+        [str(_PROJECT_ROOT / ".venv" / "bin" / "python3"), "-I",
+         str(_PROJECT_ROOT / "scripts" / "bulk_worker.py"), "start"],
+        capture_output=True, text=True, cwd=str(_PROJECT_ROOT),
+    )
+    return {"stdout": result.stdout.strip(), "stderr": result.stderr.strip(), "returncode": result.returncode}
+
+
+@app.post("/api/import/pack/worker/stop")
+async def worker_stop():
+    """Para worker persistente gracefulmente."""
+    import subprocess
+    result = subprocess.run(
+        [str(_PROJECT_ROOT / ".venv" / "bin" / "python3"), "-I",
+         str(_PROJECT_ROOT / "scripts" / "bulk_worker.py"), "stop"],
+        capture_output=True, text=True, cwd=str(_PROJECT_ROOT),
+    )
+    return {"stdout": result.stdout.strip(), "stderr": result.stderr.strip(), "returncode": result.returncode}
+
+
+@app.post("/api/import/pack/worker/pause")
+async def worker_pause():
+    """Pausa worker após lote atual."""
+    import subprocess
+    result = subprocess.run(
+        [str(_PROJECT_ROOT / ".venv" / "bin" / "python3"), "-I",
+         str(_PROJECT_ROOT / "scripts" / "bulk_worker.py"), "pause"],
+        capture_output=True, text=True, cwd=str(_PROJECT_ROOT),
+    )
+    return {"stdout": result.stdout.strip(), "stderr": result.stderr.strip(), "returncode": result.returncode}
+
+
+@app.post("/api/import/pack/worker/resume")
+async def worker_resume():
+    """Retoma worker pausado."""
+    import subprocess
+    result = subprocess.run(
+        [str(_PROJECT_ROOT / ".venv" / "bin" / "python3"), "-I",
+         str(_PROJECT_ROOT / "scripts" / "bulk_worker.py"), "resume"],
+        capture_output=True, text=True, cwd=str(_PROJECT_ROOT),
+    )
+    return {"stdout": result.stdout.strip(), "stderr": result.stderr.strip(), "returncode": result.returncode}
+
+
+@app.get("/api/import/pack/worker/status")
+async def worker_status():
+    """Status do worker persistente."""
+    import subprocess
+    result = subprocess.run(
+        [str(_PROJECT_ROOT / ".venv" / "bin" / "python3"), "-I",
+         str(_PROJECT_ROOT / "scripts" / "bulk_worker.py"), "status"],
+        capture_output=True, text=True, cwd=str(_PROJECT_ROOT),
+    )
+    return {"output": result.stdout.strip(), "returncode": result.returncode}
+
+
+@app.post("/api/import/pack/retry-failed")
+async def pack_retry_failed():
+    """Reenfileira entradas FAILED para nova tentativa."""
+    from src.media.pack_bulk_importer import PackBulkImporter
+
+    ssd_path = os.environ.get("JHC_SSD_PATH", "/Volumes/SSD EXT MACBOOK")
+    importer = PackBulkImporter(ssd_root=ssd_path, data_root=str(DATA_ROOT))
+    retried = importer.retry_failed()
+    return {"retried": retried}
+
+
 @app.get("/api/import/pack/entries")
 async def pack_entries(state: str = "", limit: int = 100):
     """Lista entradas de download filtradas por estado."""

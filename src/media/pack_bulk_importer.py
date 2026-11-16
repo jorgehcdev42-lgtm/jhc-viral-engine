@@ -573,6 +573,122 @@ class PackBulkImporter:
             "ssd_free_gb": round(self._progress.ssd_free_bytes / (1024**3), 2),
         }
 
+    def get_dashboard_data(self) -> dict:
+        """Retorna dados completos para dashboard do acervo — MISSÃO 032 FASE 2.
+
+        Inclui breakdown por tipo, velocidade, histórico de erros, status do worker.
+        Dados reais do checkpoint, nunca simulados.
+        """
+        import subprocess
+        from pathlib import Path
+
+        progress = self.get_progress()
+        by_state = progress.get("by_state", {})
+
+        # Breakdown por tipo (vídeo vs imagem) via tags ou extensão
+        videos_completed = 0
+        images_completed = 0
+        videos_failed = 0
+        images_failed = 0
+        failed_entries = []
+        completed_times = []
+
+        for e in self._entries.values():
+            is_video = any("type=v" in str(t) for t in (e.tags if hasattr(e, "tags") else []))
+            is_image = any("type=img" in str(t) for t in (e.tags if hasattr(e, "tags") else []))
+            # Fallback por extensão se tags não tiverem type
+            if not is_video and not is_image:
+                fn = e.filename if hasattr(e, "filename") else ""
+                if fn.endswith((".mp4", ".mov", ".avi", ".mkv", ".webm")):
+                    is_video = True
+                elif fn.endswith((".jpg", ".jpeg", ".png", ".gif", ".webp")):
+                    is_image = True
+
+            if e.state == "COMPLETED":
+                if is_video:
+                    videos_completed += 1
+                elif is_image:
+                    images_completed += 1
+                if hasattr(e, "completed_at") and e.completed_at:
+                    completed_times.append(e.completed_at)
+            elif e.state == "FAILED":
+                if is_video:
+                    videos_failed += 1
+                elif is_image:
+                    images_failed += 1
+                failed_entries.append({
+                    "filename": e.filename if hasattr(e, "filename") else "?",
+                    "error": e.error if hasattr(e, "error") else "?",
+                    "retries": e.retries if hasattr(e, "retries") else 0,
+                })
+
+        # Velocidade estimada
+        speed_mbps = 0.0
+        if len(completed_times) >= 2:
+            first_t = min(completed_times)
+            last_t = max(completed_times)
+            duration_s = last_t - first_t
+            if duration_s > 0:
+                total_bytes = sum(
+                    e.size_bytes for e in self._entries.values()
+                    if e.state == "COMPLETED" and hasattr(e, "size_bytes")
+                )
+                speed_mbps = round((total_bytes / (1024 * 1024)) / duration_s, 2)
+
+        # Worker status
+        worker_running = False
+        worker_pid = None
+        pid_file = Path(self.data_root) / "bulk_import" / "state" / "worker.pid"
+        if pid_file.exists():
+            try:
+                pid = int(pid_file.read_text().strip())
+                import os as _os
+                _os.kill(pid, 0)
+                worker_running = True
+                worker_pid = pid
+            except (ValueError, OSError):
+                pass
+
+        # Últimos erros (do log do worker)
+        recent_errors = []
+        log_file = Path(self.data_root) / "bulk_import" / "logs" / "worker.log"
+        if log_file.exists():
+            try:
+                lines = log_file.read_text().strip().split("\n")
+                error_lines = [l for l in lines if "[ERROR]" in l or "[WARNING]" in l]
+                recent_errors = error_lines[-10:]  # últimos 10 erros/warnings
+            except Exception:
+                pass
+
+        # Histórico de downloads (últimos 20 COMPLETED)
+        download_history = []
+        completed_entries = sorted(
+            [e for e in self._entries.values() if e.state == "COMPLETED"],
+            key=lambda x: x.completed_at if hasattr(x, "completed_at") and x.completed_at else 0,
+            reverse=True,
+        )[:20]
+        for e in completed_entries:
+            download_history.append({
+                "filename": e.filename if hasattr(e, "filename") else "?",
+                "size_bytes": e.size_bytes if hasattr(e, "size_bytes") else 0,
+                "completed_at": e.completed_at if hasattr(e, "completed_at") else None,
+            })
+
+        return {
+            **progress,
+            "videos_completed": videos_completed,
+            "images_completed": images_completed,
+            "videos_failed": videos_failed,
+            "images_failed": images_failed,
+            "total_unique": len(self._entries),
+            "speed_mbps": speed_mbps,
+            "worker_running": worker_running,
+            "worker_pid": worker_pid,
+            "recent_errors": recent_errors,
+            "download_history": download_history,
+            "failed_entries": failed_entries[:10],  # top 10 falhas
+        }
+
     def get_entries(self, state: str = "", limit: int = 100) -> list[dict]:
         """Lista entradas filtradas por estado."""
         results = []
