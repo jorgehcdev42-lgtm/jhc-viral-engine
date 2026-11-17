@@ -2553,3 +2553,63 @@ async def get_auth_platforms_status():
         else:
             result[platform] = {"authenticated": False}
     return result
+
+# ===== PRODUCTION PIPELINE — FÁBRICA AUTÔNOMA =====
+
+@app.post("/api/pipeline/create")
+async def pipeline_create_job(body: dict):
+    """Cria job de produção com auto-seleção do catálogo."""
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    job = pipeline.create_job(
+        video_path=body.get("video_path", ""),
+        platform=body.get("platform", "tiktok"),
+        market=body.get("market", "br"),
+        title=body.get("title", ""),
+        subtitle_text=body.get("subtitle_text", ""),
+        auto_select=body.get("auto_select", False),
+    )
+    return job.to_dict()
+
+@app.post("/api/pipeline/execute/{job_id}")
+async def pipeline_execute_job(job_id: str):
+    """Executa job de produção (com semáforo de render)."""
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    try:
+        job = pipeline.execute_job(job_id)
+        return job.to_dict()
+    except ValueError as e:
+        return JSONResponse(status_code=404, content={"error": str(e)})
+
+@app.post("/api/pipeline/schedule/{job_id}")
+async def pipeline_schedule_job(job_id: str, body: dict = None):
+    """Agenda job concluído para publicação interna."""
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    scheduled_at = (body or {}).get("scheduled_at")
+    return pipeline.schedule_job(job_id, scheduled_at)
+
+@app.get("/api/pipeline/jobs")
+async def pipeline_list_jobs(limit: int = 50):
+    """Lista jobs de produção."""
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    return {"jobs": pipeline.list_jobs(limit=limit)}
+
+@app.get("/api/pipeline/job/{job_id}")
+async def pipeline_get_job(job_id: str):
+    """Detalhes de um job específico."""
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    job = pipeline.get_job(job_id)
+    if not job:
+        return JSONResponse(status_code=404, content={"error": "Job não encontrado"})
+    return job
+
+@app.get("/api/pipeline/stats")
+async def pipeline_stats():
+    """Estatísticas da pipeline de produção."""
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    return pipeline.get_stats()
