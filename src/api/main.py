@@ -2484,3 +2484,72 @@ async def record_material_usage(body: dict):
     catalog.load()
     catalog.record_usage(filenames, reel_id)
     return {"recorded": len(filenames), "reel_id": reel_id}
+
+
+@app.get("/api/catalog/select-fresh")
+async def select_fresh_materials(
+    theme: str = "",
+    max_results: int = 10,
+    prefer_vertical: bool = True,
+    min_duration: float = 5.0,
+    max_duration: float = 120.0,
+    min_width: int = 720,
+):
+    """Seleção inteligente que exclui conteúdo desatualizado automaticamente."""
+    from src.production.smart_catalog import SmartCatalog, SelectionCriteria
+    catalog = SmartCatalog(data_root="data")
+    catalog.load()
+    criteria = SelectionCriteria(
+        theme=theme,
+        max_results=max_results,
+        prefer_vertical=prefer_vertical,
+        min_duration=min_duration,
+        max_duration=max_duration,
+        min_width=min_width,
+    )
+    selected = catalog.select_fresh_materials(criteria)
+    return {
+        "count": len(selected),
+        "filtered_stale": True,
+        "materials": [
+            {
+                "filename": e.filename,
+                "path": e.path,
+                "width": e.width,
+                "height": e.height,
+                "duration": round(e.duration, 1),
+                "quality_score": e.quality_score(),
+                "is_vertical": e.is_vertical(),
+            }
+            for e in selected
+        ],
+    }
+
+
+@app.get("/api/auth/platforms/status")
+async def get_auth_platforms_status():
+    """Status das sessões autenticadas por plataforma social."""
+    from pathlib import Path
+    import json, time
+    sessions_dir = Path("data/browser_sessions")
+    result = {}
+    for platform in ("tiktok", "instagram", "youtube"):
+        cookie_file = sessions_dir / f"{platform}_cookies.json"
+        state_file = sessions_dir / f"{platform}_state.json"
+        profile_dir = sessions_dir / f"{platform}_profile"
+        if cookie_file.exists() and state_file.exists():
+            try:
+                cookies = json.loads(cookie_file.read_text())
+                age_h = (time.time() - cookie_file.stat().st_mtime) / 3600
+                result[platform] = {
+                    "authenticated": True,
+                    "cookie_count": len(cookies),
+                    "saved_hours_ago": round(age_h, 1),
+                }
+            except Exception:
+                result[platform] = {"authenticated": False, "error": "cookie_read_failed"}
+        elif profile_dir.exists() and any(profile_dir.iterdir()):
+            result[platform] = {"authenticated": False, "has_profile": True}
+        else:
+            result[platform] = {"authenticated": False}
+    return result

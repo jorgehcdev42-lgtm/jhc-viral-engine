@@ -250,6 +250,39 @@ class SmartCatalog:
         self.usage_log_path.parent.mkdir(parents=True, exist_ok=True)
         self.usage_log_path.write_text(json.dumps(self._usage_log, indent=2))
 
+    # Palavras-chave que indicam conteúdo desatualizado para GTA 6
+    STALE_PATTERNS = [
+        "primeiro trailer", "1º trailer", "trailer 1", "trailer um",
+        "segundo trailer", "2º trailer", "trailer 2", "trailer dois",
+        "terceiro trailer", "3º trailer", "trailer 3",
+        "anunciado", "revelado", "confirmado para 2025",
+        "adiado", "delay", "adicionado", "rumor",
+        "vazou gameplay antiga", "beta fechado",
+    ]
+
+    def is_stale_content(self, entry: CatalogEntry) -> bool:
+        """Verifica se o vídeo contém conteúdo desatualizado/obsoleto.
+
+        Filtra vídeos sobre eventos passados (trailers antigos, anúncios
+        já superados) que não são relevantes para o lançamento do GTA 6.
+        """
+        name_lower = entry.filename.lower()
+        for pattern in self.STALE_PATTERNS:
+            if pattern in name_lower:
+                return True
+        return False
+
+    def select_fresh_materials(
+        self, criteria: SelectionCriteria
+    ) -> list[CatalogEntry]:
+        """Seleção inteligente que exclui automaticamente conteúdo desatualizado."""
+        selected = self.select_materials(criteria)
+        fresh = [e for e in selected if not self.is_stale_content(e)]
+        # Se filtrar demais, relaxa e retorna os melhores mesmo assim
+        if not fresh and selected:
+            return selected[:criteria.max_results]
+        return fresh
+
     def get_stats(self) -> dict:
         """Return catalog statistics."""
         if not self._loaded:

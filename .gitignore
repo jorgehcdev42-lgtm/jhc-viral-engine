@@ -90,3 +90,6 @@ data/bulk_import/worker.pid
 
 # Branding assets — personal use only, not versioned
 LOGOS E FOTOS DE CAPA E PERFIL/
+
+# Browser sessions — NEVER commit platform credentials or cookies
+data/browser_sessions/
