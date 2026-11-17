@@ -2411,3 +2411,76 @@ async def get_optimization_suggestions():
     from src.analytics import generate_report
     report = generate_report(data_root="data")
     return {"suggestions": report.suggestions}
+
+
+# ===== SMART CATALOG — FÁBRICA INTELIGENTE DE AUTOREELS =====
+
+@app.get("/api/catalog/stats")
+async def get_catalog_stats():
+    """Estatísticas do catálogo inteligente de materiais."""
+    from src.production.smart_catalog import SmartCatalog
+    catalog = SmartCatalog(data_root="data")
+    catalog.load()
+    return catalog.get_stats()
+
+
+@app.get("/api/catalog/select")
+async def select_materials(
+    theme: str = "",
+    max_results: int = 10,
+    prefer_vertical: bool = True,
+    min_duration: float = 5.0,
+    max_duration: float = 120.0,
+    min_width: int = 720,
+):
+    """Seleção inteligente de materiais para produção AutoReel."""
+    from src.production.smart_catalog import SmartCatalog, SelectionCriteria
+    catalog = SmartCatalog(data_root="data")
+    catalog.load()
+    criteria = SelectionCriteria(
+        theme=theme,
+        max_results=max_results,
+        prefer_vertical=prefer_vertical,
+        min_duration=min_duration,
+        max_duration=max_duration,
+        min_width=min_width,
+    )
+    selected = catalog.select_materials(criteria)
+    return {
+        "count": len(selected),
+        "criteria": {
+            "theme": theme,
+            "prefer_vertical": prefer_vertical,
+            "min_duration": min_duration,
+            "max_duration": max_duration,
+            "min_width": min_width,
+        },
+        "materials": [
+            {
+                "filename": e.filename,
+                "path": e.path,
+                "width": e.width,
+                "height": e.height,
+                "duration": round(e.duration, 1),
+                "codec": e.codec,
+                "quality_score": e.quality_score(),
+                "is_vertical": e.is_vertical(),
+                "used_count": e.used_count,
+            }
+            for e in selected
+        ],
+    }
+
+
+@app.post("/api/catalog/record-usage")
+async def record_material_usage(body: dict):
+    """Registra uso de materiais em produção AutoReel."""
+    from src.production.smart_catalog import SmartCatalog
+    filenames = body.get("filenames", [])
+    reel_id = body.get("reel_id", "")
+    if not filenames:
+        return {"error": "filenames required"}
+    catalog = SmartCatalog(data_root="data")
+    catalog.load()
+    catalog.record_usage(filenames, reel_id)
+    return {"recorded": len(filenames), "reel_id": reel_id}
