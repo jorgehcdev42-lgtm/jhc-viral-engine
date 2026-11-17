@@ -58,6 +58,25 @@ def run_batch(count: int = 10) -> dict:
     already_used = get_existing_job_materials()
     print(f"   Já processados: {len(already_used)} materiais")
 
+    # Blacklist de materiais que falharam com black frames (HEVC incompatível com crop/scale)
+    BLACKLIST_MATERIALS = {"Vídeo 0013.mp4"}
+    # Adicionar materiais que falharam neste batch ou anteriores por QG rejection
+    jobs_file = DATA_ROOT / "production_pipeline" / "production_jobs.json"
+    if jobs_file.exists():
+        try:
+            jdata = json.loads(jobs_file.read_text())
+            for j in jdata.values():
+                if j.get("status") == "failed" and "black" in j.get("error", "").lower():
+                    for m in j.get("materials_used", []):
+                        BLACKLIST_MATERIALS.add(m)
+                    vp = j.get("video_path", "")
+                    if vp:
+                        BLACKLIST_MATERIALS.add(Path(vp).name)
+        except Exception:
+            pass
+    if BLACKLIST_MATERIALS:
+        print(f"   ⛔ Blacklisted (black frames): {BLACKLIST_MATERIALS}")
+
     results = {"success": 0, "failed": 0, "skipped": 0, "jobs": []}
     start_time = time.time()
 
@@ -74,8 +93,8 @@ def run_batch(count: int = 10) -> dict:
         )
         fresh = catalog.select_fresh_materials(criteria)
 
-        # Filtrar materiais já processados nesta batch ou anteriormente
-        unused_fresh = [m for m in fresh if m.filename not in already_used]
+        # Filtrar materiais já processados, falhos com black frames, ou blacklisted
+        unused_fresh = [m for m in fresh if m.filename not in already_used and m.filename not in BLACKLIST_MATERIALS]
 
         if not unused_fresh:
             print(f"   ⚠️  Sem materiais frescos restantes. Batch concluído.")
