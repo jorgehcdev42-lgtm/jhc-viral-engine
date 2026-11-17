@@ -2835,16 +2835,63 @@ async function loadPipelineJobs() {
  el.innerHTML = jobs.map(j => {
  const color = statusColors[j.status] || '#718096';
  const time = j.created_at ? new Date(j.created_at * 1000).toLocaleTimeString('pt-BR') : '?';
- return '<div style="padding:8px 0;border-bottom:1px solid #2d2d44;display:flex;justify-content:space-between;align-items:center;">' +
+ const hasVideo = j.output_path && (j.status === 'completed' || j.status === 'scheduled');
+ const videoUrl = hasVideo ? '/api/pipeline/job/' + j.job_id + '/video' : '';
+ const schedId = j.scheduler_job_id || j.job_id;
+ let actions = '';
+ if (hasVideo) {
+ actions = '<div style="display:flex;gap:4px;margin-top:6px;">' +
+ '<button onclick="previewJob(\'' + j.job_id + '\')" style="font-size:10px;padding:3px 8px;background:#2d2d44;color:#e2e8f0;border:1px solid #4a5568;border-radius:4px;cursor:pointer;">▶️ Preview</button>' +
+ '<button onclick="approveJob(\'' + schedId + '\')" style="font-size:10px;padding:3px 8px;background:#065f46;color:#4ade80;border:1px solid #4ade80;border-radius:4px;cursor:pointer;">✅ Aprovar</button>' +
+ '<button onclick="rejectJob(\'' + schedId + '\')" style="font-size:10px;padding:3px 8px;background:#7f1d1d;color:#fc8181;border:1px solid #fc8181;border-radius:4px;cursor:pointer;">❌ Rejeitar</button>' +
+ '<a href="' + videoUrl + '" download style="font-size:10px;padding:3px 8px;background:#2d2d44;color:#e2e8f0;border-radius:4px;text-decoration:none;">📥</a>' +
+ '</div>';
+ }
+ return '<div style="padding:8px 0;border-bottom:1px solid #2d2d44;">' +
+ '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
  '<div><strong style="color:' + color + '">[' + j.status.toUpperCase() + ']</strong> ' +
  '<span style="color:#e2e8f0;font-size:12px;">' + (j.title || j.job_id) + '</span><br>' +
  '<span style="font-size:11px;color:#718096;">' + j.platform + ' | ' + j.market + ' | ' + time +
  (j.materials_used?.length ? ' | 📦 ' + j.materials_used[0] : '') +
- (j.quality_score ? ' | QG:' + j.quality_score.toFixed(0) : '') + '</span></div>' +
- (j.output_path ? '<a href="/api/output/autoreel/' + j.output_path.split('/').pop() + '" target="_blank" style="font-size:11px;padding:3px 8px;background:#2d2d44;color:#e2e8f0;border-radius:4px;text-decoration:none;">📥</a>' : '') +
- '</div>';
+ (j.quality_score ? ' | QG:' + j.quality_score.toFixed(0) : '') + '</span>' +
+ actions + '</div></div></div>';
  }).join('');
  } catch(e) { el.textContent = 'Erro: ' + e.message; }
+}
+
+// Player inline para preview de vídeo
+let activePreview = null;
+function previewJob(jobId) {
+ // Fechar preview anterior se existir
+ if (activePreview) { activePreview.remove(); activePreview = null; }
+ const container = document.createElement('div');
+ container.id = 'video-preview-' + jobId;
+ container.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:#000;border:2px solid #4ade80;border-radius:12px;padding:8px;max-width:360px;box-shadow:0 0 40px rgba(0,0,0,0.8);';
+ container.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+ '<span style="color:#4ade80;font-weight:700;font-size:13px;">🎬 Preview — ' + jobId + '</span>' +
+ '<button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:#fc8181;font-size:16px;cursor:pointer;">✕</button></div>' +
+ '<video src="/api/pipeline/job/' + jobId + '/video" controls autoplay muted playsinline style="width:100%;max-height:500px;border-radius:8px;background:#111;"></video>';
+ document.body.appendChild(container);
+ activePreview = container;
+}
+
+async function approveJob(schedId) {
+ try {
+ const r = await fetch('/api/autopublish/approve/' + schedId + '?score=1.0', { method: 'POST' });
+ const d = await r.json();
+ alert('✅ Aprovado: ' + JSON.stringify(d));
+ loadPipelineJobs();
+ } catch(e) { alert('❌ Erro: ' + e.message); }
+}
+
+async function rejectJob(schedId) {
+ if (!confirm('Rejeitar job ' + schedId + '?')) return;
+ try {
+ const r = await fetch('/api/autopublish/reject/' + schedId + '?score=0.0', { method: 'POST' });
+ const d = await r.json();
+ alert('❌ Rejeitado: ' + JSON.stringify(d));
+ loadPipelineJobs();
+ } catch(e) { alert('❌ Erro: ' + e.message); }
 }
 
 // Init

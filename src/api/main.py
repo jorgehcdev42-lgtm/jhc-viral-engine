@@ -2607,6 +2607,20 @@ async def pipeline_get_job(job_id: str):
         return JSONResponse(status_code=404, content={"error": "Job não encontrado"})
     return job
 
+@app.get("/api/pipeline/job/{job_id}/video")
+async def pipeline_job_video(job_id: str):
+    """Stream de vídeo de um job da pipeline para preview inline."""
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    job = pipeline.get_job(job_id)
+    if not job or not job.get("output_path"):
+        raise HTTPException(status_code=404, detail="Job ou vídeo não encontrado")
+    video_path = Path(job["output_path"])
+    if not video_path.exists():
+        raise HTTPException(status_code=404, detail="Arquivo de vídeo não existe")
+    return FileResponse(str(video_path), media_type="video/mp4")
+
+
 @app.get("/api/pipeline/stats")
 async def pipeline_stats():
     """Estatísticas da pipeline de produção."""
