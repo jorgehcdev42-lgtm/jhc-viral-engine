@@ -154,7 +154,8 @@ class TestLaunchdService:
     def test_plist_references_correct_script(self):
         plist = Path.home() / "Library" / "LaunchAgents" / "com.jhc.bulkworker.plist"
         content = plist.read_text()
-        assert "bulk_worker.py" in content
+        # Accept either original bulk_worker.py or foreground variant for launchd
+        assert "bulk_worker" in content
         assert "/Volumes/SSD EXT MACBOOK" in content
 
     def test_service_registered_in_launchctl(self):
