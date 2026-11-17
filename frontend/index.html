@@ -1104,8 +1104,30 @@ body::after {
 <div class="card-title">Resultado</div>
 <div id="ar-result-content"></div>
 </div>
+<!-- PRODUÇÃO INTELIGENTE — Pipeline + Catálogo -->
 <div class="card">
-<div class="card-title">Produções Recentes</div>
+<div class="card-header"><span class="card-icon">🧠</span><div class="card-title">Produção Inteligente</div><button class="btn btn-sm" onclick="loadPipelineJobs()" style="margin-left:auto;font-size:0.75rem;">↻ Atualizar</button></div>
+<div style="display:grid;gap:12px;">
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+<button onclick="createSmartJob()" style="padding:10px 16px;background:linear-gradient(135deg,#4ade80,#22c55e);border:none;color:#000;font-weight:700;border-radius:8px;cursor:pointer;font-size:13px;">🎯 Selecionar Automaticamente</button>
+<span style="color:#718096;font-size:12px;">Usa SmartCatalog para escolher o melhor material fresco</span>
+</div>
+<div id="pipeline-catalog-preview" style="display:none;padding:10px;background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.2);border-radius:8px;">
+<div style="font-weight:700;font-size:13px;margin-bottom:6px;color:#4ade80;">📋 Material Selecionado</div>
+<div id="pipeline-selected-material" style="font-size:12px;color:#a0aec0;"></div>
+</div>
+<div id="pipeline-status" style="color:#718096;font-size:12px;"></div>
+</div>
+</div>
+
+<!-- PIPELINE JOBS -->
+<div class="card">
+<div class="card-header"><span class="card-icon">📋</span><div class="card-title">Fila de Produção</div></div>
+<div id="pipeline-jobs-list" style="color:#718096;font-size:13px;">Carregando...</div>
+</div>
+
+<div class="card">
+<div class="card-title">Produções Recentes (Legacy)</div>
 <div id="ar-outputs-list" style="color:#718096;font-size:13px;">Carregando...</div>
 </div>
 </div>
@@ -2758,6 +2780,71 @@ async function loadAnalytics() {
  } catch (e) {
   container.innerHTML = '<div class="error-box">Erro ao carregar analytics: ' + e.message + '</div>';
  }
+}
+
+// ===== PRODUCTION PIPELINE UI =====
+async function createSmartJob() {
+ const statusEl = document.getElementById('pipeline-status');
+ const previewEl = document.getElementById('pipeline-catalog-preview');
+ const materialEl = document.getElementById('pipeline-selected-material');
+ statusEl.textContent = '⏳ Selecionando melhor material do catálogo...';
+ try {
+ const job = await apiPost('/api/pipeline/create', {
+ platform: document.getElementById('ar-platform')?.value || 'tiktok',
+ market: document.getElementById('ar-market')?.value || 'br',
+ title: document.getElementById('ar-subtitle')?.value || '',
+ subtitle_text: document.getElementById('ar-subtitle')?.value || '',
+ auto_select: true,
+ });
+ if (job.error) { statusEl.innerHTML = '<span style="color:#fc8181">❌ ' + job.error + '</span>'; return; }
+ if (job.materials_used && job.materials_used.length) {
+ previewEl.style.display = 'block';
+ materialEl.innerHTML = '🎬 <b>' + job.materials_used[0] + '</b><br>Status: ' + job.status + ' | Job ID: ' + job.job_id;
+ } else {
+ previewEl.style.display = 'none';
+ }
+ statusEl.innerHTML = '✅ Job criado: <b>' + job.job_id + '</b> (' + job.status + ')';
+ // Auto-execute
+ statusEl.textContent += ' → 🎬 Produzindo...';
+ const result = await apiPost('/api/pipeline/execute/' + job.job_id, {});
+ if (result.error) {
+ statusEl.innerHTML = '<span style="color:#fc8181">❌ ' + result.error + '</span>';
+ } else if (result.status === 'completed') {
+ statusEl.innerHTML = '✅ Produção concluída! Output: ' + (result.output_path || 'N/A') + ' | QG: ' + (result.quality_passed ? '✅' : '❌') + ' Score: ' + (result.quality_score || 0).toFixed(0);
+ // Auto-schedule
+ const sched = await apiPost('/api/pipeline/schedule/' + job.job_id, {});
+ if (sched.status === 'submitted') {
+ statusEl.innerHTML += '<br>📅 Agendado internamente: ' + sched.job_id;
+ }
+ } else {
+ statusEl.innerHTML = '⚠️ Status: ' + result.status + (result.error ? ' | ' + result.error : '');
+ }
+ loadPipelineJobs();
+ } catch(e) {
+ statusEl.innerHTML = '<span style="color:#fc8181">❌ Erro: ' + e.message + '</span>';
+ }
+}
+
+async function loadPipelineJobs() {
+ const el = document.getElementById('pipeline-jobs-list');
+ try {
+ const data = await api('/api/pipeline/jobs?limit=20');
+ const jobs = data.jobs || [];
+ if (!jobs.length) { el.textContent = 'Nenhum job na fila.'; return; }
+ const statusColors = { pending:'#718096', selecting:'#a78bfa', producing:'#f59e0b', validating:'#38bdf8', completed:'#4ade80', scheduled:'#818cf8', failed:'#fc8181' };
+ el.innerHTML = jobs.map(j => {
+ const color = statusColors[j.status] || '#718096';
+ const time = j.created_at ? new Date(j.created_at * 1000).toLocaleTimeString('pt-BR') : '?';
+ return '<div style="padding:8px 0;border-bottom:1px solid #2d2d44;display:flex;justify-content:space-between;align-items:center;">' +
+ '<div><strong style="color:' + color + '">[' + j.status.toUpperCase() + ']</strong> ' +
+ '<span style="color:#e2e8f0;font-size:12px;">' + (j.title || j.job_id) + '</span><br>' +
+ '<span style="font-size:11px;color:#718096;">' + j.platform + ' | ' + j.market + ' | ' + time +
+ (j.materials_used?.length ? ' | 📦 ' + j.materials_used[0] : '') +
+ (j.quality_score ? ' | QG:' + j.quality_score.toFixed(0) : '') + '</span></div>' +
+ (j.output_path ? '<a href="/api/output/autoreel/' + j.output_path.split('/').pop() + '" target="_blank" style="font-size:11px;padding:3px 8px;background:#2d2d44;color:#e2e8f0;border-radius:4px;text-decoration:none;">📥</a>' : '') +
+ '</div>';
+ }).join('');
+ } catch(e) { el.textContent = 'Erro: ' + e.message; }
 }
 
 // Init
