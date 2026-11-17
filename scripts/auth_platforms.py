@@ -4,12 +4,15 @@
 Abre navegador visível (não headless) para login em cada plataforma.
 Salva sessão em perfil separado por plataforma para reuso automático.
 
+O navegador permanece aberto até você fechá-lo manualmente.
+Quando fechar, os cookies são salvos automaticamente.
+
 Uso:
     python scripts/auth_platforms.py tiktok
     python scripts/auth_platforms.py instagram
     python scripts/auth_platforms.py youtube
     python scripts/auth_platforms.py all       # todas sequencialmente
-    python scripts/auth_platforms.py status     # verifica sessões salvas
+    python scripts/auth_platforms.py status    # verifica sessões salvas
 """
 
 import asyncio
@@ -26,8 +29,9 @@ PLATFORM_URLS = {
     "youtube": "https://studio.youtube.com/",
 }
 
+
 async def authenticate_platform(platform: str) -> bool:
-    """Abre navegador visível para login e salva sessão."""
+    """Abre navegador visível para login e salva sessão quando fechar."""
     from playwright.async_api import async_playwright
 
     profile_dir = SESSIONS_DIR / f"{platform}_profile"
@@ -36,8 +40,9 @@ async def authenticate_platform(platform: str) -> bool:
     print(f"\n🔐 Abrindo {platform.upper()} para login...")
     print(f"   Perfil: {profile_dir}")
     print(f"   URL: {PLATFORM_URLS[platform]}")
-    print(f"   ⚠️  Faça login manualmente. O navegador fechará automaticamente.")
-    print(f"   Pressione ENTER no terminal quando estiver logado.\n")
+    print(f"   ⚠️  Faça login manualmente no navegador.")
+    print(f"   ⚠️  Quando terminar, FECHE A JANELA do navegador.")
+    print(f"   Os cookies serão salvos automaticamente.\n")
 
     async with async_playwright() as p:
         context = await p.chromium.launch_persistent_context(
@@ -49,24 +54,43 @@ async def authenticate_platform(platform: str) -> bool:
         page = context.pages[0] if context.pages else await context.new_page()
         await page.goto(PLATFORM_URLS[platform], wait_until="domcontentloaded")
 
-        # Aguarda usuário fazer login e pressionar Enter
-        input(f"   👉 Pressione ENTER após fazer login no {platform.upper()}... ")
+        # Aguarda o usuário fechar a janela do navegador
+        try:
+            # Espera até todas as páginas serem fechadas
+            while context.pages:
+                try:
+                    await context.pages[0].wait_for_event("close", timeout=2.0)
+                except Exception:
+                    # Timeout — verifica se o contexto ainda existe
+                    if not context.pages:
+                        break
+                    continue
+        except Exception:
+            pass
 
         # Salva cookies e storage state
-        cookies = await context.cookies()
-        storage_state = await context.storage_state()
+        try:
+            cookies = await context.cookies()
+            storage_state = await context.storage_state()
 
-        cookie_file = SESSIONS_DIR / f"{platform}_cookies.json"
-        state_file = SESSIONS_DIR / f"{platform}_state.json"
+            cookie_file = SESSIONS_DIR / f"{platform}_cookies.json"
+            state_file = SESSIONS_DIR / f"{platform}_state.json"
 
-        cookie_file.write_text(json.dumps(cookies, indent=2, ensure_ascii=False))
-        state_file.write_text(json.dumps(storage_state, indent=2, ensure_ascii=False))
+            cookie_file.write_text(json.dumps(cookies, indent=2, ensure_ascii=False))
+            state_file.write_text(json.dumps(storage_state, indent=2, ensure_ascii=False))
 
-        await context.close()
+            await context.close()
 
-    print(f"   ✅ Sessão {platform.upper()} salva!")
-    print(f"      Cookies: {len(cookies)} | State: {state_file.stat().st_size} bytes")
-    return True
+            print(f"   ✅ Sessão {platform.upper()} salva!")
+            print(f"   Cookies: {len(cookies)} | State: {state_file.stat().st_size} bytes")
+            return True
+        except Exception as e:
+            print(f"   ❌ Erro ao salvar sessão: {e}")
+            try:
+                await context.close()
+            except Exception:
+                pass
+            return False
 
 
 def check_status():
@@ -79,7 +103,8 @@ def check_status():
 
         if cookie_file.exists() and state_file.exists():
             cookies = json.loads(cookie_file.read_text())
-            age_hours = (Path(__file__).stat().st_mtime - cookie_file.stat().st_mtime) / 3600
+            import time
+            age_hours = (time.time() - cookie_file.stat().st_mtime) / 3600
             print(f"   ✅ {platform.upper():10s} — {len(cookies):3d} cookies — salvo há {abs(age_hours):.1f}h")
         elif profile_dir.exists() and any(profile_dir.iterdir()):
             print(f"   ⚠️  {platform.upper():10s} — perfil existe mas sem cookies exportados")
