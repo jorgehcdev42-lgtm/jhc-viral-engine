@@ -167,11 +167,30 @@ class AutoReelStudio:
             "height": height,
             "fps": eval(video_stream.get("r_frame_rate", "30/1")) if "/" in video_stream.get("r_frame_rate", "") else float(video_stream.get("r_frame_rate", 30)),
             "codec": video_stream.get("codec_name", "unknown"),
+            "pix_fmt": video_stream.get("pix_fmt", "unknown"),
             "has_audio": bool(audio_stream),
             "audio_codec": audio_stream.get("codec_name", ""),
             "bitrate": int(fmt.get("bit_rate", 0)),
             "size_mb": int(fmt.get("size", 0)) / (1024 * 1024),
         }
+
+    # Codecs conhecidos por produzir frames pretos com scale+crop no libx264
+    PROBLEMATIC_CODECS = {"hevc", "h265", "hvc1"}
+    # Pixel formats que precisam de conversão explícita para yuv420p
+    NEEDS_PIXFMT_CONVERSION = {"yuv420p10le", "yuv422p", "yuv444p", "p010le", "nv12"}
+
+    def _check_codec_compatibility(self, info: dict) -> tuple[bool, str]:
+        """Verifica compatibilidade do codec/pix_fmt com o pipeline.
+        Retorna (compatível, mensagem). Se incompatível, explica o motivo."""
+        codec = info.get("codec", "unknown").lower()
+        pix_fmt = info.get("pix_fmt", "unknown")
+
+        if codec in self.PROBLEMATIC_CODECS:
+            return False, f"Codec {codec} produz frames pretos com scale+crop. Use material H.264 ou transcodifique antes."
+        if pix_fmt in self.NEEDS_PIXFMT_CONVERSION:
+            # Não rejeita, mas avisa — o filter chain deve incluir format=yuv420p
+            return True, f"pix_fmt {pix_fmt} requer conversão explícita para yuv420p"
+        return True, ""
 
     def _detect_scenes(self, input_path: str, threshold: float = 0.3) -> list[float]:
         """Detecta timestamps de mudança de cena."""
@@ -488,6 +507,17 @@ class AutoReelStudio:
             self._report(progress)
 
             info = self._get_video_info(str(source))
+
+            # FASE 2: Validação de codec/pix_fmt ANTES do render
+            compatible, codec_msg = self._check_codec_compatibility(info)
+            if not compatible:
+                progress.status = ReelStatus.FAILED.value
+                progress.error = f"Codec incompatível: {codec_msg}"
+                self._report(progress)
+                return progress
+            if codec_msg:
+                progress.message = f"Aviso: {codec_msg}"
+                self._report(progress)
             if info.get("error"):
                 progress.status = ReelStatus.FAILED.value
                 progress.error = info["error"]
