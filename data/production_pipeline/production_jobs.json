@@ -368,5 +368,23 @@
     "duration_seconds": 262.95,
     "materials_used": [],
     "scheduler_job_id": "f7fc4f3c-557"
+  },
+  "72eef445-eba": {
+    "job_id": "72eef445-eba",
+    "status": "producing",
+    "video_path": "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/VIDEOS CORTES/Vídeo 0007.mp4",
+    "output_path": "",
+    "platform": "tiktok",
+    "market": "br",
+    "title": "GTA 6 TÁ CHEGANDO! 🔥",
+    "subtitle_text": "GTA 6 - 19/11/2026",
+    "quality_score": 0.0,
+    "quality_passed": false,
+    "error": "",
+    "created_at": 1794939357.559305,
+    "completed_at": 0.0,
+    "duration_seconds": 0.0,
+    "materials_used": [],
+    "scheduler_job_id": ""
   }
 }
