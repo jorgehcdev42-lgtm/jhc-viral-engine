@@ -224,6 +224,7 @@ class ProductionPipeline:
 
         scheduler = AutoPublishScheduler(data_root=self.data_root)
         pub_job = AutoPublishJob(
+            job_id=str(uuid.uuid4())[:12],
             profile_id=f"{job.market}_{job.platform}",
             platform=job.platform,
             video_path=job.output_path,
