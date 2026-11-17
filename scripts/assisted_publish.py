@@ -30,8 +30,36 @@ PLATFORM_UPLOAD_URLS = {
 }
 
 
-def get_ready_jobs() -> list[dict]:
-    """Lista jobs do pipeline prontos para publicação (status=scheduled ou completed)."""
+def _get_scheduler_job_state(scheduler_job_id: str) -> str:
+    """Retorna estado do job no AutoPublishScheduler."""
+    sched_file = DATA_ROOT / "scheduler" / "autopublish_jobs.json"
+    if not sched_file.exists():
+        return "unknown"
+    try:
+        jobs = json.loads(sched_file.read_text())
+        for j in jobs:
+            if j.get("job_id") == scheduler_job_id:
+                return j.get("state", "unknown")
+    except Exception:
+        pass
+    return "unknown"
+
+
+def _is_approved(job: dict) -> bool:
+    """Verifica se job foi aprovado via QualityGate no scheduler."""
+    sched_id = job.get("scheduler_job_id", "")
+    if not sched_id:
+        return False
+    state = _get_scheduler_job_state(sched_id)
+    return state == "approved"
+
+
+def get_ready_jobs(require_approval: bool = True) -> list[dict]:
+    """Lista jobs do pipeline prontos para publicação (status=scheduled ou completed).
+
+    Args:
+        require_approval: Se True, só retorna jobs aprovados via QualityGate.
+    """
     jobs_file = DATA_ROOT / "production_pipeline" / "production_jobs.json"
     if not jobs_file.exists():
         return []
@@ -41,6 +69,8 @@ def get_ready_jobs() -> list[dict]:
         if job.get("status") in ("scheduled", "completed") and job.get("output_path"):
             p = Path(job["output_path"])
             if p.exists() and p.stat().st_size > 100_000:
+                if require_approval and not _is_approved(job):
+                    continue
                 ready.append(job)
     return sorted(ready, key=lambda j: j.get("created_at", 0), reverse=True)
 
@@ -135,17 +165,32 @@ def confirm_publish(job_id: str, post_url: str = "") -> dict:
     return result
 
 
-def list_ready():
-    """Lista jobs prontos para publicação assistida."""
-    jobs = get_ready_jobs()
+def list_ready(show_all: bool = False):
+    """Lista jobs prontos para publicação assistida.
+
+    Args:
+        show_all: Se True, mostra todos os jobs (incluindo não aprovados).
+    """
+    jobs = get_ready_jobs(require_approval=not show_all)
     if not jobs:
-        print("   Nenhum job pronto para publicação.")
+        if show_all:
+            print("   Nenhum job encontrado.")
+        else:
+            print("   Nenhum job APROVADO pronto para publicação.")
+            print("   Use 'list --all' para ver todos os jobs.")
+            # Mostrar quantos existem sem aprovação
+            all_jobs = get_ready_jobs(require_approval=False)
+            if all_jobs:
+                print(f"   ({len(all_jobs)} jobs aguardando aprovação via /api/autopublish/approve/<job_id>)")
         return
 
-    print(f"\n📦 Jobs prontos para publicação ({len(jobs)}):\n")
+    label = "aprovados" if not show_all else "todos"
+    print(f"\n📦 Jobs {label} para publicação ({len(jobs)}):\n")
     for j in jobs:
         size_mb = Path(j["output_path"]).stat().st_size / (1024 * 1024)
-        print(f"   [{j['status']:10s}] {j['job_id']} | {j['platform']:8s} | {size_mb:.1f}MB | {j.get('title', 'N/A')}")
+        approved = _is_approved(j)
+        status_icon = "✅" if approved else "⏳"
+        print(f"   {status_icon} [{j['status']:10s}] {j['job_id']} | {j['platform']:8s} | {size_mb:.1f}MB | {j.get('title', 'N/A')}")
     print()
 
 
@@ -157,7 +202,8 @@ def main():
     cmd = sys.argv[1].lower()
 
     if cmd == "list":
-        list_ready()
+        show_all = len(sys.argv) > 2 and sys.argv[2].lower() in ("--all", "-a", "all")
+        list_ready(show_all=show_all)
         return
 
     if cmd == "confirm":
@@ -170,14 +216,21 @@ def main():
         print(f"   Resultado: {json.dumps(result, indent=2)}")
         return
 
-    # Publicar job específico
+    # Publicar job específico — requer aprovação prévia
     job_id = cmd
-    jobs = get_ready_jobs()
-    target = next((j for j in jobs if j["job_id"] == job_id), None)
+    all_jobs = get_ready_jobs(require_approval=False)
+    target = next((j for j in all_jobs if j["job_id"] == job_id), None)
 
     if not target:
         print(f"   ❌ Job não encontrado ou não pronto: {job_id}")
-        print("   Use 'list' para ver jobs disponíveis.")
+        print("   Use 'list --all' para ver todos os jobs.")
+        sys.exit(1)
+
+    if not _is_approved(target):
+        sched_id = target.get("scheduler_job_id", job_id)
+        print(f"   🚫 Job {job_id} NÃO APROVADO.")
+        print(f"   Aprove primeiro: POST /api/autopublish/approve/{sched_id}?score=1.0")
+        print(f"   Ou via CLI: curl -X POST http://localhost:8000/api/autopublish/approve/{sched_id}?score=1.0")
         sys.exit(1)
 
     meta = prepare_metadata(target)
