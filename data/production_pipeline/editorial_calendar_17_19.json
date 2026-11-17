@@ -1,0 +1,59 @@
+{
+  "campaign": "GTA 6 Launch Week",
+  "period": "2026-11-17 to 2026-11-19",
+  "generated_at": "2026-11-17T01:30:00-03:00",
+  "slots": [
+    {
+      "date": "2026-11-17",
+      "day_label": "D-2 (Segunda)",
+      "theme": "Contagem Regressiva + Hype",
+      "platforms": ["tiktok", "instagram"],
+      "suggested_titles": [
+        "FALTAM 2 DIAS! 🔥 GTA 6 TÁ CHEGANDO",
+        "CONTAGEM REGRESSIVA: 48 HORAS! ⏰"
+      ],
+      "hashtags": ["#gta6", "#gtavi", "#rockstargames", "#countdown", "#gaming", "#viral", "#fyp"],
+      "editorial_note": "Vídeos de hype geral, teasers, retrospectiva dos trailers. Tom: expectativa máxima.",
+      "fact_check_status": "N/A — conteúdo editorial/opinião",
+      "rights_status": "Materiais do acervo próprio — verificar licença de trilha sonora"
+    },
+    {
+      "date": "2026-11-18",
+      "day_label": "D-1 (Terça)",
+      "theme": "Vazamentos + Especulação Fundamentada",
+      "platforms": ["tiktok", "youtube"],
+      "suggested_titles": [
+        "O QUE VAZOU DO GTA 6? 👀 ANÁLISE",
+        "GTA 6: TUDO QUE SABEMOS ATÉ AGORA 🎮"
+      ],
+      "hashtags": ["#gta6", "#gtavi", "#leaks", "#rockstar", "#gaming", "#shorts", "#análise"],
+      "editorial_note": "Retrospectiva de informações públicas confirmadas + especulação claramente identificada. NÃO apresentar rumores como fatos.",
+      "fact_check_status": "Verificar cada claim contra fontes oficiais (Rockstar Newswire, Take-Two IR)",
+      "rights_status": "Materiais do acervo próprio — clips de trailers públicos são fair use para análise"
+    },
+    {
+      "date": "2026-11-19",
+      "day_label": "LAUNCH DAY (Quarta)",
+      "theme": "Lançamento + Reação + Gameplay",
+      "platforms": ["tiktok", "instagram", "youtube"],
+      "suggested_titles": [
+        "GTA 6 LANÇOU! 🚀 PRIMEIRAS IMPRESSÕES",
+        "VICE CITY DE VOLTA! 🌴 GAMEPLAY LEAK?",
+        "FLASH BR NO GTA 6! ⚡ REAÇÃO AO VIVO"
+      ],
+      "hashtags": ["#gta6", "#gtavi", "#launchday", "#rockstargames", "#gameplay", "#viral", "#fyp", "#trending"],
+      "editorial_note": "Dia de máximo alcance. Priorizar vídeos com reação genuína, primeiras impressões, highlights. Se houver gameplay real disponível, priorizar. Caso contrário, usar materiais do acervo com disclaimer claro.",
+      "fact_check_status": "CRÍTICO — só publicar informações verificadas no dia. Rumores devem ser identificados como tal.",
+      "rights_status": "Gameplay próprio = OK. Clips de terceiros = verificar licença. Trailers oficiais = fair use para review."
+    }
+  ],
+  "job_assignments": [],
+  "notes": [
+    "Calendário gerado automaticamente pelo JHC Viral Engine",
+    "Cada slot deve receber 2-3 reels aprovados via QualityGate",
+    "Aprovação manual obrigatória antes de qualquer publicação",
+    "Direitos de uso devem ser verificados para cada vídeo individualmente",
+    "Hashtags ajustáveis por plataforma e tendência do momento",
+    "Horários sugeridos: TikTok 18h-22h, Instagram 12h-14h e 19h-21h, YouTube 17h-20h"
+  ]
+}
