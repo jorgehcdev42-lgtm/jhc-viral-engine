@@ -8,6 +8,7 @@ Registro de uso de materiais e prevenção de repetição excessiva.
 from __future__ import annotations
 
 import json
+import subprocess
 import threading
 import time
 import uuid
@@ -159,49 +160,33 @@ class ProductionPipeline:
             result = studio.produce(request)
             job.duration_seconds = round(time.time() - start, 2)
 
-            if result.status == "done" and result.output_path:
-                job.status = "validating"
-                job.output_path = result.output_path
-                self._save_jobs()
+            if result.status != "done" or not result.output_path:
+                job.status = "failed"
+                job.error = result.error or "Produção falhou"
+            else:
+                raw_output = result.output_path
+                validation = self._validate_output(raw_output)
 
-                # Validação ffprobe
-                import subprocess
-                try:
-                    r = subprocess.run(
-                        ["ffprobe", "-v", "quiet", "-print_format", "json",
-                         "-show_format", "-show_streams", result.output_path],
-                        capture_output=True, text=True, timeout=10,
-                    )
-                    probe = json.loads(r.stdout)
-                    vs = [s for s in probe.get("streams", []) if s.get("codec_type") == "video"]
-                    if vs:
-                        w = vs[0].get("width", 0)
-                        h = vs[0].get("height", 0)
-                        dur = float(probe.get("format", {}).get("duration", 0))
-                        job.quality_score = min(100, (w * h) / (1080 * 1920) * 50 + min(dur / 60, 1) * 30 + 20)
-                        job.quality_passed = w >= 720 and h >= 720 and dur > 0.5
-                    else:
-                        job.quality_passed = False
-                        job.error = "Sem stream de vídeo"
-                except Exception as e:
-                    job.quality_passed = True  # fallback: assume OK se ffprobe falhar
-                    job.quality_score = 50.0
-
-                if job.quality_passed:
+                if not validation["valid"]:
+                    job.status = "failed"
+                    job.error = validation["error"]
+                    job.quality_score = validation.get("score", 0.0)
+                    # Remover arquivo inválido
+                    Path(raw_output).unlink(missing_ok=True)
+                else:
+                    # Validação passou — arquivo já está no destino correto
+                    job.output_path = raw_output
+                    job.quality_score = validation["score"]
+                    job.quality_passed = True
                     job.status = "completed"
                     job.completed_at = time.time()
+
                     # Registrar uso dos materiais
                     if job.materials_used:
                         from src.production.smart_catalog import SmartCatalog
                         catalog = SmartCatalog(data_root=self.data_root)
                         catalog.load()
                         catalog.record_usage(job.materials_used, reel_id=job.job_id)
-                else:
-                    job.status = "failed"
-                    job.error = job.error or "Quality Gate reprovado"
-            else:
-                job.status = "failed"
-                job.error = result.error or "Produção falhou"
 
         except Exception as e:
             job.status = "failed"
@@ -211,6 +196,44 @@ class ProductionPipeline:
             self._save_jobs()
 
         return job
+
+    def _validate_output(self, path: str) -> dict:
+        """Valida rigorosamente output de render via ffprobe. Retorna dict com valid/score/error."""
+        p = Path(path)
+        if not p.exists():
+            return {"valid": False, "error": "Arquivo não existe", "score": 0.0}
+        size = p.stat().st_size
+        if size < 100_000:
+            return {"valid": False, "error": f"Arquivo muito pequeno ({size} bytes)", "score": 0.0}
+        try:
+            r = subprocess.run(
+                ["ffprobe", "-v", "quiet", "-print_format", "json",
+                 "-show_format", "-show_streams", str(p)],
+                capture_output=True, text=True, timeout=15,
+            )
+            if r.returncode != 0:
+                return {"valid": False, "error": f"ffprobe exit {r.returncode}", "score": 0.0}
+            probe = json.loads(r.stdout)
+            vs = [s for s in probe.get("streams", []) if s.get("codec_type") == "video"]
+            audio = [s for s in probe.get("streams", []) if s.get("codec_type") == "audio"]
+            if not vs:
+                return {"valid": False, "error": "Sem stream de vídeo", "score": 0.0}
+            w = vs[0].get("width", 0)
+            h = vs[0].get("height", 0)
+            dur = float(probe.get("format", {}).get("duration", 0))
+            nb_frames = int(vs[0].get("nb_frames", 0) or 0)
+            if w < 720 or h < 720:
+                return {"valid": False, "error": f"Resolução baixa {w}x{h}", "score": 0.0}
+            if dur < 0.5:
+                return {"valid": False, "error": f"Duração inválida {dur}s", "score": 0.0}
+            if nb_frames > 0 and dur > 0 and (nb_frames / dur) < 10:
+                return {"valid": False, "error": f"FPS baixo ({nb_frames/dur:.1f})", "score": 0.0}
+            score = min(100, (w * h) / (1080 * 1920) * 50 + min(dur / 60, 1) * 30 + (10 if audio else 0) + 10)
+            return {"valid": True, "score": round(score, 1), "error": ""}
+        except subprocess.TimeoutExpired:
+            return {"valid": False, "error": "ffprobe timeout", "score": 0.0}
+        except Exception as e:
+            return {"valid": False, "error": str(e), "score": 0.0}
 
     def schedule_job(self, job_id: str, scheduled_at: Optional[float] = None) -> dict:
         """Agenda job concluído para publicação interna (não publica externamente)."""
