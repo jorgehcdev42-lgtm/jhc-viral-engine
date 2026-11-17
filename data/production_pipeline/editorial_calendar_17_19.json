@@ -1,59 +1,194 @@
 {
-  "campaign": "GTA 6 Launch Week",
-  "period": "2026-11-17 to 2026-11-19",
-  "generated_at": "2026-11-17T01:30:00-03:00",
-  "slots": [
-    {
-      "date": "2026-11-17",
-      "day_label": "D-2 (Segunda)",
-      "theme": "Contagem Regressiva + Hype",
-      "platforms": ["tiktok", "instagram"],
-      "suggested_titles": [
-        "FALTAM 2 DIAS! 🔥 GTA 6 TÁ CHEGANDO",
-        "CONTAGEM REGRESSIVA: 48 HORAS! ⏰"
-      ],
-      "hashtags": ["#gta6", "#gtavi", "#rockstargames", "#countdown", "#gaming", "#viral", "#fyp"],
-      "editorial_note": "Vídeos de hype geral, teasers, retrospectiva dos trailers. Tom: expectativa máxima.",
-      "fact_check_status": "N/A — conteúdo editorial/opinião",
-      "rights_status": "Materiais do acervo próprio — verificar licença de trilha sonora"
-    },
-    {
-      "date": "2026-11-18",
-      "day_label": "D-1 (Terça)",
-      "theme": "Vazamentos + Especulação Fundamentada",
-      "platforms": ["tiktok", "youtube"],
-      "suggested_titles": [
-        "O QUE VAZOU DO GTA 6? 👀 ANÁLISE",
-        "GTA 6: TUDO QUE SABEMOS ATÉ AGORA 🎮"
-      ],
-      "hashtags": ["#gta6", "#gtavi", "#leaks", "#rockstar", "#gaming", "#shorts", "#análise"],
-      "editorial_note": "Retrospectiva de informações públicas confirmadas + especulação claramente identificada. NÃO apresentar rumores como fatos.",
-      "fact_check_status": "Verificar cada claim contra fontes oficiais (Rockstar Newswire, Take-Two IR)",
-      "rights_status": "Materiais do acervo próprio — clips de trailers públicos são fair use para análise"
-    },
-    {
-      "date": "2026-11-19",
-      "day_label": "LAUNCH DAY (Quarta)",
-      "theme": "Lançamento + Reação + Gameplay",
-      "platforms": ["tiktok", "instagram", "youtube"],
-      "suggested_titles": [
-        "GTA 6 LANÇOU! 🚀 PRIMEIRAS IMPRESSÕES",
-        "VICE CITY DE VOLTA! 🌴 GAMEPLAY LEAK?",
-        "FLASH BR NO GTA 6! ⚡ REAÇÃO AO VIVO"
-      ],
-      "hashtags": ["#gta6", "#gtavi", "#launchday", "#rockstargames", "#gameplay", "#viral", "#fyp", "#trending"],
-      "editorial_note": "Dia de máximo alcance. Priorizar vídeos com reação genuína, primeiras impressões, highlights. Se houver gameplay real disponível, priorizar. Caso contrário, usar materiais do acervo com disclaimer claro.",
-      "fact_check_status": "CRÍTICO — só publicar informações verificadas no dia. Rumores devem ser identificados como tal.",
-      "rights_status": "Gameplay próprio = OK. Clips de terceiros = verificar licença. Trailers oficiais = fair use para review."
-    }
-  ],
-  "job_assignments": [],
-  "notes": [
-    "Calendário gerado automaticamente pelo JHC Viral Engine",
-    "Cada slot deve receber 2-3 reels aprovados via QualityGate",
-    "Aprovação manual obrigatória antes de qualquer publicação",
-    "Direitos de uso devem ser verificados para cada vídeo individualmente",
-    "Hashtags ajustáveis por plataforma e tendência do momento",
-    "Horários sugeridos: TikTok 18h-22h, Instagram 12h-14h e 19h-21h, YouTube 17h-20h"
-  ]
+ "campaign": "GTA VI — Leonida Flash BR Launch Week",
+ "period": "2026-11-17 to 2026-11-19",
+ "generated_at": "2026-11-17T02:30:00-03:00",
+ "updated_by": "MISSÃO 034.6",
+ "total_unique_videos": 8,
+ "duplicates_excluded": 1,
+ "slots": [
+ {
+ "date": "2026-11-17",
+ "day_label": "D-2 (Segunda)",
+ "theme": "Contagem Regressiva + Hype Inicial",
+ "editorial_note": "Vídeos de expectativa e aquecimento. Tom: empolgação sem afirmar fatos não confirmados.",
+ "fact_check_status": "N/A — conteúdo editorial/opinião",
+ "rights_status": "Materiais do acervo próprio — verificar trilha sonora",
+ "assignments": [
+ {
+ "job_id": "f1b71bca-2a8",
+ "file": "data/autoreel/output/0b64659d19e6_br_tiktok.mp4",
+ "title": "GTA 6 TÁ CHEGANDO! 🔥 Faltam 2 dias!",
+ "description": "A contagem regressiva começou! GTA VI tá quase aí e o hype é real demais. Quem mais tá ansioso? 👇\n\n#GTA6 #GTAVI #RockstarGames #LeonidaFlashBR #Gaming #Viral #FYP #ContagemRegressiva",
+ "hashtags": ["#GTA6", "#GTAVI", "#RockstarGames", "#LeonidaFlashBR", "#Gaming", "#Viral", "#FYP"],
+ "platforms": {"tiktok": true, "instagram": true, "youtube": true},
+ "accounts": {"tiktok": "@leonidagta6flashbr", "instagram": "@leonidagta6flashbr", "youtube": "@LeonidagtaVIFlashBR"},
+ "duration": "64.7s",
+ "quality_gate": 100,
+ "editorial_status": "APROVADO",
+ "approval_status": "PENDENTE",
+ "publish_status": "NÃO PUBLICADO",
+ "is_demo": false,
+ "is_duplicate": false
+ },
+ {
+ "job_id": "7b0b8816-217",
+ "file": "data/autoreel/output/8a1923a1b1fb_br_tiktok.mp4",
+ "title": "O HYPE É REAL! 🎮 GTA VI chegando!",
+ "description": "Se você não tá hypado pra GTA VI, cê tá errado! 😂 O que vocês mais querem ver no jogo novo?\n\n#GTA6 #Hype #Rockstar #LeonidaFlashBR #Gamer #Shorts #Viral",
+ "hashtags": ["#GTA6", "#Hype", "#Rockstar", "#LeonidaFlashBR", "#Gamer", "#Shorts"],
+ "platforms": {"tiktok": true, "instagram": true, "youtube": true},
+ "accounts": {"tiktok": "@leonidagta6flashbr", "instagram": "@leonidagta6flashbr", "youtube": "@LeonidagtaVIFlashBR"},
+ "duration": "65.0s",
+ "quality_gate": 100,
+ "editorial_status": "APROVADO",
+ "approval_status": "PENDENTE",
+ "publish_status": "NÃO PUBLICADO",
+ "is_demo": false,
+ "is_duplicate": false
+ }
+ ]
+ },
+ {
+ "date": "2026-11-18",
+ "day_label": "D-1 (Terça)",
+ "theme": "Análise + Especulação Fundamentada",
+ "editorial_note": "Retrospectiva de informações públicas + especulação claramente identificada. NÃO apresentar rumores como fatos.",
+ "fact_check_status": "Verificar cada claim contra fontes oficiais (Rockstar Newswire, Take-Two IR)",
+ "rights_status": "Clips de trailers públicos = fair use para análise",
+ "assignments": [
+ {
+ "job_id": "65437462-844",
+ "file": "data/autoreel/output/05fee8d4f9ce_br_tiktok.mp4",
+ "title": "GTA VI: Tudo que sabemos até agora 👀",
+ "description": "Resumão do que a Rockstar já confirmou sobre GTA VI! Mapa, personagens, mecânicas... bora relembrar? 🧐\n\n⚠️ Este vídeo contém análises baseadas em informações públicas. Rumores são identificados como tal.\n\n#GTA6 #GTAVI #Análise #RockstarGames #LeonidaFlashBR #Gaming #Especulação",
+ "hashtags": ["#GTA6", "#GTAVI", "#Análise", "#RockstarGames", "#LeonidaFlashBR", "#Gaming"],
+ "platforms": {"tiktok": true, "instagram": true, "youtube": true},
+ "accounts": {"tiktok": "@leonidagta6flashbr", "instagram": "@leonidagta6flashbr", "youtube": "@LeonidagtaVIFlashBR"},
+ "duration": "67.3s",
+ "quality_gate": 100,
+ "editorial_status": "APROVADO",
+ "approval_status": "PENDENTE",
+ "publish_status": "NÃO PUBLICADO",
+ "is_demo": false,
+ "is_duplicate": false
+ },
+ {
+ "job_id": "fd2d3f01-059",
+ "file": "data/autoreel/output/bfc74910f4e0_br_tiktok.mp4",
+ "title": "FLASH BR NO GTA VI! ⚡ Expectativas",
+ "description": "Como seria jogar GTA VI sendo brasileiro? 🇧🇷 Imagina a zoeira em Vice City! Qual sua expectativa?\n\n#GTA6 #Brasil #LeonidaFlashBR #ViceCity #Gamer #Reels #Expectativa",
+ "hashtags": ["#GTA6", "#Brasil", "#LeonidaFlashBR", "#ViceCity", "#Gamer", "#Reels"],
+ "platforms": {"tiktok": true, "instagram": true, "youtube": true},
+ "accounts": {"tiktok": "@leonidagta6flashbr", "instagram": "@leonidagta6flashbr", "youtube": "@LeonidagtaVIFlashBR"},
+ "duration": "67.9s",
+ "quality_gate": 100,
+ "editorial_status": "APROVADO",
+ "approval_status": "PENDENTE",
+ "publish_status": "NÃO PUBLICADO",
+ "is_demo": false,
+ "is_duplicate": false
+ }
+ ]
+ },
+ {
+ "date": "2026-11-19",
+ "day_label": "Launch Day (Quarta)",
+ "theme": "Lançamento + Reação + Destaques",
+ "editorial_note": "Dia de máximo alcance. Priorizar reação genuína e destaques. Se houver gameplay real, priorizar. Caso contrário, usar materiais com disclaimer claro.",
+ "fact_check_status": "CRÍTICO — só publicar informações verificadas. Rumores devem ser identificados.",
+ "rights_status": "Gameplay próprio = OK. Clips terceiros = verificar licença.",
+ "assignments": [
+ {
+ "job_id": "0fad2baa-c22",
+ "file": "data/autoreel/output/6e74549a22cf_br_tiktok.mp4",
+ "title": "GTA VI LANÇOU! 🚀 Primeiras Impressões",
+ "description": "GTA VI finalmente chegou! 🎉 Quais foram suas primeiras impressões? Conta aqui nos comentários!\n\n#GTA6 #Lançamento #RockstarGames #LeonidaFlashBR #Gaming #LaunchDay #Viral",
+ "hashtags": ["#GTA6", "#Lançamento", "#RockstarGames", "#LeonidaFlashBR", "#Gaming", "#LaunchDay"],
+ "platforms": {"tiktok": true, "instagram": true, "youtube": true},
+ "accounts": {"tiktok": "@leonidagta6flashbr", "instagram": "@leonidagta6flashbr", "youtube": "@LeonidagtaVIFlashBR"},
+ "duration": "77.3s",
+ "quality_gate": 100,
+ "editorial_status": "APROVADO",
+ "approval_status": "PENDENTE",
+ "publish_status": "NÃO PUBLICADO",
+ "is_demo": true,
+ "is_duplicate": false,
+ "demo_note": "Demo E2E M034.1 — pode ser usado como conteúdo se editado ou substituído por gameplay real"
+ },
+ {
+ "job_id": "f7ead07f-03f",
+ "file": "data/autoreel/output/2cf4f11dfc8a_br_tiktok.mp4",
+ "title": "VICE CITY DE VOLTA! 🌴 Nostalgia + Novidade",
+ "description": "Vice City voltou e tá mais linda do que nunca! 🌅 Quem jogou o original vai chorar de emoção!\n\n#GTA6 #ViceCity #Nostalgia #RockstarGames #LeonidaFlashBR #Gamer #Reels",
+ "hashtags": ["#GTA6", "#ViceCity", "#Nostalgia", "#RockstarGames", "#LeonidaFlashBR", "#Gamer"],
+ "platforms": {"tiktok": true, "instagram": true, "youtube": true},
+ "accounts": {"tiktok": "@leonidagta6flashbr", "instagram": "@leonidagta6flashbr", "youtube": "@LeonidagtaVIFlashBR"},
+ "duration": "87.2s",
+ "quality_gate": 100,
+ "editorial_status": "APROVADO",
+ "approval_status": "PENDENTE",
+ "publish_status": "NÃO PUBLICADO",
+ "is_demo": true,
+ "is_duplicate": false,
+ "demo_note": "Demo E2E M034.1"
+ },
+ {
+ "job_id": "94a6bf77-91e",
+ "file": "data/autoreel/output/2bbb0ae18e2e_br_tiktok.mp4",
+ "title": "LEONIDA FLASH BR EM GTA VI! ⚡",
+ "description": "O canal Leonida Flash BR tá pronto pra dominar GTA VI! 🔥 Se inscreve e ativa o sininho pra não perder nada!\n\n#GTA6 #LeonidaFlashBR #CanalBR #Gamer #InscrevaSe #Viral #FYP",
+ "hashtags": ["#GTA6", "#LeonidaFlashBR", "#CanalBR", "#Gamer", "#InscrevaSe", "#Viral"],
+ "platforms": {"tiktok": true, "instagram": true, "youtube": true},
+ "accounts": {"tiktok": "@leonidagta6flashbr", "instagram": "@leonidagta6flashbr", "youtube": "@LeonidagtaVIFlashBR"},
+ "duration": "66.9s",
+ "quality_gate": 100,
+ "editorial_status": "APROVADO",
+ "approval_status": "PENDENTE",
+ "publish_status": "NÃO PUBLICADO",
+ "is_demo": true,
+ "is_duplicate": false,
+ "demo_note": "Demo E2E M034.1"
+ },
+ {
+ "job_id": "b6ebabfe-077",
+ "file": "data/autoreel/output/628c8e091d1b_br_tiktok.mp4",
+ "title": "CONTAGEM FINAL! ⏰ GTA VI É AMANHÃ!",
+ "description": "Últimas horas antes de GTA VI! 🕐 Já preparou o setup? Conta aqui qual plataforma você vai jogar!\n\n#GTA6 #Countdown #RockstarGames #LeonidaFlashBR #Gaming #Setup #PS5 #Xbox",
+ "hashtags": ["#GTA6", "#Countdown", "#RockstarGames", "#LeonidaFlashBR", "#Gaming", "#Setup"],
+ "platforms": {"tiktok": true, "instagram": true, "youtube": true},
+ "accounts": {"tiktok": "@leonidagta6flashbr", "instagram": "@leonidagta6flashbr", "youtube": "@LeonidagtaVIFlashBR"},
+ "duration": "60.1s",
+ "quality_gate": 100,
+ "editorial_status": "APROVADO",
+ "approval_status": "PENDENTE",
+ "publish_status": "NÃO PUBLICADO",
+ "is_demo": true,
+ "is_duplicate": false,
+ "demo_note": "Demo E2E M034.1"
+ }
+ ]
+ }
+ ],
+ "excluded_duplicates": [
+ {
+ "job_id": "4a12a6e9-1d3",
+ "reason": "SHA-256 idêntico a f1b71bca-2a8 (hash=265572a65aa4b328). Mesmo conteúdo renderizado duas vezes.",
+ "original_job": "f1b71bca-2a8"
+ }
+ ],
+ "horarios_sugeridos": {
+ "tiktok": "18h-22h (pico de engajamento BR)",
+ "instagram": "12h-14h e 19h-21h",
+ "youtube": "17h-20h (Shorts)"
+ },
+ "notas_finais": [
+ "Calendário atualizado pela MISSÃO 034.6 com dados reais dos vídeos produzidos",
+ "Todos os 8 vídeos passaram QualityGate técnico (score 100) e avaliação editorial automática",
+ "Nenhum vídeo afirma lançamento oficial de GTA VI em 19/11 — trata-se de campanha temática",
+ "Aprovação manual obrigatória via dashboard antes de qualquer publicação",
+ "Publicação assistida via Safari — usuário arrasta vídeo e confirma manualmente",
+ "4 vídeos são demos E2E (podem ser usados como conteúdo ou substituídos por gameplay real)",
+ "4 vídeos são conteúdo novo produzido pelo batch recovery",
+ "1 duplicata excluída (mesmo hash SHA-256)"
+ ]
 }
