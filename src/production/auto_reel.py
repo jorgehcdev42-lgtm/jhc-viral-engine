@@ -192,6 +192,34 @@ class AutoReelStudio:
             return True, f"pix_fmt {pix_fmt} requer conversão explícita para yuv420p"
         return True, ""
 
+    def _transcode_to_h264(self, input_path: str) -> str | None:
+        """Transcodifica vídeo HEVC/H.265 para H.264 intermediário.
+        Retorna caminho do arquivo transcoded ou None se falhar.
+        Arquivo temporário criado em data/autoreel/tmp/."""
+        import tempfile
+        tmp_dir = Path(self.data_root) / "autoreel" / "tmp"
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        output_path = tmp_dir / f"transcoded_{Path(input_path).stem}_h264.mp4"
+
+        # Se já existe transcoded válido, reutiliza
+        if output_path.exists() and output_path.stat().st_size > 100_000:
+            return str(output_path)
+
+        cmd = [
+            "-y", "-hide_banner",
+            "-i", str(input_path),
+            "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "128k",
+            "-movflags", "+faststart",
+            str(output_path),
+        ]
+        rc, stdout, stderr = self._run_ffmpeg(cmd, "HEVC→H.264 transcode")
+        if rc != 0 or not output_path.exists() or output_path.stat().st_size < 100_000:
+            output_path.unlink(missing_ok=True)
+            return None
+        return str(output_path)
+
     def _detect_scenes(self, input_path: str, threshold: float = 0.3) -> list[float]:
         """Detecta timestamps de mudança de cena."""
         cmd = [
@@ -508,14 +536,25 @@ class AutoReelStudio:
 
             info = self._get_video_info(str(source))
 
-            # FASE 2: Validação de codec/pix_fmt ANTES do render
+            # FASE 2: Validação de codec/pix_fmt — transcodifica HEVC automaticamente
             compatible, codec_msg = self._check_codec_compatibility(info)
             if not compatible:
-                progress.status = ReelStatus.FAILED.value
-                progress.error = f"Codec incompatível: {codec_msg}"
+                # Tentar transcodificação HEVC→H.264 intermediária
+                progress.message = f"Transcodificando {info.get('codec','?')} → H.264..."
+                progress.percent = 8
                 self._report(progress)
-                return progress
-            if codec_msg:
+                transcoded = self._transcode_to_h264(str(source))
+                if transcoded and Path(transcoded).exists():
+                    source = Path(transcoded)
+                    info = self._get_video_info(str(source))
+                    progress.message = "Transcodificação concluída."
+                    self._report(progress)
+                else:
+                    progress.status = ReelStatus.FAILED.value
+                    progress.error = f"Codec incompatível e transcodificação falhou: {codec_msg}"
+                    self._report(progress)
+                    return progress
+            elif codec_msg:
                 progress.message = f"Aviso: {codec_msg}"
                 self._report(progress)
             if info.get("error"):
