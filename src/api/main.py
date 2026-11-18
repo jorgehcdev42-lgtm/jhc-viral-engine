@@ -2526,6 +2526,53 @@ async def select_fresh_materials(
     }
 
 
+ACCOUNTS_FILE = Path("data/publishing/credentials/accounts.json")
+
+
+@app.get("/api/accounts")
+async def get_accounts():
+    """Retorna configuração persistente das contas conectadas."""
+    if ACCOUNTS_FILE.exists():
+        try:
+            data = json.loads(ACCOUNTS_FILE.read_text())
+            return data.get("accounts", {})
+        except Exception:
+            pass
+    # Fallback: retorna estrutura padrão com handles corretos
+    return {
+        "instagram": {"handle": "@leonidagta6flashbr", "status": "configured", "auth_method": "manual"},
+        "tiktok": {"handle": "@leonidagta6flashbr", "status": "configured", "auth_method": "manual"},
+        "youtube": {"handle": "@leonidagta6flashbr", "status": "configured", "auth_method": "manual"},
+    }
+
+
+@app.post("/api/accounts/update")
+async def update_accounts(request: Request):
+    """Atualiza configuração de uma conta específica."""
+    body = await request.json()
+    platform = body.get("platform", "")
+    updates = body.get("updates", {})
+    if not platform or platform not in ("instagram", "tiktok", "youtube"):
+        return JSONResponse(status_code=400, content={"detail": "Plataforma inválida"})
+
+    accounts = {}
+    if ACCOUNTS_FILE.exists():
+        try:
+            accounts = json.loads(ACCOUNTS_FILE.read_text()).get("accounts", {})
+        except Exception:
+            pass
+
+    if platform not in accounts:
+        accounts[platform] = {"handle": "", "status": "not_configured", "auth_method": "manual"}
+
+    accounts[platform].update(updates)
+    import datetime
+    payload = {"accounts": accounts, "updated_at": datetime.datetime.utcnow().isoformat() + "Z"}
+    ACCOUNTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    ACCOUNTS_FILE.write_text(json.dumps(payload, indent=2, ensure_ascii=False))
+    return {"ok": True, "platform": platform, "account": accounts[platform]}
+
+
 @app.get("/api/auth/platforms/status")
 async def get_auth_platforms_status():
     """Status das sessões autenticadas por plataforma social."""
