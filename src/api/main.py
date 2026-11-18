@@ -788,7 +788,7 @@ async def run_radar_monitor():
     script = str(_PROJECT_ROOT / "scripts" / "radar_monitor.py")
     try:
         result = subprocess.run(
-            [sys.executable, script],
+            [str(_PROJECT_ROOT / ".venv" / "bin" / "python3"), "-I", script],
             capture_output=True, text=True, timeout=60,
             cwd=str(_PROJECT_ROOT),
         )
