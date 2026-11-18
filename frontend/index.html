@@ -1364,6 +1364,27 @@ body::after {
 </div>
 </div>
 
+<!-- ===== RADAR GTA VI ===== -->
+<div id="page-radar" class="page">
+<div class="page-header"><div class="page-title">📡 Radar GTA VI</div></div>
+<div class="card">
+<div class="card-header"><span class="card-icon">🔍</span><div class="card-title">Buscar Vídeos</div></div>
+<div class="input-row" style="flex-wrap:wrap;gap:0.75rem">
+<input type="text" id="radar-query" class="gta-input" placeholder="GTA VI, Rockstar Games, trailer..." style="flex:2;min-width:200px">
+<select id="radar-source" class="gta-select" style="flex:1;min-width:120px">
+<option value="youtube">YouTube</option>
+<option value="instagram">Instagram</option>
+</select>
+<button class="btn btn-primary" onclick="runRadarSearch()">🔍 Buscar</button>
+</div>
+<div id="radar-results"><div class="empty-state">Busque vídeos sobre GTA VI nas plataformas</div></div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-icon">🔥</span><div class="card-title">Tendências Recentes</div></div>
+<div id="radar-trending"><div class="loading-state"><div class="loading-spinner"></div>Carregando tendências...</div></div>
+</div>
+</div>
+
 <!-- ===== AUDIOVISUAL (MISSÃO 017) ===== -->
 <div id="page-audiovisual" class="page">
 <div class="page-header"><div class="page-title">🎵 Integração Audiovisual</div></div>
@@ -2273,6 +2294,38 @@ async function refreshUrlHistory() {
 }
 
 // === MISSÃO 040 FASE 2 — Radar GTA VI ===
+async function runRadarSearch() {
+ const query = document.getElementById('radar-query').value.trim();
+ const source = document.getElementById('radar-source').value;
+ const el = document.getElementById('radar-results');
+ if (!query) { el.innerHTML = '<div class="empty-state">Digite um termo de busca</div>'; return; }
+ el.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div>Buscando...</div>';
+ try {
+  const endpoint = source === 'instagram' ? '/api/instagram-radar/search' : '/api/radar/search';
+  const data = await api(`${endpoint}?q=${encodeURIComponent(query)}&limit=10`);
+  if (data.error) { el.innerHTML = '<div class="empty-state">Erro: ' + data.error + '</div>'; return; }
+  const results = data.results || data.items || [];
+  if (!results.length) { el.innerHTML = '<div class="empty-state">Nenhum resultado encontrado para "' + query + '"</div>'; return; }
+  let html = '<div style="display:grid;gap:0.75rem">';
+  for (const r of results) {
+   const title = r.title || r.caption || 'Sem título';
+   const views = r.views || r.view_count || 0;
+   const score = r.viral_score || r.score || 0;
+   const url = r.url || r.link || '#';
+   const thumb = r.thumbnail || r.image || '';
+   html += `<div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:0.75rem;display:flex;gap:0.75rem;align-items:center">`;
+   if (thumb) html += `<img src="${thumb}" style="width:80px;height:60px;object-fit:cover;border-radius:4px" onerror="this.style.display='none'">`;
+   html += `<div style="flex:1;min-width:0"><div style="color:#fff;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</div>`;
+   html += `<div style="color:#aaa;font-size:0.8rem">👁 ${views.toLocaleString()} | 🔥 Score: ${score}/100</div></div>`;
+   html += `<a href="${url}" target="_blank" class="btn btn-secondary" style="font-size:0.75rem;padding:4px 8px">Abrir</a></div>`;
+  }
+  html += '</div>';
+  el.innerHTML = html;
+ } catch(e) {
+  el.innerHTML = '<div class="empty-state">Erro na busca: ' + e.message + '</div>';
+ }
+}
+
 async function loadRadar() {
  const main = document.getElementById('main-content');
  main.innerHTML = `
