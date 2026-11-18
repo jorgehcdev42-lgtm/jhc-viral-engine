@@ -785,13 +785,14 @@ async def get_radar_monitor_status():
 async def run_radar_monitor():
     """Trigger a single radar search cycle now."""
     import subprocess
-    import sys
-    script = str(_PROJECT_ROOT / "scripts" / "radar_monitor.py")
+    venv_python = "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/.venv/bin/python3"
+    script = "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/scripts/radar_monitor.py"
+    project_cwd = "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6"
     try:
         result = subprocess.run(
-            [sys.executable, script],
+            [venv_python, "-I", script],
             capture_output=True, text=True, timeout=60,
-            cwd=str(_PROJECT_ROOT),
+            cwd=project_cwd,
         )
         if result.returncode == 0:
             output = json.loads(result.stdout) if result.stdout.strip() else {}
