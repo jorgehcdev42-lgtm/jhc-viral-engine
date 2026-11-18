@@ -2759,3 +2759,45 @@ async def radar_cache(max_age_hours: int = 24):
     radar = YouTubeRadar()
     results = radar.get_cached_results(max_age_hours=max_age_hours)
     return {"results": results, "count": len(results), "cached": len(results) > 0}
+
+
+# =============================================================================
+# MISSÃO 040 FASE 3 — Catalog Bridge (Import → SmartCatalog → Pipeline)
+# =============================================================================
+
+@app.post("/api/catalog/bridge/register")
+async def catalog_bridge_register(request: Request):
+    """Registra vídeo importado no SmartCatalog e opcionalmente cria job de produção."""
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    from src.media.catalog_bridge import CatalogBridge
+
+    body = await request.json()
+    file_path = body.get("file_path", "").strip()
+    if not file_path:
+        return JSONResponse(status_code=400, content={"detail": "file_path obrigatório"})
+
+    def _do_register():
+        bridge = CatalogBridge()
+        return bridge.auto_process_import(
+            file_path=file_path,
+            source_url=body.get("source_url", ""),
+            title=body.get("title", ""),
+            author=body.get("author", ""),
+            platform=body.get("platform", "youtube"),
+            auto_produce=body.get("auto_produce", True),
+        )
+
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        result = await loop.run_in_executor(executor, _do_register)
+    return result
+
+
+@app.get("/api/catalog/bridge/pending")
+async def catalog_bridge_pending():
+    """Lista vídeos importados ainda não registrados no catálogo."""
+    from src.media.catalog_bridge import CatalogBridge
+    bridge = CatalogBridge()
+    pending = bridge.get_pending_imports()
+    return {"pending": pending, "count": len(pending)}
