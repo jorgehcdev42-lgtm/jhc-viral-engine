@@ -619,9 +619,16 @@ body::after {
 /* Responsive */
 @media (max-width: 900px) {
  :root { --sidebar-w: 0px; }
- .sidebar { display: none; }
- .main { padding: 1.5rem; }
- .stats-row { grid-template-columns: repeat(2, 1fr); }
+ .sidebar:not(.mobile-open) { display: none; }
+ .sidebar.mobile-open { display: flex !important; position: fixed; top: 0; left: 0; bottom: 0; width: 280px; z-index: 9999; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-top: env(safe-area-inset-top, 0); padding-bottom: env(safe-area-inset-bottom, 0); background: #0d0d1a; }
+ .mobile-menu-btn { display: flex !important; }
+ .main { margin-left: 0 !important; padding: 1rem; padding-top: 60px; }
+ .stats-row { grid-template-columns: 1fr; }
+ .page-header { padding-left: 50px; }
+ .input-row { flex-direction: column; }
+ .input-row input, .input-row select, .input-row button { width: 100%; min-width: unset; }
+ table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+ .btn { min-height: 44px; font-size: 0.9rem; }
 }
 
 /* Mobile Menu */
@@ -679,6 +686,9 @@ body::after {
 </style>
 </head>
 <body>
+<button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Menu">☰</button>
+<div class="mobile-overlay" id="mobile-overlay" onclick="closeMobileMenu()"></div>
+
 
 <nav class="sidebar">
  <div class="sidebar-brand">
