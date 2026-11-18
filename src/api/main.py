@@ -2849,7 +2849,7 @@ async def publish_assisted_prepare(request: Request):
     accounts = {
         "tiktok": "@leonidagta6flashbr",
         "instagram": "@leonidagta6flashbr",
-        "youtube": "@LeonidagtaVIFlashBR",
+        "youtube": "@leonidagta6flashbr",
     }
 
     upload_url = PLATFORM_UPLOAD_URLS[platform]
@@ -2988,7 +2988,7 @@ async def publish_assisted_prepare(request: Request):
     accounts = {
         "tiktok": "@leonidagta6flashbr",
         "instagram": "@leonidagta6flashbr",
-        "youtube": "@LeonidagtaVIFlashBR",
+        "youtube": "@leonidagta6flashbr",
     }
 
     upload_url = PLATFORM_UPLOAD_URLS[platform]
