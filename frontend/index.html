@@ -664,6 +664,7 @@ body::after {
 <div class="nav-item" data-page="ssd-library"><span class="nav-icon">💾</span> Biblioteca SSD</div>
 <div class="nav-item" data-page="importer"><span class="nav-icon">📥</span> Importador</div>
 <div class="nav-item" data-page="url-import"><span class="nav-icon">🔗</span> Importar URL</div>
+<div class="nav-item" data-page="radar"><span class="nav-icon">📡</span> Radar GTA VI</div>
  </div>
 
  <div class="nav-section">
@@ -1584,6 +1585,7 @@ function loadPageData(page) {
  if (page === 'stories') loadStories();
  if (page === 'importer') loadImporter();
 if (page === 'url-import') loadUrlImport();
+if (page === 'radar') loadRadar();
  if (page === 'audiovisual') loadAudioVisual();
  if (page === 'export') loadExportProfiles();
  if (page === 'browser-pub') loadBrowserPub();
@@ -2215,6 +2217,127 @@ async function refreshUrlHistory() {
  return `<tr><td>${(h.title||h.url||'?').substring(0,50)}</td><td>${h.platform||'?'}</td><td>${st} ${h.status}</td><td>${sz}</td><td>${dt}</td></tr>`;
  }).join('') + '</tbody></table>';
  } catch(e) { el.textContent = 'Erro ao carregar'; }
+}
+
+// === MISSÃO 040 FASE 2 — Radar GTA VI ===
+async function loadRadar() {
+ const main = document.getElementById('main-content');
+ main.innerHTML = `
+ <h2 style="margin-bottom:1rem">📡 Radar GTA VI — Descoberta de Conteúdos</h2>
+ <div class="card" style="margin-bottom:1rem">
+ <div class="card-header"><span class="card-icon">🔍</span><div class="card-title">Busca Personalizada</div></div>
+ <div style="padding:1rem">
+ <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+ <input type="text" id="radar-query" placeholder="Termo de busca (ex: GTA VI gameplay)" value="GTA VI" style="flex:1;min-width:200px;padding:10px;background:#1a1a2e;border:1px solid #333;color:#fff;border-radius:6px;font-size:0.95rem">
+ <select id="radar-date" style="padding:10px;background:#1a1a2e;border:1px solid #333;color:#fff;border-radius:6px">
+ <option value="24h">Últimas 24h</option>
+ <option value="7d" selected>Últimos 7 dias</option>
+ <option value="30d">Últimos 30 dias</option>
+ <option value="all">Todos</option>
+ </select>
+ <button class="btn btn-primary" onclick="runRadarSearch()">🔍 Buscar</button>
+ <button class="btn" onclick="runRadarDiscover()" style="background:#1a5c2e;color:#fff">📡 Descobrir Automático</button>
+ </div>
+ <div id="radar-status" style="color:#aaa;margin-bottom:8px"></div>
+ </div>
+ </div>
+ <div class="card">
+ <div class="card-header"><span class="card-icon">🎬</span><div class="card-title">Resultados</div><button class="btn btn-sm" onclick="refreshRadarResults()" style="margin-left:auto;font-size:0.75rem">↻</button></div>
+ <div id="radar-results" style="padding:1rem">Clique em Buscar ou Descobrir Automático para encontrar vídeos.</div>
+ </div>`;
+ // Tentar carregar cache
+ try {
+ const cache = await api('/api/radar/cache?max_age_hours=24');
+ if (cache.cached && cache.count > 0) {
+ renderRadarResults(cache.results);
+ document.getElementById('radar-status').textContent = `📦 ${cache.count} resultados em cache (últimas 24h)`;
+ }
+ } catch(e) {}
+}
+
+async function runRadarSearch() {
+ const query = document.getElementById('radar-query').value.trim() || 'GTA VI';
+ const dateFilter = document.getElementById('radar-date').value;
+ const statusEl = document.getElementById('radar-status');
+ statusEl.innerHTML = '<span style="color:#ff0">⏳ Buscando no YouTube...</span>';
+ try {
+ const data = await api(`/api/radar/search?query=${encodeURIComponent(query)}&max_results=15&date_filter=${dateFilter}`);
+ if (data.error) { statusEl.innerHTML = `<span style="color:#f44">❌ ${data.error}</span>`; return; }
+ renderRadarResults(data.results || []);
+ statusEl.innerHTML = `<span style="color:#0f0">✅ ${data.count} resultados encontrados para "${query}" (${dateFilter})</span>`;
+ } catch(e) {
+ statusEl.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
+ }
+}
+
+async function runRadarDiscover() {
+ const dateFilter = document.getElementById('radar-date').value;
+ const statusEl = document.getElementById('radar-status');
+ statusEl.innerHTML = '<span style="color:#ff0">⏳ Buscando com todos os termos pré-definidos (pode levar ~60s)...</span>';
+ try {
+ const data = await api(`/api/radar/discover?max_per_term=3&date_filter=${dateFilter}`);
+ if (data.error) { statusEl.innerHTML = `<span style="color:#f44">❌ ${data.error}</span>`; return; }
+ renderRadarResults(data.results || []);
+ statusEl.innerHTML = `<span style="color:#0f0">✅ ${data.count} resultados descobertos usando ${data.terms_used} termos</span>`;
+ } catch(e) {
+ statusEl.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
+ }
+}
+
+async function refreshRadarResults() {
+ try {
+ const cache = await api('/api/radar/cache?max_age_hours=48');
+ if (cache.cached && cache.count > 0) {
+ renderRadarResults(cache.results);
+ } else {
+ document.getElementById('radar-results').textContent = 'Cache vazio. Execute uma busca.';
+ }
+ } catch(e) {
+ document.getElementById('radar-results').textContent = 'Erro ao carregar cache.';
+ }
+}
+
+function renderRadarResults(results) {
+ const el = document.getElementById('radar-results');
+ if (!results || !results.length) { el.textContent = 'Nenhum resultado encontrado.'; return; }
+ el.innerHTML = '<table class="data-table"><thead><tr><th>Título</th><th>Autor</th><th>Duração</th><th>Views</th><th>Score</th><th>Oficial</th><th>Importado</th><th>Ações</th></tr></thead><tbody>' +
+ results.map(r => {
+ const dur = r.duration ? `${Math.floor(r.duration/60)}:${String(Math.round(r.duration%60)).padStart(2,'0')}` : '-';
+ const views = r.view_count ? Number(r.view_count).toLocaleString('pt-BR') : '-';
+ const official = r.is_official ? '⭐' : '';
+ const imported = r.already_imported ? '<span style="color:#f44">🔄 Sim</span>' : '<span style="color:#0f0">Não</span>';
+ const importBtn = r.already_imported ? '' : `<button class="btn btn-sm" onclick="importFromRadar('${r.url}')" style="font-size:0.7rem">📥 Importar</button>`;
+ const openBtn = `<a href="${r.url}" target="_blank" class="btn btn-sm" style="font-size:0.7rem;text-decoration:none">🔗 Abrir</a>`;
+ return `<tr>
+ <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.title||'').replace(/"/g,'&quot;')}">${(r.title||'?').substring(0,45)}</td>
+ <td>${(r.author||'?').substring(0,20)}</td>
+ <td>${dur}</td>
+ <td>${views}</td>
+ <td style="color:${r.relevance_score>=70?'#0f0':r.relevance_score>=40?'#ff0':'#f44'}">${r.relevance_score||0}</td>
+ <td>${official}</td>
+ <td>${imported}</td>
+ <td>${openBtn} ${importBtn}</td>
+ </tr>`;
+ }).join('') + '</tbody></table>';
+}
+
+async function importFromRadar(url) {
+ if (!url) return;
+ try {
+ const resp = await fetch(`${API}/api/import/url/download`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({url})
+ });
+ const data = await resp.json();
+ if (data.status === 'duplicate') {
+ alert('URL já foi importada anteriormente');
+ } else {
+ alert('Download iniciado! Verifique a seção Importar URL.');
+ setTimeout(() => { if(document.querySelector('[data-page="url-import"]')) document.querySelector('[data-page="url-import"]').click(); }, 1000);
+ }
+ } catch(e) {
+ alert('Erro ao iniciar download: ' + e.message);
+ }
 }
 
 // === MISSÃO 017 — Audiovisual ===

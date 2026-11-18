@@ -2703,3 +2703,59 @@ async def import_url_delete(request: Request):
     importer = UrlImporter()
     deleted = importer.delete_entry(url)
     return {"deleted": deleted}
+
+
+# =============================================================================
+# MISSÃO 040 FASE 2 — Radar GTA VI (Busca YouTube)
+# =============================================================================
+
+@app.get("/api/radar/search")
+async def radar_search(
+    query: str = "",
+    max_results: int = 10,
+    date_filter: str = "7d",
+):
+    """Busca vídeos sobre GTA VI no YouTube via yt-dlp (assíncrono)."""
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    from src.research.youtube_radar import YouTubeRadar
+
+    def _do_search():
+        radar = YouTubeRadar()
+        results = radar.search(query=query, max_results=max_results, date_filter=date_filter)
+        results = radar.check_already_imported(results)
+        return results
+
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        results = await loop.run_in_executor(executor, _do_search)
+    return {"results": results, "count": len(results), "query": query, "date_filter": date_filter}
+
+
+@app.get("/api/radar/discover")
+async def radar_discover(max_per_term: int = 5, date_filter: str = "7d"):
+    """Busca automática usando todos os termos pré-definidos (assíncrono)."""
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    from src.research.youtube_radar import YouTubeRadar
+
+    def _do_discover():
+        radar = YouTubeRadar()
+        results = radar.search_all_terms(max_per_term=max_per_term, date_filter=date_filter)
+        results = radar.check_already_imported(results)
+        radar.save_to_cache(results)
+        return results
+
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        results = await loop.run_in_executor(executor, _do_discover)
+    return {"results": results, "count": len(results), "terms_used": 12}
+
+
+@app.get("/api/radar/cache")
+async def radar_cache(max_age_hours: int = 24):
+    """Retorna resultados em cache se ainda válidos."""
+    from src.research.youtube_radar import YouTubeRadar
+    radar = YouTubeRadar()
+    results = radar.get_cached_results(max_age_hours=max_age_hours)
+    return {"results": results, "count": len(results), "cached": len(results) > 0}
