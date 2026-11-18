@@ -379,6 +379,81 @@ class AutoPublishScheduler:
             history = [h for h in history if h.get("profile_id") == profile_id]
         return history[-limit:]
 
+    # --- Global queue control (persistent) ---
+
+    STATE_FILE = "scheduler_state.json"
+
+    def _load_state(self) -> dict:
+        """Load persistent scheduler state from disk."""
+        state_path = self.scheduler_dir / self.STATE_FILE
+        if not state_path.exists():
+            return {"status": "stopped", "paused_at": None, "resumed_at": None}
+        try:
+            return json.loads(state_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return {"status": "stopped", "paused_at": None, "resumed_at": None}
+
+    def _save_state(self, state: dict) -> None:
+        """Persist scheduler state to disk."""
+        state_path = self.scheduler_dir / self.STATE_FILE
+        state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def start_queue(self) -> dict:
+        """Start the autopublish queue processing."""
+        state = self._load_state()
+        state["status"] = "running"
+        state["resumed_at"] = time.time()
+        state["started_at"] = state.get("started_at") or time.time()
+        self._save_state(state)
+        logger.info("Autopublish queue STARTED")
+        return {"status": "running", "message": "Fila de publicação iniciada"}
+
+    def pause_queue(self) -> dict:
+        """Pause the autopublish queue (jobs stay queued, no new processing)."""
+        state = self._load_state()
+        state["status"] = "paused"
+        state["paused_at"] = time.time()
+        self._save_state(state)
+        logger.info("Autopublish queue PAUSED")
+        return {"status": "paused", "message": "Fila de publicação pausada"}
+
+    def resume_queue(self) -> dict:
+        """Resume a paused autopublish queue."""
+        state = self._load_state()
+        if state["status"] != "paused":
+            return {"status": state["status"], "message": f"Fila não está pausada (estado={state['status']})"}
+        state["status"] = "running"
+        state["resumed_at"] = time.time()
+        self._save_state(state)
+        logger.info("Autopublish queue RESUMED")
+        return {"status": "running", "message": "Fila de publicação retomada"}
+
+    def stop_queue(self) -> dict:
+        """Stop the autopublish queue completely."""
+        state = self._load_state()
+        state["status"] = "stopped"
+        state["stopped_at"] = time.time()
+        self._save_state(state)
+        logger.info("Autopublish queue STOPPED")
+        return {"status": "stopped", "message": "Fila de publicação parada"}
+
+    def get_queue_status(self) -> dict:
+        """Get current queue control status with job counts."""
+        state = self._load_state()
+        summary = self.get_status_summary()
+        return {
+            "queue_status": state.get("status", "stopped"),
+            "started_at": state.get("started_at"),
+            "paused_at": state.get("paused_at"),
+            "resumed_at": state.get("resumed_at"),
+            "stopped_at": state.get("stopped_at"),
+            "active_jobs": summary["active_jobs"],
+            "eligible_now": summary["eligible_now"] if state.get("status") == "running" else 0,
+            "state_counts": summary["state_counts"],
+            "platform_counts": summary["platform_counts"],
+            "history_count": summary["history_count"],
+        }
+
     def get_status_summary(self) -> dict:
         """Get overall scheduler status summary."""
         state_counts: dict[str, int] = {}

@@ -721,6 +721,44 @@ async def get_scheduler_status():
     return scheduler.get_scheduler_status()
 
 
+# --- AutoPublish Queue Control ---
+
+@app.get("/api/queue/status")
+async def get_queue_status():
+    """Get autopublish queue control status."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    s = AutoPublishScheduler(DATA_ROOT)
+    return s.get_queue_status()
+
+@app.post("/api/queue/start")
+async def start_queue():
+    """Start the autopublish queue."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    s = AutoPublishScheduler(DATA_ROOT)
+    return s.start_queue()
+
+@app.post("/api/queue/pause")
+async def pause_queue():
+    """Pause the autopublish queue."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    s = AutoPublishScheduler(DATA_ROOT)
+    return s.pause_queue()
+
+@app.post("/api/queue/resume")
+async def resume_queue():
+    """Resume a paused autopublish queue."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    s = AutoPublishScheduler(DATA_ROOT)
+    return s.resume_queue()
+
+@app.post("/api/queue/stop")
+async def stop_queue():
+    """Stop the autopublish queue."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    s = AutoPublishScheduler(DATA_ROOT)
+    return s.stop_queue()
+
+
 @app.get("/api/scheduler/quota/{profile_id}")
 async def get_quota(profile_id: str):
     """Get production quota for a specific profile."""
