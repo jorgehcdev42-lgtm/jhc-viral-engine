@@ -701,6 +701,11 @@ body::after {
  </div>
 
  <div class="card">
+ <div class="card-header"><span class="card-icon">📈</span><div class="card-title">Analytics em Tempo Real</div></div>
+ <div id="dashboard-analytics"><div class="loading-state"><div class="loading-spinner"></div>Carregando métricas...</div></div>
+ </div>
+
+ <div class="card">
  <div class="card-header"><span class="card-icon">🎯</span><div class="card-title">Perfis Operacionais</div></div>
  <div id="dashboard-profiles"><div class="loading-state"><div class="loading-spinner"></div>Carregando perfis...</div></div>
  </div>
@@ -2822,6 +2827,68 @@ async function loadBrowserPub() {
 }
 
 // Dashboard
+async function loadDashboardAnalytics() {
+ const el = document.getElementById('dashboard-analytics');
+ if (!el) return;
+ try {
+ const data = await api('/api/analytics/dashboard');
+ if (data.error) { el.innerHTML = '<div class="empty-state">Erro: ' + data.error + '</div>'; return; }
+ const cat = data.catalog || {};
+ const pipe = data.pipeline || {};
+ const queue = data.queue || {};
+ const radar = data.radar || {};
+ const accs = data.accounts || {};
+ const videos = cat.total_videos || 0;
+ const mb = cat.total_mb || 0;
+ const jobs = pipe.total_jobs || 0;
+ const byStatus = pipe.by_status || {};
+ const completed = byStatus.completed || 0;
+ const scheduled = byStatus.scheduled || 0;
+ const failed = byStatus.failed || 0;
+ const qStatus = queue.status || 'stopped';
+ const qColor = qStatus === 'running' ? '#4caf50' : qStatus === 'paused' ? '#ff9800' : '#f44336';
+ const qLabel = qStatus === 'running' ? 'Rodando' : qStatus === 'paused' ? 'Pausada' : 'Parada';
+ const radarRuns = radar.total_runs || 0;
+ const radarCount = radar.latest_count || 0;
+ const radarOn = radar.enabled ? '🟢' : '🔴';
+ let accHtml = '';
+ for (const [p, info] of Object.entries(accs)) {
+ const icon = p === 'instagram' ? '📸' : p === 'tiktok' ? '🎵' : '▶️';
+ const name = p.charAt(0).toUpperCase() + p.slice(1);
+ accHtml += `<span style="display:inline-flex;align-items:center;gap:4px;background:#1a1a2e;padding:4px 8px;border-radius:4px;font-size:0.8rem">${icon} ${info.handle || '?'} <span style="color:${info.status==='configured'?'#ff9800':'#aaa'}">(${info.status||'?'})</span></span> `;
+ }
+ el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem">
+ <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:1rem;text-align:center">
+ <div style="font-size:2rem;font-weight:700;color:#4fc3f7">${videos}</div>
+ <div style="color:#aaa;font-size:0.85rem">Vídeos (${mb.toFixed(0)}MB)</div>
+ </div>
+ <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:1rem;text-align:center">
+ <div style="font-size:2rem;font-weight:700;color:#81c784">${completed}</div>
+ <div style="color:#aaa;font-size:0.85rem">Concluídos</div>
+ </div>
+ <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:1rem;text-align:center">
+ <div style="font-size:2rem;font-weight:700;color:#ffb74d">${scheduled}</div>
+ <div style="color:#aaa;font-size:0.85rem">Agendados</div>
+ </div>
+ <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:1rem;text-align:center">
+ <div style="font-size:2rem;font-weight:700;color:#e57373">${failed}</div>
+ <div style="color:#aaa;font-size:0.85rem">Falhas</div>
+ </div>
+ <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:1rem;text-align:center">
+ <div style="font-size:1.2rem;font-weight:700;color:${qColor}">${qLabel}</div>
+ <div style="color:#aaa;font-size:0.85rem">Fila Publicação</div>
+ </div>
+ <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:1rem;text-align:center">
+ <div style="font-size:1.2rem;font-weight:700;color:#ce93d8">${radarOn} ${radarRuns} buscas</div>
+ <div style="color:#aaa;font-size:0.85rem">Radar (${radarCount} resultados)</div>
+ </div>
+ </div>
+ <div style="margin-top:1rem;display:flex;flex-wrap:wrap;gap:0.5rem">${accHtml}</div>`;
+ } catch(e) {
+ el.innerHTML = '<div class="empty-state">Erro ao carregar analytics: ' + e.message + '</div>';
+ }
+}
+
 async function loadDashboard() {
  const h = await api('/api/health');
  const badge = document.getElementById('health-badge');
@@ -2842,6 +2909,7 @@ async function loadDashboard() {
  const profiles = await api('/api/profiles');
  if (!profiles.error) {
  const active = profiles.filter(p => p.enabled);
+ loadDashboardAnalytics();
  document.getElementById('dashboard-profiles').innerHTML =
  '<table class="data-table"><thead><tr><th>ID</th><th>Nome</th><th>Nicho</th><th>Status</th></tr></thead><tbody>' +
  active.map(p => '<tr><td style="font-family:monospace;font-size:0.75rem;color:var(--gta-neon-cyan)">' + p.profile_id + '</td><td style="font-weight:600;color:var(--text-primary)">' + p.name + '</td><td>' + p.niche + '</td><td><span class="badge badge-active">Ativo</span></td></tr>').join('') +
