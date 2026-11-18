@@ -652,6 +652,7 @@ body::after {
  <div class="nav-item" data-page="publishing"><span class="nav-icon">📡</span> Publicações</div>
 <div class="nav-item" data-page="accounts"><span class="nav-icon">🔗</span> Contas Conectadas</div>
 <div class="nav-item" data-page="setup"><span class="nav-icon">📋</span> Setup & Config</div>
+<div class="nav-item" data-page="tutorials"><span class="nav-icon">📚</span> Tutoriais e Ajuda</div>
  </div>
 
  <div class="nav-section">
@@ -1147,6 +1148,88 @@ O Radar Instagram requer cookies de sessão autenticada:<br><br>
 <div id="setup-system-status"><div class="loading-state"><div class="loading-spinner"></div>Carregando...</div></div>
 </div>
 
+</div>
+
+
+<!-- ===== TUTORIAIS E AJUDA ===== -->
+<div id="page-tutorials" class="page">
+<div class="page-header"><div class="page-title">📚 Tutoriais e Ajuda</div></div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">🔍</span><div class="card-title">Buscar Tutorial</div></div>
+<div style="padding:1rem">
+<input type="text" id="tutorial-search" class="gta-input" placeholder="Digite para buscar: login, radar, publicação, corte..." oninput="filterTutorials()" style="width:100%;font-size:1rem">
+</div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">🚀</span><div class="card-title">Tutorial Guiado — Primeiro Acesso</div></div>
+<div id="guided-tutorial" style="padding:1rem">
+<div id="guided-step-0">
+<h3 style="color:#4fc3f7;margin-bottom:0.5rem">Bem-vindo ao JHC Viral Engine!</h3>
+<p style="color:#ccc;line-height:1.8">Este guia vai te apresentar todas as funcionalidades do sistema. Clique em <strong>Próximo</strong> para começar.</p>
+<button class="btn btn-primary" onclick="nextGuidedStep(1)">▶ Começar Tutorial</button>
+<button class="btn btn-secondary" onclick="skipGuidedTutorial()">⏭ Pular</button>
+</div>
+<div id="guided-step-1" style="display:none">
+<h3 style="color:#4fc3f7;margin-bottom:0.5rem">Passo 1/7 — Dashboard Principal</h3>
+<p style="color:#ccc;line-height:1.8">O Dashboard mostra métricas em tempo real: vídeos produzidos, jobs concluídos, agendados, falhas e status da fila. Os cards coloridos resumem o estado do sistema.</p>
+<button class="btn btn-secondary" onclick="nextGuidedStep(0)">◀ Voltar</button>
+<button class="btn btn-primary" onclick="nextGuidedStep(2)">Próximo ▶</button>
+</div>
+<div id="guided-step-2" style="display:none">
+<h3 style="color:#4fc3f7;margin-bottom:0.5rem">Passo 2/7 — Conectar Contas</h3>
+<p style="color:#ccc;line-height:1.8">Vá em <strong>Contas Conectadas</strong> no menu lateral. Lá você vê suas 3 contas (@leonidagta6flashbr) e o status de cada uma. Para publicação automática, configure OAuth na aba Setup.</p>
+<button class="btn btn-secondary" onclick="nextGuidedStep(1)">◀ Voltar</button>
+<button class="btn btn-primary" onclick="nextGuidedStep(3)">Próximo ▶</button>
+</div>
+<div id="guided-step-3" style="display:none">
+<h3 style="color:#4fc3f7;margin-bottom:0.5rem">Passo 3/7 — Importar Vídeo</h3>
+<p style="color:#ccc;line-height:1.8">Em <strong>Importar URL</strong>, cole um link do YouTube, Instagram ou TikTok. O sistema baixa, extrai metadados e registra automaticamente no SmartCatalog.</p>
+<button class="btn btn-secondary" onclick="nextGuidedStep(2)">◀ Voltar</button>
+<button class="btn btn-primary" onclick="nextGuidedStep(4)">Próximo ▶</button>
+</div>
+<div id="guided-step-4" style="display:none">
+<h3 style="color:#4fc3f7;margin-bottom:0.5rem">Passo 4/7 — Radar GTA VI</h3>
+<p style="color:#ccc;line-height:1.8">Em <strong>Radar GTA VI</strong>, busque vídeos recentes sobre GTA VI no YouTube. O Viral Score (0-100) indica potencial viral. Clique em "Abrir" para ver o vídeo original.</p>
+<button class="btn btn-secondary" onclick="nextGuidedStep(3)">◀ Voltar</button>
+<button class="btn btn-primary" onclick="nextGuidedStep(5)">Próximo ▶</button>
+</div>
+<div id="guided-step-5" style="display:none">
+<h3 style="color:#4fc3f7;margin-bottom:0.5rem">Passo 5/7 — Produzir e Aprovar</h3>
+<p style="color:#ccc;line-height:1.8">Na <strong>Produção</strong>, veja os jobs criados. Assista o preview, aprove ou rejeite. Jobs aprovados ficam prontos para publicação.</p>
+<button class="btn btn-secondary" onclick="nextGuidedStep(4)">◀ Voltar</button>
+<button class="btn btn-primary" onclick="nextGuidedStep(6)">Próximo ▶</button>
+</div>
+<div id="guided-step-6" style="display:none">
+<h3 style="color:#4fc3f7;margin-bottom:0.5rem">Passo 6/7 — Publicar</h3>
+<p style="color:#ccc;line-height:1.8">Em <strong>Publicações</strong>, use a Publicação Assistida: selecione o vídeo, escolha a plataforma, e o sistema prepara metadados e abre a página de upload no navegador.</p>
+<button class="btn btn-secondary" onclick="nextGuidedStep(5)">◀ Voltar</button>
+<button class="btn btn-primary" onclick="nextGuidedStep(7)">Próximo ▶</button>
+</div>
+<div id="guided-step-7" style="display:none">
+<h3 style="color:#4fc3f7;margin-bottom:0.5rem">Passo 7/7 — Monitorar Resultados</h3>
+<p style="color:#ccc;line-height:1.8">No <strong>Dashboard</strong> e em <strong>Analytics</strong>, acompanhe métricas de produção e publicação. A fila pode ser controlada em Contas Conectadas (Iniciar/Pausar/Parar).</p>
+<button class="btn btn-secondary" onclick="nextGuidedStep(6)">◀ Voltar</button>
+<button class="btn btn-primary" onclick="skipGuidedTutorial()">✅ Concluir Tutorial</button>
+</div>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">📖</span><div class="card-title">Todos os Tutoriais</div></div>
+<div id="tutorials-list" style="padding:1rem"></div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">❓</span><div class="card-title">Perguntas Frequentes</div></div>
+<div id="faq-list" style="padding:1rem"></div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">📝</span><div class="card-title">Glossário</div></div>
+<div id="glossary-list" style="padding:1rem"></div>
+</div>
 </div>
 
 <!-- ===== DIAGNOSTICS ===== -->
@@ -1762,6 +1845,7 @@ function loadPageData(page) {
 if (page === 'url-import') loadUrlImport();
  if (page === 'accounts') { loadAccounts(); loadQueueControl(); loadRadarMonitor(); }
  if (page === 'setup') { loadSetupStatus(); }
+ if (page === 'tutorials') { loadTutorials(); }
 if (page === 'radar') loadRadar();
 if (page === 'ig-radar') loadInstagramRadar();
 if (page === 'assisted-pub') loadAssistedPub();
@@ -3332,6 +3416,131 @@ async function schedulePublish() {
  msg.innerHTML = '<div class="error-box">' + (data.detail || 'Erro ao agendar') + '</div>';
  }
  } catch(e) { msg.innerHTML = '<div class="error-box">' + e.message + '</div>'; }
+}
+
+const TUTORIALS_DATA = [
+ {cat:"Acesso",title:"Primeiro acesso e login",content:"<strong>O QUE É:</strong> Tela inicial do aplicativo.<br><strong>PARA QUE SERVE:</strong> Autenticar o usuário.<br><strong>ONDE ENCONTRAR:</strong> Ao abrir http://localhost:8080<br><strong>COMO UTILIZAR:</strong> Digite admin / 160669 e clique Entrar.<br><strong>RESULTADO:</strong> Dashboard principal carregado.<br><strong>PROBLEMAS:</strong> Se voltar ao login, limpe o cache do navegador."},
+ {cat:"Contas",title:"Como conectar Instagram",content:"<strong>O QUE É:</strong> Vincular conta @leonidagta6flashbr.<br><strong>PARA QUE SERVE:</strong> Publicar Reels automaticamente.<br><strong>ONDE ENCONTRAR:</strong> Contas Conectadas → Instagram.<br><strong>COMO UTILIZAR:</strong> Configure OAuth na aba Setup & Config.<br><strong>RESULTADO:</strong> Status muda para 'Conectado'.<br><strong>PROBLEMAS:</strong> Verifique se o app Meta foi aprovado."},
+ {cat:"Contas",title:"Como conectar TikTok",content:"<strong>O QUE É:</strong> Vincular conta @leonidagta6flashbr.<br><strong>PARA QUE SERVE:</strong> Publicar vídeos no TikTok.<br><strong>ONDE ENCONTRAR:</strong> Contas Conectadas → TikTok.<br><strong>COMO UTILIZAR:</strong> Configure OAuth na aba Setup & Config.<br><strong>RESULTADO:</strong> Status muda para 'Conectado'.<br><strong>PROBLEMAS:</strong> Content Posting API requer aprovação do TikTok."},
+ {cat:"Contas",title:"Como conectar YouTube",content:"<strong>O QUE É:</strong> Vincular canal @leonidagta6flashbr.<br><strong>PARA QUE SERVE:</strong> Publicar Shorts automaticamente.<br><strong>ONDE ENCONTRAR:</strong> Contas Conectadas → YouTube.<br><strong>COMO UTILIZAR:</strong> Configure OAuth no Google Cloud Console (ver aba Setup).<br><strong>RESULTADO:</strong> Canal vinculado e pronto para upload.<br><strong>PROBLEMAS:</strong> Não confunda handle com email Google."},
+ {cat:"Contas",title:"Como verificar conta autenticada",content:"<strong>O QUE É:</strong> Confirmar que a conta está realmente conectada.<br><strong>PARA QUE SERVE:</strong> Evitar publicação na conta errada.<br><strong>ONDE ENCONTRAR:</strong> Contas Conectadas.<br><strong>COMO UTILIZAR:</strong> Verifique o status (Configurado vs Conectado).<br><strong>RESULTADO:</strong> 'Conectado' = OAuth válido. 'Configurado' = apenas handle registrado."},
+ {cat:"Radar",title:"Pesquisar vídeos no YouTube",content:"<strong>O QUE É:</strong> Buscar vídeos recentes sobre GTA VI.<br><strong>PARA QUE SERVE:</strong> Descobrir conteúdo viral.<br><strong>ONDE ENCONTRAR:</strong> Radar GTA VI no menu lateral.<br><strong>COMO UTILIZAR:</strong> Digite 'GTA VI' e clique Buscar.<br><strong>RESULTADO:</strong> Lista com thumbnails, títulos, views e Viral Score.<br><strong>PROBLEMAS:</strong> Se vazio, tente termos diferentes como 'Rockstar Games'."},
+ {cat:"Radar",title:"Encontrar Reels populares no Instagram",content:"<strong>O QUE É:</strong> Descobrir Reels virais de GTA VI.<br><strong>PARA QUE SERVE:</strong> Identificar tendências.<br><strong>ONDE ENCONTRAR:</strong> Radar GTA VI → selecione Instagram.<br><strong>COMO UTILIZAR:</strong> Busque por hashtag ou perfil.<br><strong>RESULTADO:</strong> Lista ordenada por engajamento.<br><strong>PROBLEMAS:</strong> Requer cookies do Instagram (ver aba Setup)."},
+ {cat:"Radar",title:"Interpretar o Viral Score",content:"<strong>O QUE É:</strong> Pontuação de 0 a 100.<br><strong>PARA QUE SERVE:</strong> Avaliar potencial viral de um vídeo.<br><strong>ONDE ENCONTRAR:</strong> Nos resultados do Radar.<br><strong>COMO UTILIZAR:</strong> 🔥 80-100 = Altíssimo potencial. 🚀 60-79 = Alto. ⭐ 40-59 = Médio. 📉 0-39 = Baixo.<br><strong>RESULTADO:</strong> Priorize vídeos com score acima de 60.<br><strong>PROBLEMAS:</strong> Score baixo não significa vídeo ruim, apenas menos viral."},
+ {cat:"Importação",title:"Importar vídeo por URL",content:"<strong>O QUE É:</strong> Baixar vídeo de link externo.<br><strong>PARA QUE SERVE:</strong> Adicionar material ao catálogo.<br><strong>ONDE ENCONTRAR:</strong> Importar URL no menu lateral.<br><strong>COMO UTILIZAR:</strong> Cole URL do YouTube/Instagram/TikTok e clique Importar.<br><strong>RESULTADO:</strong> Vídeo baixado, registrado no SmartCatalog e job criado.<br><strong>PROBLEMAS:</strong> Instagram requer cookies. URLs privadas podem falhar."},
+ {cat:"Importação",title:"Baixar vídeo autorizado",content:"<strong>O QUE É:</strong> Download de vídeo para uso editorial.<br><strong>PARA QUE SERVE:</strong> Criar cortes e reels.<br><strong>ONDE ENCONTRAR:</strong> Importar URL ou Radar.<br><strong>COMO UTILIZAR:</strong> Apenas baixe vídeos com permissão de reutilização.<br><strong>RESULTADO:</strong> Arquivo MP4 salvo em data/autoreel/output/.<br><strong>PROBLEMAS:</strong> Respeite direitos autorais. Use apenas conteúdo autorizado."},
+ {cat:"Produção",title:"Criar cortes automaticamente",content:"<strong>O QUE É:</strong> Pipeline de edição automática.<br><strong>PARA QUE SERVE:</strong> Transformar material bruto em reels verticais.<br><strong>ONDE ENCONTRAR:</strong> Produção no menu lateral.<br><strong>COMO UTILIZAR:</strong> Selecione material → Crie job → Aguarde renderização.<br><strong>RESULTADO:</strong> Vídeo vertical 1080x1920 com identidade Leonida.<br><strong>PROBLEMAS:</strong> Jobs falhos aparecem em vermelho. Verifique logs."},
+ {cat:"Produção",title:"Configurar legendas",content:"<strong>O QUE É:</strong> Texto sincronizado ao áudio.<br><strong>PARA QUE SERVE:</strong> Acessibilidade e engajamento.<br><strong>ONDE ENCONTRAR:</strong> Durante criação do job de produção.<br><strong>COMO UTILIZAR:</strong> Ative legendas nas opções do job.<br><strong>RESULTADO:</strong> Legendas embutidas no vídeo final.<br><strong>PROBLEMAS:</strong> Precisão depende da qualidade do áudio original."},
+ {cat:"Produção",title:"Identidade visual Leonida",content:"<strong>O QUE É:</strong> Marca visual dos vídeos.<br><strong>PARA QUE SERVE:</strong> Reconhecimento da marca @leonidagta6flashbr.<br><strong>ONDE ENCONTRAR:</strong> Aplicada automaticamente pela Fábrica de Cortes.<br><strong>COMO UTILIZAR:</strong> Configurada nos templates de produção.<br><strong>RESULTADO:</strong> Intro/outro, cores e fontes consistentes.<br><strong>PROBLEMAS:</strong> Personalize em Branding Studio."},
+ {cat:"Revisão",title:"Visualizar vídeos produzidos",content:"<strong>O QUE É:</strong> Player de vídeo integrado.<br><strong>PARA QUE SERVE:</strong> Assistir antes de aprovar.<br><strong>ONDE ENCONTRAR:</strong> Produção → clique no job.<br><strong>COMO UTILIZAR:</strong> Clique no thumbnail para abrir o player.<br><strong>RESULTADO:</strong> Vídeo reproduzido diretamente no dashboard.<br><strong>PROBLEMAS:</strong> Se não carregar, verifique se o arquivo existe em data/autoreel/output/."},
+ {cat:"Revisão",title:"Aprovar ou rejeitar vídeo",content:"<strong>O QUE É:</strong> Decisão editorial humana.<br><strong>PARA QUE SERVE:</strong> Controle de qualidade antes da publicação.<br><strong>ONDE ENCONTRAR:</strong> Produção → botões Aprovar/Rejeitar.<br><strong>COMO UTILIZAR:</strong> Assista → clique Aprovar (verde) ou Rejeitar (vermelho).<br><strong>RESULTADO:</strong> Aprovado = pronto para publicar. Rejeitado = volta para fila.<br><strong>PROBLEMAS:</strong> Aprovação técnica ≠ aprovação editorial."},
+ {cat:"Publicação",title:"Preparar publicações nas três redes",content:"<strong>O QUE É:</strong> Metadados formatados por plataforma.<br><strong>PARA QUE SERVE:</strong> Agilizar upload manual.<br><strong>ONDE ENCONTRAR:</strong> Publicações → Preparar para as 3 redes.<br><strong>COMO UTILIZAR:</strong> Selecione vídeo → clique Preparar.<br><strong>RESULTADO:</strong> Título, descrição, hashtags copiados para clipboard. Safari abre página de upload.<br><strong>PROBLEMAS:</strong> Cole os metadados manualmente na plataforma."},
+ {cat:"Publicação",title:"Usar publicação assistida",content:"<strong>O QUE É:</strong> Semi-automação do upload.<br><strong>PARA QUE SERVE:</strong> Reduzir trabalho manual sem risco.<br><strong>ONDE ENCONTRAR:</strong> Publicações → botões de plataforma.<br><strong>COMO UTILIZAR:</strong> Selecione vídeo → clique PUBLICAR NO INSTAGRAM/YOUTUBE/TIKTOK.<br><strong>RESULTADO:</strong> Sistema prepara tudo e abre a página certa no navegador.<br><strong>PROBLEMAS:</strong> Você ainda precisa arrastar o vídeo e confirmar na plataforma."},
+ {cat:"Publicação",title:"Habilitar publicação automática",content:"<strong>O QUE É:</strong> Upload direto via API oficial.<br><strong>PARA QUE SERVE:</strong> Zero intervenção manual.<br><strong>ONDE ENCONTRAR:</strong> Setup & Config → OAuth Necessário.<br><strong>COMO UTILIZAR:</strong> Configure credenciais OAuth para cada plataforma.<br><strong>RESULTADO:</strong> Vídeos aprovados são publicados automaticamente.<br><strong>PROBLEMAS:</strong> Requer aprovação das APIs. Verifique instruções na aba Setup."},
+ {cat:"Agendamento",title:"Agendar publicações",content:"<strong>O QUE É:</strong> Definir data/hora de publicação.<br><strong>PARA QUE SERVE:</strong> Otimizar alcance por horário.<br><strong>ONDE ENCONTRAR:</strong> Calendário Editorial.<br><strong>COMO UTILIZAR:</strong> Selecione slot → atribua vídeo → confirme.<br><strong>RESULTADO:</strong> Job agendado aparece na fila com horário definido.<br><strong>PROBLEMAS:</strong> Fila deve estar em status 'Rodando' para processar."},
+ {cat:"Operação",title:"Iniciar, pausar e retomar a fila",content:"<strong>O QUE É:</strong> Controle da fila de publicação.<br><strong>PARA QUE SERVE:</strong> Gerenciar quando processar jobs.<br><strong>ONDE ENCONTRAR:</strong> Contas Conectadas → Controle da Fila.<br><strong>COMO UTILIZAR:</strong> ▶ Iniciar | ⏸ Pausar | ⏯ Retomar | ⏹ Parar.<br><strong>RESULTADO:</strong> Estado persiste entre reinícios do backend.<br><strong>PROBLEMAS:</strong> Se parada, nenhum job será processado."},
+ {cat:"Operação",title:"Acompanhar downloads e renderizações",content:"<strong>O QUE É:</strong> Progresso em tempo real.<br><strong>PARA QUE SERVE:</strong> Saber quando o vídeo estará pronto.<br><strong>ONDE ENCONTRAR:</strong> Produção → status do job.<br><strong>COMO UTILIZAR:</strong> Observe badges: pending/processing/completed/failed.<br><strong>RESULTADO:</strong> Completed = vídeo pronto para revisão.<br><strong>PROBLEMAS:</strong> Failed = verifique logs em /tmp/backend.log."},
+ {cat:"Analytics",title:"Consultar resultados e Analytics",content:"<strong>O QUE É:</strong> Métricas agregadas do sistema.<br><strong>PARA QUE SERVE:</strong> Entender desempenho de produção.<br><strong>ONDE ENCONTRAR:</strong> Dashboard → Analytics em Tempo Real.<br><strong>COMO UTILIZAR:</strong> Veja cards: vídeos, concluídos, agendados, falhas, fila, radar.<br><strong>RESULTADO:</strong> Visão geral instantânea do sistema.<br><strong>PROBLEMAS:</strong> Métricas de plataformas (views/likes) requerem OAuth."},
+ {cat:"Problemas",title:"Resolver erros de login",content:"<strong>SINTOMA:</strong> Dashboard volta ao login após entrar.<br><strong>CAUSA:</strong> Token expirado ou JWT secret mudou.<br><strong>SOLUÇÃO:</strong> Limpe localStorage do navegador (F12 → Application → Local Storage → Clear). Faça login novamente.<br><strong>PERSISTE?</strong> Reinicie o backend e tente novamente."},
+ {cat:"Problemas",title:"Resolver problemas de conexão das plataformas",content:"<strong>SINTOMA:</strong> Conta mostra 'Configurado' em vez de 'Conectado'.<br><strong>CAUSA:</strong> OAuth não configurado ou token expirado.<br><strong>SOLUÇÃO:</strong> Verifique instruções na aba Setup & Config → OAuth Necessário.<br><strong>PERSISTE?</strong> Gere novo token/access key na plataforma."},
+ {cat:"Problemas",title:"Recuperar jobs interrompidos",content:"<strong>SINTOMA:</strong> Job ficou em 'processing' para sempre.<br><strong>CAUSA:</strong> Backend reiniciou durante renderização.<br><strong>SOLUÇÃO:</strong> Na Produção, cancele o job travado e crie um novo com o mesmo material.<br><strong>PERSISTE?</strong> Verifique espaço em disco e memória disponível."},
+ {cat:"Problemas",title:"Identificar publicações que falharam",content:"<strong>SINTOMA:</strong> Vídeo aprovado mas não publicado.<br><strong>CAUSA:</strong> Erro de API, token expirado ou quota excedida.<br><strong>SOLUÇÃO:</strong> Verifique Histórico de Publicação. Reconfigure OAuth se necessário.<br><strong>PERSISTE?</strong> Use Publicação Assistida como fallback."},
+ {cat:"Diário",title:"Como utilizar o aplicativo diariamente",content:"<strong>MANHÃ:</strong> Abra o Dashboard. Verifique métricas. Confira radares.<br><strong>TARDE:</strong> Revise novos vídeos produzidos. Aprove/rejeite. Agende publicações.<br><strong>NOITE:</strong> Verifique publicações realizadas. Consulte Analytics.<br><strong>DICA:</strong> Mantenha a fila em 'Rodando' para processamento contínuo.<br><strong>CELULAR:</strong> Acesse http://IP-DO-MAC:8080 na mesma rede Wi-Fi."}
+];
+
+const FAQ_DATA = [
+ {q:"O app funciona no celular?",a:"Sim! Acesse http://192.168.0.235:8080 no navegador do celular (mesma rede Wi-Fi)."},
+ {q:"Quais são as credenciais de login?",a:"Usuário: admin | Senha: 160669"},
+ {q:"Posso publicar automaticamente?",a:"Sim, após configurar OAuth para cada plataforma. Veja a aba Setup & Config."},
+ {q:"O Radar Instagram funciona?",a:"Parcialmente. Requer cookies do Instagram exportados do Safari. Veja Setup & Config."},
+ {q:"Quantos vídeos posso produzir?",a:"Sem limite técnico. Depende do espaço em disco e memória do MacBook."},
+ {q:"O que é Viral Score?",a:"Pontuação de 0 a 100 que estima o potencial viral de um vídeo baseado em métricas disponíveis."},
+ {q:"Como faço backup dos vídeos?",a:"Os vídeos ficam em data/autoreel/output/. Copie essa pasta para backup."},
+ {q:"O app funciona sem internet?",a:"Parcialmente. Login e produção funcionam offline. Radar e publicação requerem internet."}
+];
+
+const GLOSSARY_DATA = [
+ {term:"SmartCatalog",def:"Banco de dados que indexa todos os vídeos importados com metadados."},
+ {term:"Pipeline",def:"Sequência de etapas: importação → corte → edição → quality gate → aprovação."},
+ {term:"QualityGate",def:"Validação técnica automática (formato, resolução, codec, duração)."},
+ {term:"OAuth",def:"Protocolo de autorização que permite publicar via API oficial das plataformas."},
+ {term:"Viral Score",def:"Métrica proprietária de 0-100 baseada em views, likes, comments, recência e engajamento."},
+ {term:"AutoReel",def:"Motor de produção automática de vídeos verticais com identidade visual."},
+ {term:"Scheduler",def:"Sistema de agendamento que gerencia quando cada vídeo será publicado."},
+ {term:"Publish Pipeline",def:"Máquina de estados: draft → ready → publishing → published/failed."},
+ {term:"JWT",def:"JSON Web Token — mecanismo de autenticação usado pelo dashboard."},
+ {term:"CORS",def:"Cross-Origin Resource Sharing — política de segurança do navegador para requisições entre origens diferentes."}
+];
+
+function renderTutorials(filter) {
+ const el = document.getElementById('tutorials-list');
+ if (!el) return;
+ const q = (filter || '').toLowerCase();
+ const filtered = TUTORIALS_DATA.filter(t => !q || t.title.toLowerCase().includes(q) || t.cat.toLowerCase().includes(q) || t.content.toLowerCase().includes(q));
+ if (!filtered.length) { el.innerHTML = '<div class="empty-state">Nenhum tutorial encontrado para "' + filter + '"</div>'; return; }
+ let html = '<div style="display:grid;gap:0.75rem">';
+ const cats = [...new Set(filtered.map(t => t.cat))];
+ for (const cat of cats) {
+ html += '<div style="color:#4fc3f7;font-weight:700;font-size:0.9rem;margin-top:0.5rem;text-transform:uppercase">' + cat + '</div>';
+ for (const t of filtered.filter(x => x.cat === cat)) {
+ html += '<details style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:0.75rem;cursor:pointer">';
+ html += '<summary style="color:#fff;font-weight:600">' + t.title + '</summary>';
+ html += '<div style="color:#ccc;line-height:1.8;margin-top:0.5rem">' + t.content + '</div>';
+ html += '</details>';
+ }
+ }
+ html += '</div>';
+ el.innerHTML = html;
+}
+
+function filterTutorials() {
+ const q = document.getElementById('tutorial-search').value.trim();
+ renderTutorials(q);
+}
+
+function renderFAQ() {
+ const el = document.getElementById('faq-list');
+ if (!el) return;
+ let html = '<div style="display:grid;gap:0.5rem">';
+ for (const f of FAQ_DATA) {
+ html += '<details style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:0.75rem;cursor:pointer">';
+ html += '<summary style="color:#fff;font-weight:600">❓ ' + f.q + '</summary>';
+ html += '<div style="color:#ccc;line-height:1.8;margin-top:0.5rem">' + f.a + '</div>';
+ html += '</details>';
+ }
+ html += '</div>';
+ el.innerHTML = html;
+}
+
+function renderGlossary() {
+ const el = document.getElementById('glossary-list');
+ if (!el) return;
+ let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:0.5rem">';
+ for (const g of GLOSSARY_DATA) {
+ html += '<div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:0.75rem">';
+ html += '<div style="color:#4fc3f7;font-weight:700">' + g.term + '</div>';
+ html += '<div style="color:#ccc;font-size:0.85rem;margin-top:4px">' + g.def + '</div>';
+ html += '</div>';
+ }
+ html += '</div>';
+ el.innerHTML = html;
+}
+
+function nextGuidedStep(step) {
+ for (let i = 0; i <= 7; i++) {
+ const el = document.getElementById('guided-step-' + i);
+ if (el) el.style.display = i === step ? 'block' : 'none';
+ }
+}
+
+function skipGuidedTutorial() {
+ document.getElementById('guided-tutorial').innerHTML = '<div style="color:#4caf50;font-weight:600;padding:1rem">✅ Tutorial concluído! Explore o menu lateral para descobrir todas as funcionalidades.</div>';
+}
+
+async function loadTutorials() {
+ renderTutorials('');
+ renderFAQ();
+ renderGlossary();
 }
 
 async function loadSetupStatus() {
