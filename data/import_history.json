@@ -28,7 +28,7 @@
     "file_size": 533932,
     "sha256": "3b20d0da243cc13340b99360602236f1babb649cd333e9127565ebe27e97722d",
     "error": "",
-    "imported_at": "2026-11-17T22:33:16-0300",
+    "imported_at": "2026-11-18T00:20:28-0300",
     "metadata": {
       "title": "Me at the zoo",
       "author": "jawed",
@@ -36,10 +36,12 @@
       "resolution": "320x240",
       "thumbnail": "https://i.ytimg.com/vi/jNQXAC9IVRw/hqdefault.jpg?sqp=-oaymwEmCOADEOgC8quKqQMa8AEB-AG-AoAC8AGKAgwIABABGFUgWShlMA8=&rs=AOn4CLA9eLBatYv9WbkD4BbZ2Im-biSPTw",
       "platform": "youtube",
-      "view_count": 448766048,
+      "view_count": 448769149,
       "upload_date": "20050424",
       "description": "Microplastics are accumulating in human brains at an alarming rate\nhttps://www.youtube.com/watch?v=0PT5c1z3LL8\n\n“Nanoplastics and Human Health” with Matthew J Campen, PhD, MSPH\nhttps://www.youtube.com/watch?v=RRBN_4L09Mg\n\n00:00 Intro\n00:05 The cool thing\n00:17 End",
-      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "catalog_registered": true,
+      "pipeline_job_id": "51cee6e7-267"
     }
   }
 ]

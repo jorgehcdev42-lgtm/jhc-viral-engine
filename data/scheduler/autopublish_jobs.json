@@ -491,5 +491,14 @@
     "created_at": 1794942741.2316291,
     "updated_at": 1794942741.2316291,
     "approved_at": null
+  },
+  {
+    "job_id": "f7ead07f-03f",
+    "platform": "tiktok",
+    "status": "published",
+    "approval_status": "approved",
+    "published_url": "",
+    "published_at": "2026-11-18T00:17:42-0300",
+    "method": "assisted"
   }
 ]

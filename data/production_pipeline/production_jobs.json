@@ -476,5 +476,41 @@
     "duration_seconds": 179.41,
     "materials_used": [],
     "scheduler_job_id": "119046f2-fec"
+  },
+  "a4d46284-633": {
+    "job_id": "a4d46284-633",
+    "status": "pending",
+    "video_path": "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/data/imported_videos/4822c870d8f3_Me at the zoo.mp4",
+    "output_path": "",
+    "platform": "tiktok",
+    "market": "br",
+    "title": "Me at the zoo",
+    "subtitle_text": "",
+    "quality_score": 0.0,
+    "quality_passed": false,
+    "error": "",
+    "created_at": 1794969892.8049831,
+    "completed_at": 0.0,
+    "duration_seconds": 0.0,
+    "materials_used": [],
+    "scheduler_job_id": ""
+  },
+  "51cee6e7-267": {
+    "job_id": "51cee6e7-267",
+    "status": "pending",
+    "video_path": "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/data/imported_videos/4822c870d8f3_Me at the zoo.mp4",
+    "output_path": "",
+    "platform": "tiktok",
+    "market": "br",
+    "title": "Me at the zoo",
+    "subtitle_text": "",
+    "quality_score": 0.0,
+    "quality_passed": false,
+    "error": "",
+    "created_at": 1794972029.055216,
+    "completed_at": 0.0,
+    "duration_seconds": 0.0,
+    "materials_used": [],
+    "scheduler_job_id": ""
   }
 }

@@ -3152,3 +3152,80 @@ async def auto_publish_history(limit: int = 50):
     from src.publishing.auto_publisher import AutoPublisher
     publisher = AutoPublisher()
     return {"history": publisher.get_publish_history(limit=limit)}
+
+
+# =============================================================================
+# MISSAO 040.2 -- Radar Viral Instagram
+# =============================================================================
+
+@app.get("/api/instagram-radar/search")
+async def instagram_radar_search(profile: str = "", hashtag: str = "", max_results: int = 10):
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    from src.research.instagram_radar import InstagramRadar
+    def _do():
+        radar = InstagramRadar()
+        if profile:
+            return radar.search_profile(profile, max_results)
+        elif hashtag:
+            return radar.search_hashtag(hashtag, max_results)
+        else:
+            return radar.search_all(max_per_source=max_results)
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor(max_workers=1) as ex:
+        results = await loop.run_in_executor(ex, _do)
+    results = InstagramRadar().check_already_imported(results)
+    return {"results": results, "count": len(results)}
+
+@app.get("/api/instagram-radar/discover")
+async def instagram_radar_discover(max_per_source: int = 5):
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    from src.research.instagram_radar import InstagramRadar
+    def _do():
+        radar = InstagramRadar()
+        r = radar.search_all(max_per_source=max_per_source)
+        r = radar.check_already_imported(r)
+        radar.save_cache(r, "latest")
+        return r
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor(max_workers=1) as ex:
+        results = await loop.run_in_executor(ex, _do)
+    return {"results": results, "count": len(results)}
+
+@app.get("/api/instagram-radar/cache")
+async def instagram_radar_cache(max_age_hours: int = 24):
+    from src.research.instagram_radar import InstagramRadar
+    radar = InstagramRadar()
+    results = radar.load_cache("latest", max_age_hours)
+    return {"results": results, "count": len(results), "cached": len(results) > 0}
+
+@app.get("/api/instagram-radar/filters")
+async def instagram_radar_filters():
+    from src.research.instagram_radar import InstagramRadar
+    return InstagramRadar().get_filter_options()
+
+@app.get("/api/instagram-radar/profiles")
+async def instagram_radar_profiles():
+    from src.research.instagram_radar import InstagramRadar
+    return {"profiles": InstagramRadar()._monitored_profiles}
+
+@app.post("/api/instagram-radar/profiles/add")
+async def instagram_radar_add_profile(request: Request):
+    from src.research.instagram_radar import InstagramRadar
+    body = await request.json()
+    profile = body.get("profile", "").strip()
+    if not profile:
+        return JSONResponse(status_code=400, content={"detail": "profile obrigatorio"})
+    radar = InstagramRadar()
+    return {"profiles": radar.add_monitored_profile(profile), "added": profile}
+
+@app.post("/api/instagram-radar/profiles/remove")
+async def instagram_radar_remove_profile(request: Request):
+    from src.research.instagram_radar import InstagramRadar
+    body = await request.json()
+    profile = body.get("profile", "").strip()
+    if not profile:
+        return JSONResponse(status_code=400, content={"detail": "profile obrigatorio"})
+    radar = InstagramRadar()
+    return {"profiles": radar.remove_monitored_profile(profile), "removed": profile}

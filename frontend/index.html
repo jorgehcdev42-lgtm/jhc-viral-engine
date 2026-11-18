@@ -665,6 +665,7 @@ body::after {
 <div class="nav-item" data-page="importer"><span class="nav-icon">📥</span> Importador</div>
 <div class="nav-item" data-page="url-import"><span class="nav-icon">🔗</span> Importar URL</div>
 <div class="nav-item" data-page="radar"><span class="nav-icon">📡</span> Radar GTA VI</div>
+<div class="nav-item" data-page="ig-radar"><span class="nav-icon">📸</span> Radar Viral Instagram</div>
  </div>
 
  <div class="nav-section">
@@ -1625,6 +1626,7 @@ function loadPageData(page) {
  if (page === 'importer') loadImporter();
 if (page === 'url-import') loadUrlImport();
 if (page === 'radar') loadRadar();
+if (page === 'ig-radar') loadInstagramRadar();
 if (page === 'assisted-pub') loadAssistedPub();
  if (page === 'audiovisual') loadAudioVisual();
  if (page === 'export') loadExportProfiles();
@@ -2499,6 +2501,176 @@ async function confirmAssistedPub() {
  } catch(e) {
  el.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
  }
+}
+
+// === MISSÃO 040.2 — Radar Viral Instagram ===
+async function loadInstagramRadar() {
+ const main = document.getElementById('main-content');
+ main.innerHTML = `
+ <h2 style="margin-bottom:1rem">📸 Radar Viral Instagram — GTA VI</h2>
+ <div class="card" style="margin-bottom:1rem;border-left:3px solid #E1306C">
+ <div class="card-header"><span class="card-icon">⚠️</span><div class="card-title">Limitação Real do Instagram</div></div>
+ <div style="padding:1rem;color:#ccc;font-size:0.9rem">
+ O Instagram <strong>não oferece API pública de busca de Reels</strong> e bloqueia scraping via yt-dlp (requer cookies de sessão autenticada).<br>
+ Este radar funciona em dois modos:<br>
+ • <strong>Busca por URL:</strong> cole links de Reels específicos para analisar métricas e importar.<br>
+ • <strong>Monitoramento de perfis:</strong> quando configurado com cookies de sessão, busca automática funciona.<br>
+ Vídeos de terceiros são classificados como <em>referência editorial</em> — use para inspirar conteúdo original.
+ </div>
+ </div>
+ <div class="card" style="margin-bottom:1rem">
+ <div class="card-header"><span class="card-icon">🔍</span><div class="card-title">Buscar Reel por URL</div></div>
+ <div style="padding:1rem">
+ <div style="display:flex;gap:8px;margin-bottom:1rem">
+ <input type="text" id="ig-radar-url" placeholder="Cole URL do Reel Instagram (ex: https://www.instagram.com/reel/...)" style="flex:1;padding:10px;background:#1a1a2e;border:1px solid #333;color:#fff;border-radius:6px;font-size:0.95rem">
+ <button class="btn btn-primary" onclick="analyzeIgReel()">🔍 Analisar</button>
+ </div>
+ <div id="ig-reel-analysis" style="min-height:40px"></div>
+ </div>
+ </div>
+ <div class="card" style="margin-bottom:1rem">
+ <div class="card-header"><span class="card-icon">👤</span><div class="card-title">Perfis Monitorados</div><button class="btn btn-sm" onclick="refreshIgProfiles()" style="margin-left:auto;font-size:0.75rem">↻</button></div>
+ <div style="padding:1rem">
+ <div style="display:flex;gap:8px;margin-bottom:1rem">
+ <input type="text" id="ig-profile-input" placeholder="@perfil_para_monitorar" style="flex:1;padding:8px;background:#1a1a2e;border:1px solid #333;color:#fff;border-radius:6px">
+ <button class="btn" onclick="addIgProfile()" style="background:#E1306C;color:#fff">+ Adicionar</button>
+ </div>
+ <div id="ig-profiles-list">Carregando...</div>
+ </div>
+ </div>
+ <div class="card" style="margin-bottom:1rem">
+ <div class="card-header"><span class="card-icon">📡</span><div class="card-title">Descoberta Automática</div></div>
+ <div style="padding:1rem">
+ <button class="btn btn-primary" onclick="runIgDiscover()" style="background:#E1306C;color:#fff;font-weight:bold">🔍 Buscar Tendências GTA VI</button>
+ <div id="ig-discover-status" style="margin-top:8px;color:#aaa"></div>
+ </div>
+ </div>
+ <div class="card">
+ <div class="card-header"><span class="card-icon">🎬</span><div class="card-title">Resultados — Viral Score</div></div>
+ <div id="ig-radar-results" style="padding:1rem">Execute uma busca ou análise para ver resultados.</div>
+ </div>`;
+ refreshIgProfiles();
+ // Tentar carregar cache
+ try {
+ const cache = await api('/api/instagram-radar/cache?max_age_hours=24');
+ if (cache.cached && cache.count > 0) {
+ renderIgResults(cache.results);
+ document.getElementById('ig-discover-status').textContent = `📦 ${cache.count} resultados em cache`;
+ }
+ } catch(e) {}
+}
+
+async function analyzeIgReel() {
+ const url = document.getElementById('ig-radar-url').value.trim();
+ const el = document.getElementById('ig-reel-analysis');
+ if (!url) { el.innerHTML = '<span style="color:#f44">Cole uma URL primeiro</span>'; return; }
+ el.innerHTML = '<span style="color:#ff0">⏳ Analisando Reel...</span>';
+ try {
+ const resp = await fetch(`${API}/api/import/url/metadata`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({url})
+ });
+ const data = await resp.json();
+ if (data.error) {
+ el.innerHTML = `<span style="color:#f44">❌ ${data.error}<br><small>Instagram pode exigir cookies de sessão. Tente importar via URL na seção "Importar URL".</small></span>`;
+ return;
+ }
+ const dup = data.is_duplicate;
+ const thumb = data.thumbnail ? `<img src="${data.thumbnail}" style="max-width:150px;border-radius:6px;margin-top:8px;display:block">` : '';
+ el.innerHTML = `
+ <div style="background:#1a1a2e;padding:12px;border-radius:8px;border:1px solid #E1306C33">
+ <strong>${data.title || 'Sem título'}</strong><br>
+ <span style="color:#aaa">👤 ${data.author || '?'} | ⏱️ ${Math.round(data.duration||0)}s | 📐 ${data.resolution||'?'} | 👁️ ${(data.view_count||0).toLocaleString()} views</span><br>
+ ${dup ? '<span style="color:#f44;font-weight:bold">⚠️ JÁ IMPORTADO</span>' : `<button class="btn btn-sm" onclick="importIgReel('${url}')" style="margin-top:8px;background:#E1306C;color:#fff">📥 Importar para Produção</button>`}
+ ${thumb}
+ </div>`;
+ } catch(e) {
+ el.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
+ }
+}
+
+async function importIgReel(url) {
+ if (!url) return;
+ try {
+ const resp = await fetch(`${API}/api/import/url/download`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({url})
+ });
+ const data = await resp.json();
+ alert(data.status === 'duplicate' ? 'URL já importada' : 'Download iniciado! Verifique Importar URL.');
+ } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function refreshIgProfiles() {
+ const el = document.getElementById('ig-profiles-list');
+ if (!el) return;
+ try {
+ const data = await api('/api/instagram-radar/profiles');
+ const profiles = data.profiles || [];
+ if (!profiles.length) { el.textContent = 'Nenhum perfil monitorado.'; return; }
+ el.innerHTML = profiles.map(p => `<span style="display:inline-block;background:#E1306C33;color:#E1306C;padding:4px 10px;border-radius:12px;margin:2px 4px;font-size:0.85rem">@${p} <button onclick="removeIgProfile('${p}')" style="background:none;border:none;color:#f44;cursor:pointer;font-size:0.8rem">×</button></span>`).join('');
+ } catch(e) { el.textContent = 'Erro ao carregar'; }
+}
+
+async function addIgProfile() {
+ const input = document.getElementById('ig-profile-input');
+ const profile = input.value.trim().replace(/^@/, '');
+ if (!profile) return;
+ try {
+ await fetch(`${API}/api/instagram-radar/profiles/add`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({profile})
+ });
+ input.value = '';
+ refreshIgProfiles();
+ } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function removeIgProfile(profile) {
+ try {
+ await fetch(`${API}/api/instagram-radar/profiles/remove`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({profile})
+ });
+ refreshIgProfiles();
+ } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function runIgDiscover() {
+ const statusEl = document.getElementById('ig-discover-status');
+ statusEl.innerHTML = '<span style="color:#ff0">⏳ Buscando tendências (pode levar ~60s)...</span>';
+ try {
+ const data = await api('/api/instagram-radar/discover?max_per_source=3');
+ if (data.count > 0) {
+ renderIgResults(data.results);
+ statusEl.innerHTML = `<span style="color:#0f0">✅ ${data.count} resultados encontrados</span>`;
+ } else {
+ statusEl.innerHTML = '<span style="color:#ff0">⚠️ 0 resultados — Instagram bloqueia scraping sem cookies. Use "Buscar por URL" acima ou configure cookies em data/publishing/credentials/.</span>';
+ }
+ } catch(e) {
+ statusEl.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
+ }
+}
+
+function renderIgResults(results) {
+ const el = document.getElementById('ig-radar-results');
+ if (!results || !results.length) { el.textContent = 'Nenhum resultado.'; return; }
+ el.innerHTML = '<table class="data-table"><thead><tr><th>Cat.</th><th>Título</th><th>Autor</th><th>Score</th><th>Conf.</th><th>Views</th><th>Direitos</th><th>Ações</th></tr></thead><tbody>' +
+ results.map(r => {
+ const scoreColor = r.viral_score >= 75 ? '#0f0' : r.viral_score >= 50 ? '#ff0' : '#f44';
+ const confPct = Math.round((r.confidence || 0) * 100);
+ const rightsBadge = r.rights_status === 'fair_use' ? '<span style="color:#0f0">Fair Use</span>' : r.rights_status === 'reference_only' ? '<span style="color:#ff0">Referência</span>' : '<span style="color:#aaa">?</span>';
+ return `<tr>
+ <td>${r.category || '?'}</td>
+ <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.title||'').replace(/"/g,'&quot;')}">${(r.title||'?').substring(0,35)}</td>
+ <td>@${(r.author||'?').substring(0,15)}</td>
+ <td style="color:${scoreColor};font-weight:bold">${r.viral_score || 0}</td>
+ <td style="color:${confPct>=80?'#0f0':'#ff0'}">${confPct}%</td>
+ <td>${(r.view_count||0).toLocaleString()}</td>
+ <td>${rightsBadge}</td>
+ <td><a href="${r.url}" target="_blank" class="btn btn-sm" style="font-size:0.7rem;text-decoration:none">🔗 Abrir</a></td>
+ </tr>`;
+ }).join('') + '</tbody></table>';
 }
 
 // === MISSÃO 017 — Audiovisual ===
