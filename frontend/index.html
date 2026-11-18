@@ -1052,6 +1052,10 @@ body::after {
 	 </div>
  </div>
 
+ <div class="card">
+ <div class="card-header"><span class="card-icon">📡</span><div class="card-title">Monitor Radar YouTube</div></div>
+ <div id="radar-monitor-panel"><div class="loading-state"><div class="loading-spinner"></div>Carregando...</div></div>
+ </div>
  <!-- ===== DIAGNOSTICS ===== -->
  <div id="page-diagnostics" class="page">
  <div class="page-header"><div class="page-title">Diagnóstico do Sistema</div></div>
@@ -1663,7 +1667,7 @@ function loadPageData(page) {
  if (page === 'stories') loadStories();
  if (page === 'importer') loadImporter();
 if (page === 'url-import') loadUrlImport();
- if (page === 'accounts') { loadAccounts(); loadQueueControl(); }
+ if (page === 'accounts') { loadAccounts(); loadQueueControl(); loadRadarMonitor(); }
 if (page === 'radar') loadRadar();
 if (page === 'ig-radar') loadInstagramRadar();
 if (page === 'assisted-pub') loadAssistedPub();
@@ -3171,6 +3175,55 @@ async function schedulePublish() {
  msg.innerHTML = '<div class="error-box">' + (data.detail || 'Erro ao agendar') + '</div>';
  }
  } catch(e) { msg.innerHTML = '<div class="error-box">' + e.message + '</div>'; }
+}
+
+async function loadRadarMonitor() {
+ const el = document.getElementById('radar-monitor-panel');
+ if (!el) return;
+ try {
+ const data = await api('/api/radar-monitor/status');
+ if (data.error) { el.innerHTML = '<div class="empty-state">Erro: ' + data.error + '</div>'; return; }
+ const state = data.state || {};
+ const latest = data.latest_results || {};
+ const enabled = state.enabled ? true : false;
+ const runs = state.total_runs || 0;
+ const lastCount = latest.count || 0;
+ const lastTime = state.last_run ? new Date(state.last_run * 1000).toLocaleString('pt-BR') : 'Nunca';
+ const interval = state.interval || 1800;
+ const statusColor = enabled ? '#4caf50' : '#ff9800';
+ const statusLabel = enabled ? '🟢 Ativo' : '🟡 Inativo';
+ el.innerHTML = `<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+ <div style="flex:1;min-width:200px">
+ <div style="font-size:1.2rem;font-weight:700;color:${statusColor}">${statusLabel}</div>
+ <div style="color:#aaa;font-size:0.85rem;margin-top:4px">Execuções: ${runs} | Última: ${lastTime} | Resultados: ${lastCount} | Intervalo: ${interval/60}min</div>
+ </div>
+ <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+ <button class="btn btn-primary" onclick="radarMonitorAction('run')">🔍 Buscar Agora</button>
+ <button class="btn btn-secondary" onclick="radarMonitorToggle(${!enabled})">${enabled ? '⏸ Desativar' : '▶ Ativar'}</button>
+ </div>
+ </div>`;
+ } catch(e) {
+ el.innerHTML = '<div class="empty-state">Erro ao carregar monitor: ' + e.message + '</div>';
+ }
+}
+
+async function radarMonitorAction(action) {
+ const el = document.getElementById('radar-monitor-panel');
+ if (el) el.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div>Executando busca...</div>';
+ try {
+ const data = await api('/api/radar-monitor/' + action, {method:'POST'});
+ if (data.error) { alert('Erro: ' + data.error); }
+ else if (data.ok) { alert('Busca concluída: ' + (data.results || 0) + ' resultados encontrados'); }
+ loadRadarMonitor();
+ } catch(e) { alert('Erro: ' + e.message); loadRadarMonitor(); }
+}
+
+async function radarMonitorToggle(enable) {
+ try {
+ const data = await api('/api/radar-monitor/enable', {method:'POST', body: JSON.stringify({enabled: enable, interval: 1800}), headers:{'Content-Type':'application/json'}});
+ if (data.error) { alert('Erro: ' + data.error); }
+ loadRadarMonitor();
+ } catch(e) { alert('Erro: ' + e.message); }
 }
 
 async function loadQueueControl() {
