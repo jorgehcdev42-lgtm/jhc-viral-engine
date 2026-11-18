@@ -788,7 +788,7 @@ async def run_radar_monitor():
     script = str(_PROJECT_ROOT / "scripts" / "radar_monitor.py")
     try:
         result = subprocess.run(
-            [str(_PROJECT_ROOT / ".venv" / "bin" / "python3"), "-I", script],
+            [str(_PROJECT_ROOT.parent / ".venv" / "bin" / "python3"), "-I", script],
             capture_output=True, text=True, timeout=60,
             cwd=str(_PROJECT_ROOT),
         )
@@ -2285,7 +2285,7 @@ async def worker_start():
     """Inicia worker persistente em background — MISSÃO 032 FASE 3."""
     import subprocess
     result = subprocess.run(
-        [str(_PROJECT_ROOT / ".venv" / "bin" / "python3"), "-I",
+        [str(_PROJECT_ROOT.parent / ".venv" / "bin" / "python3"), "-I",
          str(_PROJECT_ROOT / "scripts" / "bulk_worker.py"), "start"],
         capture_output=True, text=True, cwd=str(_PROJECT_ROOT),
     )
@@ -2297,7 +2297,7 @@ async def worker_stop():
     """Para worker persistente gracefulmente."""
     import subprocess
     result = subprocess.run(
-        [str(_PROJECT_ROOT / ".venv" / "bin" / "python3"), "-I",
+        [str(_PROJECT_ROOT.parent / ".venv" / "bin" / "python3"), "-I",
          str(_PROJECT_ROOT / "scripts" / "bulk_worker.py"), "stop"],
         capture_output=True, text=True, cwd=str(_PROJECT_ROOT),
     )
@@ -2309,7 +2309,7 @@ async def worker_pause():
     """Pausa worker após lote atual."""
     import subprocess
     result = subprocess.run(
-        [str(_PROJECT_ROOT / ".venv" / "bin" / "python3"), "-I",
+        [str(_PROJECT_ROOT.parent / ".venv" / "bin" / "python3"), "-I",
          str(_PROJECT_ROOT / "scripts" / "bulk_worker.py"), "pause"],
         capture_output=True, text=True, cwd=str(_PROJECT_ROOT),
     )
@@ -2321,7 +2321,7 @@ async def worker_resume():
     """Retoma worker pausado."""
     import subprocess
     result = subprocess.run(
-        [str(_PROJECT_ROOT / ".venv" / "bin" / "python3"), "-I",
+        [str(_PROJECT_ROOT.parent / ".venv" / "bin" / "python3"), "-I",
          str(_PROJECT_ROOT / "scripts" / "bulk_worker.py"), "resume"],
         capture_output=True, text=True, cwd=str(_PROJECT_ROOT),
     )
@@ -2333,7 +2333,7 @@ async def worker_status():
     """Status do worker persistente."""
     import subprocess
     result = subprocess.run(
-        [str(_PROJECT_ROOT / ".venv" / "bin" / "python3"), "-I",
+        [str(_PROJECT_ROOT.parent / ".venv" / "bin" / "python3"), "-I",
          str(_PROJECT_ROOT / "scripts" / "bulk_worker.py"), "status"],
         capture_output=True, text=True, cwd=str(_PROJECT_ROOT),
     )
