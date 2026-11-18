@@ -103,8 +103,16 @@ def get_jwt_secret() -> str:
     if not secret:
         secret = os.environ.get("JHC_API_KEY", "")
     if not secret:
-        # Stable dev secret — tokens survive restart in local dev
-        secret = "jhc-viral-engine-dev-secret-key-2026-fixed"
+        # Read persistent secret from file (survives restart, not in git)
+        import pathlib
+        sf = pathlib.Path('data/.jwt_secret')
+        if sf.exists():
+            secret = sf.read_text().strip()
+        else:
+            import secrets as _s
+            secret = _s.token_hex(32)
+            sf.parent.mkdir(parents=True, exist_ok=True)
+            sf.write_text(secret)
     return secret
 
 
