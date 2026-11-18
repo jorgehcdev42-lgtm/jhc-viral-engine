@@ -785,6 +785,7 @@ async def get_radar_monitor_status():
 async def run_radar_monitor():
     """Trigger a single radar search cycle now."""
     import subprocess
+    import sys
     script = str(_PROJECT_ROOT / "scripts" / "radar_monitor.py")
     try:
         result = subprocess.run(
