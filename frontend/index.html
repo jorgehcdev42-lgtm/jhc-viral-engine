@@ -1445,7 +1445,7 @@ body::after {
 </main>
 
 <script>
-const API = window.location.origin;
+const API = window.location.port === '8080' ? 'http://127.0.0.1:8001' : window.location.origin;
 let authToken = null;
 
 // === AUTH SYSTEM ===
