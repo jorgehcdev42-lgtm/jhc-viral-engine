@@ -759,6 +759,68 @@ async def stop_queue():
     return s.stop_queue()
 
 
+# --- Radar Monitor Control ---
+
+RADAR_STATE_FILE = DATA_ROOT / "scheduler" / "radar_monitor_state.json"
+RADAR_RESULTS_FILE = DATA_ROOT / "radar" / "latest_youtube_results.json"
+
+@app.get("/api/radar-monitor/status")
+async def get_radar_monitor_status():
+    """Get radar monitor state and latest results."""
+    state = {"enabled": False, "last_run": None, "interval": 1800, "total_runs": 0}
+    if RADAR_STATE_FILE.exists():
+        try:
+            state = json.loads(RADAR_STATE_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    results = {"count": 0, "timestamp": None, "results": []}
+    if RADAR_RESULTS_FILE.exists():
+        try:
+            results = json.loads(RADAR_RESULTS_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {"state": state, "latest_results": results}
+
+@app.post("/api/radar-monitor/run")
+async def run_radar_monitor():
+    """Trigger a single radar search cycle now."""
+    import subprocess
+    script = str(PROJECT_ROOT / "scripts" / "radar_monitor.py")
+    try:
+        result = subprocess.run(
+            [sys.executable, script],
+            capture_output=True, text=True, timeout=60,
+            cwd=str(PROJECT_ROOT),
+        )
+        if result.returncode == 0:
+            output = json.loads(result.stdout) if result.stdout.strip() else {}
+            return {"ok": True, "results": output.get("results", 0)}
+        return {"ok": False, "error": result.stderr[:200]}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "Timeout (60s)"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
+
+@app.post("/api/radar-monitor/enable")
+async def enable_radar_monitor(request: Request):
+    """Enable or disable periodic radar monitoring."""
+    body = await request.json()
+    enabled = body.get("enabled", True)
+    interval = body.get("interval", 1800)
+    state = {"enabled": False, "last_run": None, "interval": 1800, "total_runs": 0}
+    if RADAR_STATE_FILE.exists():
+        try:
+            state = json.loads(RADAR_STATE_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    state["enabled"] = enabled
+    state["interval"] = interval
+    RADAR_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    RADAR_STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    status_label = "ativado" if enabled else "desativado"
+    return {"ok": True, "enabled": enabled, "interval": interval, "message": f"Monitor {status_label}"}
+
+
 @app.get("/api/scheduler/quota/{profile_id}")
 async def get_quota(profile_id: str):
     """Get production quota for a specific profile."""
