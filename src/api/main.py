@@ -2491,6 +2491,75 @@ async def auth_session_discover(request: Request):
 
 # --- Analytics / Inteligência de Crescimento ---
 
+@app.get("/api/analytics/dashboard")
+async def get_dashboard_analytics():
+    """Analytics agregados para o painel do dashboard — não depende de src.analytics."""
+    import os
+    result = {"catalog": {}, "pipeline": {}, "queue": {}, "radar": {}, "accounts": {}}
+
+    # Catalog stats
+    try:
+        from src.catalog.smart_catalog import SmartCatalog
+        cat = SmartCatalog(data_root=DATA_ROOT)
+        stats = cat.get_stats() if hasattr(cat, "get_stats") else {}
+        result["catalog"] = stats if isinstance(stats, dict) else {}
+    except Exception:
+        # Fallback: count files directly
+        output_dir = DATA_ROOT / "autoreel" / "output"
+        mp4_count = len(list(output_dir.glob("*.mp4"))) if output_dir.exists() else 0
+        total_mb = sum(f.stat().st_size for f in output_dir.glob("*.mp4")) / 1_048_576 if output_dir.exists() else 0
+        result["catalog"] = {"total_videos": mp4_count, "total_mb": round(total_mb, 1)}
+
+    # Pipeline stats
+    try:
+        jobs_file = DATA_ROOT / "production_pipeline" / "production_jobs.json"
+        if jobs_file.exists():
+            jobs_data = json.loads(jobs_file.read_text(encoding="utf-8"))
+            by_status = {}
+            for j in jobs_data.values():
+                s = j.get("status", "unknown")
+                by_status[s] = by_status.get(s, 0) + 1
+            result["pipeline"] = {"total_jobs": len(jobs_data), "by_status": by_status}
+    except Exception:
+        pass
+
+    # Queue status
+    try:
+        from src.automation.autopublish_scheduler import AutoPublishScheduler
+        sched = AutoPublishScheduler(DATA_ROOT)
+        qs = sched.get_queue_status()
+        result["queue"] = {"status": qs.get("queue_status"), "active_jobs": qs.get("active_jobs"), "eligible_now": qs.get("eligible_now")}
+    except Exception:
+        pass
+
+    # Radar monitor
+    radar_state_file = DATA_ROOT / "scheduler" / "radar_monitor_state.json"
+    radar_results_file = DATA_ROOT / "radar" / "latest_youtube_results.json"
+    try:
+        if radar_state_file.exists():
+            rs = json.loads(radar_state_file.read_text(encoding="utf-8"))
+            result["radar"]["enabled"] = rs.get("enabled", False)
+            result["radar"]["total_runs"] = rs.get("total_runs", 0)
+        if radar_results_file.exists():
+            rr = json.loads(radar_results_file.read_text(encoding="utf-8"))
+            result["radar"]["latest_count"] = rr.get("count", 0)
+    except Exception:
+        pass
+
+    # Accounts
+    accounts_file = DATA_ROOT / "publishing" / "credentials" / "accounts.json"
+    try:
+        if accounts_file.exists():
+            acc = json.loads(accounts_file.read_text(encoding="utf-8"))
+            for platform in ["instagram", "tiktok", "youtube"]:
+                info = acc.get("accounts", {}).get(platform, {})
+                result["accounts"][platform] = {"handle": info.get("handle", "?"), "status": info.get("status", "?")}
+    except Exception:
+        pass
+
+    return result
+
+
 @app.get("/api/analytics/report")
 async def get_analytics_report():
     """Relatório consolidado de analytics multiplataforma."""
