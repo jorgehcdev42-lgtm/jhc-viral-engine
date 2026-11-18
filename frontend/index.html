@@ -671,7 +671,8 @@ body::after {
  <div class="nav-label">Distribuição</div>
  <div class="nav-item" data-page="audiovisual"><span class="nav-icon">🎵</span> Audiovisual</div>
  <div class="nav-item" data-page="export"><span class="nav-icon">📦</span> Multi-Formato</div>
- <div class="nav-item" data-page="browser-pub"><span class="nav-icon">🌐</span> Browser Pub</div>
+ <div class="nav-item" data-page="assisted-pub"><span class="nav-icon">🚀</span> Publicação Assistida</div>
+<div class="nav-item" data-page="browser-pub"><span class="nav-icon">🌐</span> Browser Pub</div>
  </div>
 
  <div class="nav-section">
@@ -1408,6 +1409,44 @@ body::after {
 </div>
 </div>
 
+<!-- ===== PUBLICAÇÃO ASSISTIDA (MISSÃO 040.1 ETAPA 2) ===== -->
+<div id="page-assisted-pub" class="page">
+<div class="page-header"><div class="page-title">🚀 Publicação Assistida</div></div>
+<div class="card" style="margin-bottom:1rem">
+<div class="card-header"><span class="card-icon">🎬</span><div class="card-title">Reels Prontos para Publicar</div><button class="btn btn-sm" onclick="loadAssistedPub()" style="margin-left:auto;font-size:0.75rem">↻ Atualizar</button></div>
+<div id="assisted-jobs-list" style="padding:1rem">Carregando...</div>
+</div>
+<div class="card" style="margin-bottom:1rem">
+<div class="card-header"><span class="card-icon">📡</span><div class="card-title">Preparar Publicação</div></div>
+<div style="padding:1rem">
+<div id="assisted-selected-job" style="color:#aaa;margin-bottom:1rem">Selecione um reel acima para preparar a publicação.</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem">
+<button class="btn" onclick="prepareAssisted('instagram')" style="background:#E1306C;color:#fff;font-weight:bold">📸 PUBLICAR NO INSTAGRAM</button>
+<button class="btn" onclick="prepareAssisted('youtube')" style="background:#FF0000;color:#fff;font-weight:bold">▶️ PUBLICAR NO YOUTUBE</button>
+<button class="btn" onclick="prepareAssisted('tiktok')" style="background:#000;color:#fff;font-weight:bold;border:1px solid #333">🎵 PUBLICAR NO TIKTOK</button>
+<button class="btn" onclick="prepareAllPlatforms()" style="background:#1a5c2e;color:#fff;font-weight:bold">🌐 PREPARAR PARA AS 3 REDES</button>
+</div>
+<div id="assisted-prepare-result" style="min-height:40px"></div>
+</div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-icon">✅</span><div class="card-title">Confirmar Publicação</div></div>
+<div style="padding:1rem">
+<div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+<input type="text" id="confirm-job-id" class="gta-input" placeholder="Job ID" style="flex:1;min-width:120px">
+<select id="confirm-platform" class="gta-select" style="min-width:120px">
+<option value="instagram">Instagram</option>
+<option value="youtube">YouTube</option>
+<option value="tiktok">TikTok</option>
+</select>
+<input type="text" id="confirm-url" class="gta-input" placeholder="URL da publicação (opcional)" style="flex:2;min-width:200px">
+<button class="btn btn-primary" onclick="confirmAssistedPub()">✅ Confirmar Publicação</button>
+</div>
+<div id="confirm-result"></div>
+</div>
+</div>
+</div>
+
 <!-- ===== BROWSER PUBLISHER (MISSÃO 019) ===== -->
 <div id="page-browser-pub" class="page">
 <div class="page-header"><div class="page-title">🌐 Browser Publisher</div></div>
@@ -1586,6 +1625,7 @@ function loadPageData(page) {
  if (page === 'importer') loadImporter();
 if (page === 'url-import') loadUrlImport();
 if (page === 'radar') loadRadar();
+if (page === 'assisted-pub') loadAssistedPub();
  if (page === 'audiovisual') loadAudioVisual();
  if (page === 'export') loadExportProfiles();
  if (page === 'browser-pub') loadBrowserPub();
@@ -2337,6 +2377,127 @@ async function importFromRadar(url) {
  }
  } catch(e) {
  alert('Erro ao iniciar download: ' + e.message);
+ }
+}
+
+// === MISSÃO 040.1 ETAPA 2 — Publicação Assistida Operacional ===
+let _selectedJobForPublish = null;
+
+async function loadAssistedPub() {
+ const el = document.getElementById('assisted-jobs-list');
+ if (!el) return;
+ el.innerHTML = '<span style="color:#aaa">⏳ Carregando reels prontos...</span>';
+ try {
+ const data = await api('/api/publish/ready-jobs');
+ if (!data.jobs || !data.jobs.length) {
+ el.textContent = 'Nenhum reel pronto para publicação no momento.';
+ return;
+ }
+ el.innerHTML = '<table class="data-table"><thead><tr><th>Job ID</th><th>Título</th><th>Plataforma</th><th>Arquivo</th><th>Ação</th></tr></thead><tbody>' +
+ data.jobs.map(j => `<tr>
+ <td style="font-family:monospace;font-size:0.8rem">${j.job_id}</td>
+ <td>${(j.title||'?').substring(0,40)}</td>
+ <td>${j.platform||'?'}</td>
+ <td style="font-size:0.8rem;color:#aaa">${(j.video_filename||'?').substring(0,30)}</td>
+ <td><button class="btn btn-sm" onclick="selectJobForPublish('${j.job_id}','${(j.title||'').replace(/'/g,"\\'")}')" style="font-size:0.7rem;background:#1a5c2e;color:#fff">🚀 Selecionar</button></td>
+ </tr>`).join('') + '</tbody></table>';
+ el.innerHTML += `<div style="margin-top:8px;color:#aaa;font-size:0.85rem">Total: ${data.count} reels prontos</div>`;
+ } catch(e) {
+ el.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
+ }
+}
+
+function selectJobForPublish(jobId, title) {
+ _selectedJobForPublish = jobId;
+ document.getElementById('assisted-selected-job').innerHTML = `<span style="color:#0f0;font-weight:bold">✅ Reel selecionado:</span> <strong>${jobId}</strong> — ${(title||'').substring(0,50)}`;
+ document.getElementById('confirm-job-id').value = jobId;
+}
+
+async function prepareAssisted(platform) {
+ const el = document.getElementById('assisted-prepare-result');
+ if (!_selectedJobForPublish) {
+ el.innerHTML = '<span style="color:#f44">❌ Selecione um reel primeiro na tabela acima.</span>';
+ return;
+ }
+ el.innerHTML = '<span style="color:#ff0">⏳ Preparando publicação...</span>';
+ try {
+ const resp = await fetch(`${API}/api/publish/assisted-prepare`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({ job_id: _selectedJobForPublish, platform })
+ });
+ const data = await resp.json();
+ if (data.detail) {
+ el.innerHTML = `<span style="color:#f44">❌ ${data.detail}</span>`;
+ return;
+ }
+ // Abrir página de upload no Safari
+ window.open(data.upload_url, '_blank');
+ // Tentar copiar metadados via clipboard API como fallback
+ const clipText = `${data.title}\n\n${data.description}\n\n${data.hashtags.join(' ')}`;
+ try { await navigator.clipboard.writeText(clipText); } catch(e) {}
+ el.innerHTML = `
+ <div style="background:#1a1a2e;padding:12px;border-radius:8px;border:1px solid #0f033">
+ <strong style="color:#0f0">✅ Preparado para ${platform.toUpperCase()}!</strong><br>
+ <span style="color:#aaa">👤 Conta: ${data.account}</span><br>
+ <span style="color:#aaa">📋 Título e descrição copiados para a área de transferência</span><br>
+ <span style="color:#aaa">📁 Arquivo: ${data.video_filename}</span><br>
+ <span style="color:#ff0">➡️ Arraste o arquivo para a página de upload aberta no navegador</span><br>
+ <hr style="border-color:#333;margin:8px 0">
+ <small style="color:#888">${data.instructions}</small>
+ </div>`;
+ } catch(e) {
+ el.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
+ }
+}
+
+async function prepareAllPlatforms() {
+ const el = document.getElementById('assisted-prepare-result');
+ if (!_selectedJobForPublish) {
+ el.innerHTML = '<span style="color:#f44">❌ Selecione um reel primeiro na tabela acima.</span>';
+ return;
+ }
+ el.innerHTML = '<span style="color:#ff0">⏳ Preparando para as 3 redes...</span>';
+ const platforms = ['instagram', 'youtube', 'tiktok'];
+ let html = '';
+ for (const p of platforms) {
+ try {
+ const resp = await fetch(`${API}/api/publish/assisted-prepare`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({ job_id: _selectedJobForPublish, platform: p })
+ });
+ const data = await resp.json();
+ if (data.detail) {
+ html += `<div style="color:#f44;margin-bottom:4px">❌ ${p}: ${data.detail}</div>`;
+ } else {
+ html += `<div style="color:#0f0;margin-bottom:4px">✅ ${p.toUpperCase()}: <a href="${data.upload_url}" target="_blank" style="color:#4af">${data.upload_url}</a> (${data.account})</div>`;
+ }
+ } catch(e) {
+ html += `<div style="color:#f44;margin-bottom:4px">❌ ${p}: ${e.message}</div>`;
+ }
+ }
+ el.innerHTML = `<div style="background:#1a1a2e;padding:12px;border-radius:8px;border:1px solid #1a5c2e33">${html}<hr style="border-color:#333;margin:8px 0"><span style="color:#ff0">Abra cada link acima e arraste o vídeo para publicar em cada plataforma.</span></div>`;
+}
+
+async function confirmAssistedPub() {
+ const jobId = document.getElementById('confirm-job-id').value.trim();
+ const platform = document.getElementById('confirm-platform').value;
+ const url = document.getElementById('confirm-url').value.trim();
+ const el = document.getElementById('confirm-result');
+ if (!jobId) { el.innerHTML = '<span style="color:#f44">Informe o Job ID</span>'; return; }
+ el.innerHTML = '<span style="color:#ff0">⏳ Confirmando...</span>';
+ try {
+ const resp = await fetch(`${API}/api/publish/assisted-confirm`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({ job_id: jobId, platform, published_url: url })
+ });
+ const data = await resp.json();
+ if (data.confirmed) {
+ el.innerHTML = `<span style="color:#0f0;font-weight:bold">✅ Publicação confirmada! Job ${jobId} marcado como publicado no ${platform}.</span>`;
+ } else {
+ el.innerHTML = `<span style="color:#f44">❌ Falha ao confirmar: ${JSON.stringify(data)}</span>`;
+ }
+ } catch(e) {
+ el.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
  }
 }
 

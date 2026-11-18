@@ -2801,3 +2801,148 @@ async def catalog_bridge_pending():
     bridge = CatalogBridge()
     pending = bridge.get_pending_imports()
     return {"pending": pending, "count": len(pending)}
+
+
+# =============================================================================
+# MISSÃO 040.1 ETAPA 2 — Publicação Assistida Operacional
+# =============================================================================
+
+PLATFORM_UPLOAD_URLS = {
+    "tiktok": "https://www.tiktok.com/upload",
+    "instagram": "https://www.instagram.com/",
+    "youtube": "https://studio.youtube.com/channel/UC/upload",
+}
+
+
+@app.post("/api/publish/assisted-prepare")
+async def publish_assisted_prepare(request: Request):
+    """Prepara metadados e abre página de upload no Safari para publicação assistida.
+
+    Retorna: título, descrição, hashtags, URL de upload, caminho do vídeo.
+    O frontend usa window.open() para abrir a URL e navigator.clipboard para copiar metadados.
+    """
+    body = await request.json()
+    job_id = body.get("job_id", "").strip()
+    platform = body.get("platform", "tiktok").strip().lower()
+
+    if not job_id:
+        return JSONResponse(status_code=400, content={"detail": "job_id obrigatório"})
+    if platform not in PLATFORM_UPLOAD_URLS:
+        return JSONResponse(status_code=400, content={"detail": f"Plataforma inválida: {platform}. Use: tiktok, instagram, youtube"})
+
+    # Buscar job na pipeline
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    job = pipeline.get_job(job_id)
+    if not job:
+        return JSONResponse(status_code=404, content={"detail": f"Job não encontrado: {job_id}"})
+
+    video_path = job.get("output_path", "") or job.get("video_path", "")
+    if not video_path or not Path(video_path).exists():
+        return JSONResponse(status_code=404, content={"detail": "Arquivo de vídeo não encontrado"})
+
+    title = job.get("title", f"GTA VI Reel {job_id}")
+    description = job.get("description", "") or f"GTA VI conteúdo exclusivo! 🎮 #GTA6 #GTAVI #LeonidaFlashBR"
+    hashtags = job.get("hashtags", ["#GTA6", "#GTAVI", "#RockstarGames", "#LeonidaFlashBR", "#Gaming"])
+
+    # Contas por plataforma
+    accounts = {
+        "tiktok": "@leonidagta6flashbr",
+        "instagram": "@leonidagta6flashbr",
+        "youtube": "@LeonidagtaVIFlashBR",
+    }
+
+    upload_url = PLATFORM_UPLOAD_URLS[platform]
+    account = accounts.get(platform, "")
+
+    # Copiar metadados para clipboard via osascript (macOS)
+    clipboard_text = f"{title}\n\n{description}\n\n{' '.join(hashtags)}"
+    try:
+        subprocess.run(
+            ["osascript", "-e", f'set the clipboard to "{clipboard_text.replace(chr(34), chr(92)+chr(34))}"'],
+            capture_output=True, timeout=5,
+        )
+    except Exception:
+        pass  # Clipboard é best-effort; frontend tem fallback
+
+    return {
+        "job_id": job_id,
+        "platform": platform,
+        "account": account,
+        "title": title,
+        "description": description,
+        "hashtags": hashtags,
+        "upload_url": upload_url,
+        "video_path": video_path,
+        "video_filename": Path(video_path).name,
+        "clipboard_ready": True,
+        "instructions": f"1. Arraste '{Path(video_path).name}' para a página de upload\n2. Cole título/descrição (Ctrl+V)\n3. Confirme a publicação\n4. Volte ao dashboard e clique 'Confirmar Publicação'",
+    }
+
+
+@app.post("/api/publish/assisted-confirm")
+async def publish_assisted_confirm(request: Request):
+    """Confirma publicação assistida após usuário completar upload manualmente."""
+    body = await request.json()
+    job_id = body.get("job_id", "").strip()
+    platform = body.get("platform", "").strip()
+    published_url = body.get("published_url", "").strip()
+
+    if not job_id:
+        return JSONResponse(status_code=400, content={"detail": "job_id obrigatório"})
+
+    # Registrar no scheduler como publicado
+    sched_file = Path("data/scheduler/autopublish_jobs.json")
+    jobs = []
+    if sched_file.exists():
+        try:
+            jobs = json.loads(sched_file.read_text())
+        except (json.JSONDecodeError, OSError):
+            jobs = []
+
+    entry = {
+        "job_id": job_id,
+        "platform": platform,
+        "status": "published",
+        "approval_status": "approved",
+        "published_url": published_url,
+        "published_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "method": "assisted",
+    }
+
+    # Atualizar ou adicionar
+    found = False
+    for i, j in enumerate(jobs):
+        if j.get("job_id") == job_id and j.get("platform") == platform:
+            jobs[i] = entry
+            found = True
+            break
+    if not found:
+        jobs.append(entry)
+
+    sched_file.parent.mkdir(parents=True, exist_ok=True)
+    sched_file.write_text(json.dumps(jobs, indent=2, ensure_ascii=False))
+
+    return {"confirmed": True, "job_id": job_id, "platform": platform, "status": "published"}
+
+
+@app.get("/api/publish/ready-jobs")
+async def publish_ready_jobs():
+    """Lista jobs prontos para publicação (completed na pipeline, com vídeo válido)."""
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    ready = []
+    for jid, job in pipeline._jobs.items():
+        if job.status == "completed":
+            video_path = job.output_path or job.video_path
+            if video_path and Path(video_path).exists():
+                ready.append({
+                    "job_id": jid,
+                    "title": job.title,
+                    "platform": job.platform,
+                    "video_path": video_path,
+                    "video_filename": Path(video_path).name,
+                    "created_at": job.created_at,
+                })
+    ready.sort(key=lambda x: x.get("created_at", 0), reverse=True)
+    return {"jobs": ready, "count": len(ready)}
