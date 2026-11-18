@@ -1520,40 +1520,40 @@ async function doLogin() {
  const data = await r.json();
  if (!r.ok) { errEl.textContent = data.detail || 'Erro no login'; errEl.style.display = 'block'; return; }
  authToken = data.token;
- sessionStorage.setItem('jhc_token', data.token);
+ // Use localStorage instead of sessionStorage — survives page reload across origins
+ localStorage.setItem('jhc_token', data.token);
  location.reload();
  } catch(e) { errEl.textContent = 'Erro de conexão: ' + e.message; errEl.style.display = 'block'; }
 }
 
 function doLogout() {
  authToken = null;
- sessionStorage.removeItem('jhc_token');
- fetch(API + '/api/auth/logout', {method: 'POST'}).catch(() => {});
+ localStorage.removeItem('jhc_token');
+ localStorage.removeItem('jhc_token'); sessionStorage.removeItem('jhc_token');
+ fetch(API + '/api/auth/logout', {method: 'POST', credentials: 'include'}).catch(() => {});
  showLoginScreen();
 }
 
 async function checkAuth() {
- // 1. Try sessionStorage first (fast path)
- const stored = sessionStorage.getItem('jhc_token');
+ // 1. Try localStorage first (survives reload across cross-origin)
+ const stored = localStorage.getItem('jhc_token') || sessionStorage.getItem('jhc_token');
  if (stored) {
  authToken = stored;
  try {
  const r = await fetch(API + '/api/auth/me', {
  headers: {'Authorization': 'Bearer ' + authToken},
- credentials: 'include' // send httpOnly cookie too
+ credentials: 'include'
  });
  if (r.ok) return true;
  } catch(e) {}
- sessionStorage.removeItem('jhc_token');
+ localStorage.removeItem('jhc_token');
+ localStorage.removeItem('jhc_token'); sessionStorage.removeItem('jhc_token');
  authToken = null;
  }
- // 2. Fallback: try httpOnly cookie (survives tab close / session clear)
+ // 2. Fallback: try httpOnly cookie (same-origin only)
  try {
  const r = await fetch(API + '/api/auth/me', {credentials: 'include'});
  if (r.ok) {
- // Cookie is valid — server accepted it. We don't have the token in JS
- // but the browser will send the cookie automatically on subsequent requests.
- // Set a flag so api() knows to include credentials.
  authToken = '__cookie_session__';
  return true;
  }
@@ -1571,7 +1571,7 @@ async function api(path, opts = {}) {
  // Always include credentials so httpOnly cookie is sent automatically
  const r = await fetch(API + path, {...opts, headers, credentials: 'include'});
  if (r.status === 401) {
- sessionStorage.removeItem('jhc_token');
+ localStorage.removeItem('jhc_token'); sessionStorage.removeItem('jhc_token');
  authToken = null;
  showLoginScreen();
  return {error: 'Sessão expirada. Faça login novamente.'};
