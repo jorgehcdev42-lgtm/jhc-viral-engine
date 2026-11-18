@@ -247,6 +247,29 @@ class UrlImporter:
             self._save_entry(entry)
 
             logger.info(f"Download concluído: {entry.title} ({entry.file_size} bytes)")
+
+            # ETAPA 5 M040.1: Auto-registro no SmartCatalog + Pipeline via CatalogBridge
+            try:
+                from src.media.catalog_bridge import CatalogBridge
+                bridge = CatalogBridge(data_root=self.data_root)
+                bridge_result = bridge.auto_process_import(
+                    file_path=str(video_path),
+                    source_url=url,
+                    title=entry.title,
+                    author=entry.author,
+                    platform=entry.platform,
+                    auto_produce=True,
+                )
+                if bridge_result.get("registered"):
+                    logger.info(f"Auto-registrado no catálogo: job_id={bridge_result.get('job_id', 'none')}")
+                    entry.metadata["catalog_registered"] = True
+                    entry.metadata["pipeline_job_id"] = bridge_result.get("job_id", "")
+                    self._save_entry(entry)
+                else:
+                    logger.warning(f"Falha no auto-registro: {bridge_result.get('error', 'unknown')}")
+            except Exception as e:
+                logger.warning(f"CatalogBridge auto-process failed (non-fatal): {e}")
+
             return entry
 
         except Exception as e:
