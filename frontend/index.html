@@ -650,6 +650,7 @@ body::after {
  <div class="nav-item" data-page="production"><span class="nav-icon">⚡</span> Produção</div>
  <div class="nav-item" data-page="quality"><span class="nav-icon">✅</span> Quality Gate</div>
  <div class="nav-item" data-page="publishing"><span class="nav-icon">📡</span> Publicações</div>
+<div class="nav-item" data-page="accounts"><span class="nav-icon">🔗</span> Contas Conectadas</div>
  </div>
 
  <div class="nav-section">
@@ -1032,6 +1033,15 @@ body::after {
  <button class="btn btn-secondary" onclick="loadPublishJobs()">Atualizar</button>
  </div>
  <div id="pub-queue"><div class="empty-state">Nenhuma publicação na fila</div></div>
+ </div>
+ </div>
+
+ <!-- ===== CONTAS CONECTADAS ===== -->
+ <div id="page-accounts" class="page">
+ <div class="page-header"><div class="page-title">Contas Conectadas</div></div>
+ <div class="card">
+ <div class="card-header"><span class="card-icon">🔗</span><div class="card-title">Perfis por Plataforma</div></div>
+ <div id="accounts-list"><div class="loading-state"><div class="loading-spinner"></div>Carregando contas...</div></div>
  </div>
  </div>
 
@@ -1625,6 +1635,7 @@ function loadPageData(page) {
  if (page === 'stories') loadStories();
  if (page === 'importer') loadImporter();
 if (page === 'url-import') loadUrlImport();
+ if (page === 'accounts') loadAccounts();
 if (page === 'radar') loadRadar();
 if (page === 'ig-radar') loadInstagramRadar();
 if (page === 'assisted-pub') loadAssistedPub();
@@ -3100,6 +3111,45 @@ async function schedulePublish() {
  msg.innerHTML = '<div class="error-box">' + (data.detail || 'Erro ao agendar') + '</div>';
  }
  } catch(e) { msg.innerHTML = '<div class="error-box">' + e.message + '</div>'; }
+}
+
+async function loadAccounts() {
+ const el = document.getElementById('accounts-list');
+ if (!el) return;
+ try {
+ const data = await api('/api/accounts');
+ if (data.error) { el.innerHTML = '<div class="empty-state">Erro: ' + data.error + '</div>'; return; }
+ let html = '<div style="display:grid;gap:1rem">';
+ const platforms = [
+ {key:'instagram', icon:'📸', name:'Instagram'},
+ {key:'tiktok', icon:'🎵', name:'TikTok'},
+ {key:'youtube', icon:'▶️', name:'YouTube'}
+ ];
+ for (const p of platforms) {
+ const acc = data[p.key] || {};
+ const handle = acc.handle || '—';
+ const status = acc.status || 'not_configured';
+ const method = acc.auth_method || 'manual';
+ const verified = acc.last_verified ? new Date(acc.last_verified).toLocaleString('pt-BR') : 'Nunca';
+ const statusColor = status === 'connected' ? '#4caf50' : status === 'configured' ? '#ff9800' : '#f44336';
+ const statusLabel = status === 'connected' ? 'Conectado' : status === 'configured' ? 'Configurado' : 'Não configurado';
+ html += `<div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:1rem;display:flex;align-items:center;gap:1rem">
+ <span style="font-size:2rem">${p.icon}</span>
+ <div style="flex:1">
+ <div style="font-weight:600;color:#fff">${p.name}</div>
+ <div style="color:#aaa;font-size:0.85rem">${handle}</div>
+ </div>
+ <div style="text-align:right">
+ <div style="color:${statusColor};font-weight:600;font-size:0.85rem">${statusLabel}</div>
+ <div style="color:#666;font-size:0.75rem">Auth: ${method} | Verificado: ${verified}</div>
+ </div>
+ </div>`;
+ }
+ html += '</div>';
+ el.innerHTML = html;
+ } catch(e) {
+ el.innerHTML = '<div class="empty-state">Erro ao carregar contas: ' + e.message + '</div>';
+ }
 }
 
 async function loadPublishJobs() {
