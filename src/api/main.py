@@ -785,12 +785,12 @@ async def get_radar_monitor_status():
 async def run_radar_monitor():
     """Trigger a single radar search cycle now."""
     import subprocess
-    script = str(PROJECT_ROOT / "scripts" / "radar_monitor.py")
+    script = str(_PROJECT_ROOT / "scripts" / "radar_monitor.py")
     try:
         result = subprocess.run(
             [sys.executable, script],
             capture_output=True, text=True, timeout=60,
-            cwd=str(PROJECT_ROOT),
+            cwd=str(_PROJECT_ROOT),
         )
         if result.returncode == 0:
             output = json.loads(result.stdout) if result.stdout.strip() else {}
