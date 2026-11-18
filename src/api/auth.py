@@ -93,13 +93,18 @@ def verify_jwt(token: str, secret: str) -> Optional[dict]:
 
 
 def get_jwt_secret() -> str:
-    """Get JWT signing secret from env vars."""
+    """Get JWT signing secret from env vars.
+
+    Falls back to a stable dev secret so tokens survive backend restarts
+    during local development. In production, JHC_JWT_SECRET MUST be set
+    via environment variable.
+    """
     secret = os.environ.get("JHC_JWT_SECRET", "")
     if not secret:
         secret = os.environ.get("JHC_API_KEY", "")
     if not secret:
-        # Generate ephemeral secret for dev (tokens won't survive restart)
-        secret = secrets.token_hex(32)
+        # Stable dev secret — tokens survive restart in local dev
+        secret = "jhc-viral-engine-dev-secret-key-2026-fixed"
     return secret
 
 
