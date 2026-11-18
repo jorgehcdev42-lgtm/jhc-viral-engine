@@ -199,8 +199,19 @@ class UrlImporter:
 
             rc = process.returncode
             if rc != 0:
+                # Capturar output para diagnóstico (stderr foi merged em stdout)
+                remaining_output = ""
+                try:
+                    remaining_output = process.stdout.read() if process.stdout else ""
+                except Exception:
+                    pass
+                error_msg = f"yt-dlp exit code {rc}"
+                for line in remaining_output.split("\n"):
+                    if "ERROR:" in line:
+                        error_msg = line.strip().replace("ERROR: ", "")[:200]
+                        break
                 entry.status = "failed"
-                entry.error = f"yt-dlp exit code {rc}"
+                entry.error = error_msg
                 self._save_entry(entry)
                 return entry
 

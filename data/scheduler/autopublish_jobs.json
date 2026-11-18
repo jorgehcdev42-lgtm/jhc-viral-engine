@@ -127,9 +127,9 @@
     "scheduled_at": 1794889148.3951218,
     "timezone": "America/Sao_Paulo",
     "privacy": "public",
-    "state": "pending",
-    "quality_gate_passed": false,
-    "quality_gate_score": 0.0,
+    "state": "approved",
+    "quality_gate_passed": true,
+    "quality_gate_score": 1.0,
     "auth_state": "not_checked",
     "content_hash": "e17df602bcb86fb9",
     "idempotency_key": "8f2f85413f31",
@@ -141,8 +141,8 @@
     "permalink": null,
     "published_at": null,
     "created_at": 1794889148.3951292,
-    "updated_at": 1794889148.3951292,
-    "approved_at": null
+    "updated_at": 1794961610.889809,
+    "approved_at": 1794961610.889809
   },
   {
     "job_id": "ce59b613-ef1",
