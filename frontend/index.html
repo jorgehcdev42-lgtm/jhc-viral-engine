@@ -1042,7 +1042,14 @@ body::after {
  <div class="card">
  <div class="card-header"><span class="card-icon">🔗</span><div class="card-title">Perfis por Plataforma</div></div>
  <div id="accounts-list"><div class="loading-state"><div class="loading-spinner"></div>Carregando contas...</div></div>
+	 <div class="card">
+	 <div class="card-header"><span class="card-icon">⚙️</span><div class="card-title">Controle da Fila de Publicação</div></div>
+	 <div id="queue-control"><div class="loading-state"><div class="loading-spinner"></div>Carregando...</div></div>
+	 </div>
  </div>
+	 <div class="card">
+	 <div class="card-header"><span class="card-icon">⚙️</span><div class="card-title">Controle da Fila de Publicação</div></div>
+	 </div>
  </div>
 
  <!-- ===== DIAGNOSTICS ===== -->
@@ -1656,7 +1663,7 @@ function loadPageData(page) {
  if (page === 'stories') loadStories();
  if (page === 'importer') loadImporter();
 if (page === 'url-import') loadUrlImport();
- if (page === 'accounts') loadAccounts();
+ if (page === 'accounts') { loadAccounts(); loadQueueControl(); }
 if (page === 'radar') loadRadar();
 if (page === 'ig-radar') loadInstagramRadar();
 if (page === 'assisted-pub') loadAssistedPub();
@@ -3164,6 +3171,45 @@ async function schedulePublish() {
  msg.innerHTML = '<div class="error-box">' + (data.detail || 'Erro ao agendar') + '</div>';
  }
  } catch(e) { msg.innerHTML = '<div class="error-box">' + e.message + '</div>'; }
+}
+
+async function loadQueueControl() {
+ const el = document.getElementById('queue-control');
+ if (!el) return;
+ try {
+ const data = await api('/api/queue/status');
+ if (data.error) { el.innerHTML = '<div class="empty-state">Erro: ' + data.error + '</div>'; return; }
+ const status = data.queue_status || 'stopped';
+ const colors = {running:'#4caf50',paused:'#ff9800',stopped:'#f44336'};
+ const labels = {running:'🟢 Rodando',paused:'🟡 Pausada',stopped:'🔴 Parada'};
+ const color = colors[status] || '#aaa';
+ const label = labels[status] || status;
+ const eligible = data.eligible_now || 0;
+ const active = data.active_jobs || 0;
+ const history = data.history_count || 0;
+ el.innerHTML = `<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+ <div style="flex:1;min-width:200px">
+ <div style="font-size:1.5rem;font-weight:700;color:${color}">${label}</div>
+ <div style="color:#aaa;font-size:0.85rem;margin-top:4px">Jobs ativos: ${active} | Elegíveis agora: ${eligible} | Histórico: ${history}</div>
+ </div>
+ <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+ <button class="btn btn-primary" onclick="queueAction('start')" ${status==='running'?'disabled':''}>▶ Iniciar</button>
+ <button class="btn btn-secondary" onclick="queueAction('pause')" ${status!=='running'?'disabled':''}>⏸ Pausar</button>
+ <button class="btn btn-secondary" onclick="queueAction('resume')" ${status!=='paused'?'disabled':''}>⏯ Retomar</button>
+ <button class="btn btn-danger" onclick="queueAction('stop')">⏹ Parar</button>
+ </div>
+ </div>`;
+ } catch(e) {
+ el.innerHTML = '<div class="empty-state">Erro ao carregar status da fila: ' + e.message + '</div>';
+ }
+}
+
+async function queueAction(action) {
+ try {
+ const data = await api('/api/queue/' + action, {method:'POST'});
+ if (data.error) { alert('Erro: ' + data.error); return; }
+ loadQueueControl();
+ } catch(e) { alert('Erro: ' + e.message); }
 }
 
 async function loadAccounts() {
