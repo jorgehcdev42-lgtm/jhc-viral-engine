@@ -651,6 +651,7 @@ body::after {
  <div class="nav-item" data-page="quality"><span class="nav-icon">✅</span> Quality Gate</div>
  <div class="nav-item" data-page="publishing"><span class="nav-icon">📡</span> Publicações</div>
 <div class="nav-item" data-page="accounts"><span class="nav-icon">🔗</span> Contas Conectadas</div>
+<div class="nav-item" data-page="setup"><span class="nav-icon">📋</span> Setup & Config</div>
  </div>
 
  <div class="nav-section">
@@ -1061,7 +1062,94 @@ body::after {
  <div class="card-header"><span class="card-icon">📡</span><div class="card-title">Monitor Radar YouTube</div></div>
  <div id="radar-monitor-panel"><div class="loading-state"><div class="loading-spinner"></div>Carregando...</div></div>
  </div>
- <!-- ===== DIAGNOSTICS ===== -->
+ 
+<!-- ===== SETUP & CONFIG ===== -->
+<div id="page-setup" class="page">
+<div class="page-header"><div class="page-title">📋 Setup & Configuração</div></div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">🔐</span><div class="card-title">Credenciais de Acesso</div></div>
+<div style="padding:1rem;color:#ccc;line-height:1.8">
+<strong>Dashboard:</strong> <code>admin</code> / <code>160669</code><br>
+<strong>URL Local (Mac):</strong> <code>http://localhost:8080</code><br>
+<strong>URL Mobile (Wi-Fi):</strong> <code>http://192.168.0.235:8080</code><br>
+<strong>API Backend:</strong> <code>http://192.168.0.235:8001</code>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">📱</span><div class="card-title">Acesso pelo Celular</div></div>
+<div style="padding:1rem;color:#ccc;line-height:1.8">
+1. MacBook e celular devem estar na <strong>mesma rede Wi-Fi</strong><br>
+2. No celular, abra o navegador e acesse: <code>http://192.168.0.235:8080</code><br>
+3. Faça login com <code>admin</code> / <code>160669</code><br>
+4. O MacBook precisa permanecer <strong>ligado e conectado</strong><br>
+5. Se o IP mudar (reinício do roteador), atualize a URL no celular<br>
+<strong>⚠️ Nota:</strong> O IP atual é detectado automaticamente. Se não funcionar, verifique seu IP com <code>ipconfig getifaddr en0</code> no Terminal.
+</div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">🔗</span><div class="card-title">Contas de Redes Sociais</div></div>
+<div style="padding:1rem;color:#ccc;line-height:1.8">
+<strong>Instagram:</strong> <code>@leonidagta6flashbr</code><br>
+<strong>TikTok:</strong> <code>@leonidagta6flashbr</code><br>
+<strong>YouTube:</strong> <code>@leonidagta6flashbr</code><br><br>
+<strong>Status:</strong> Configuradas (publicação assistida operacional)<br>
+<strong>Publicação Automática:</strong> Requer OAuth credentials (ver abaixo)
+</div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">🚀</span><div class="card-title">Publicação Real — OAuth Necessário</div></div>
+<div style="padding:1rem;color:#ccc;line-height:1.8">
+Para ativar publicação automática real, configure as credenciais OAuth:<br><br>
+<strong>▶️ YouTube:</strong><br>
+1. Acesse <a href="https://console.cloud.google.com" target="_blank" style="color:#4fc3f7">Google Cloud Console</a><br>
+2. Crie um projeto → Ative "YouTube Data API v3"<br>
+3. Crie credenciais OAuth 2.0 (Desktop app)<br>
+4. Salve client_id e client_secret em <code>data/publishing/credentials/youtube_oauth.json</code><br><br>
+<strong>📸 Instagram:</strong><br>
+1. Acesse <a href="https://developers.facebook.com" target="_blank" style="color:#4fc3f7">Meta for Developers</a><br>
+2. Crie app → Adicione produto "Instagram Graph API"<br>
+3. Gere Access Token de longa duração<br>
+4. Salve token em <code>data/publishing/credentials/instagram_token.txt</code><br><br>
+<strong>🎵 TikTok:</strong><br>
+1. Acesse <a href="https://developers.tiktok.com" target="_blank" style="color:#4fc3f7">TikTok for Developers</a><br>
+2. Aplique para "Content Posting API"<br>
+3. Após aprovação, obtenha client_key e client_secret<br>
+4. Salve em <code>data/publishing/credentials/tiktok_oauth.json</code>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">🍪</span><div class="card-title">Cookies do Instagram (para Radar)</div></div>
+<div style="padding:1rem;color:#ccc;line-height:1.8">
+O Radar Instagram requer cookies de sessão autenticada:<br><br>
+1. Abra o Safari → Faça login no instagram.com<br>
+2. Exporte cookies via extensão ou comando yt-dlp --cookies-from-browser safari<br>
+3. Salve cookies em <code>data/publishing/credentials/instagram_cookies.txt</code><br><br>
+<strong>Alternativa:</strong> Use a importação manual por URL na seção "Importar URL" quando o radar estiver bloqueado.
+</div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">⚙️</span><div class="card-title">Serviços e Portas</div></div>
+<div style="padding:1rem;color:#ccc;line-height:1.8">
+<strong>Frontend:</strong> Python HTTP Server porta <code>8080</code> (bind 0.0.0.0)<br>
+<strong>Backend:</strong> Uvicorn/FastAPI porta <code>8001</code> (bind 0.0.0.0)<br>
+<strong>AI Studios:</strong> Porta <code>8000</code> (preservado, não mexer)<br>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">📊</span><div class="card-title">Estado Atual do Sistema</div></div>
+<div id="setup-system-status"><div class="loading-state"><div class="loading-spinner"></div>Carregando...</div></div>
+</div>
+
+</div>
+
+<!-- ===== DIAGNOSTICS ===== -->
  <div id="page-diagnostics" class="page">
  <div class="page-header"><div class="page-title">Diagnóstico do Sistema</div></div>
  <div class="card">
@@ -1673,6 +1761,7 @@ function loadPageData(page) {
  if (page === 'importer') loadImporter();
 if (page === 'url-import') loadUrlImport();
  if (page === 'accounts') { loadAccounts(); loadQueueControl(); loadRadarMonitor(); }
+ if (page === 'setup') { loadSetupStatus(); }
 if (page === 'radar') loadRadar();
 if (page === 'ig-radar') loadInstagramRadar();
 if (page === 'assisted-pub') loadAssistedPub();
@@ -3243,6 +3332,25 @@ async function schedulePublish() {
  msg.innerHTML = '<div class="error-box">' + (data.detail || 'Erro ao agendar') + '</div>';
  }
  } catch(e) { msg.innerHTML = '<div class="error-box">' + e.message + '</div>'; }
+}
+
+async function loadSetupStatus() {
+ const el = document.getElementById('setup-system-status');
+ if (!el) return;
+ try {
+ const data = await api('/api/analytics/dashboard');
+ if (data.error) { el.innerHTML = '<div class="empty-state">Erro: ' + data.error + '</div>'; return; }
+ const cat = data.catalog || {};
+ const pipe = data.pipeline || {};
+ const radar = data.radar || {};
+ const byStatus = pipe.by_status || {};
+ el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.75rem">' +
+ '<div style="background:#1a1a2e;padding:0.75rem;border-radius:6px"><div style="color:#4fc3f7;font-size:1.5rem;font-weight:700">' + (cat.total_videos||0) + '</div><div style="color:#aaa;font-size:0.8rem">Vídeos</div></div>' +
+ '<div style="background:#1a1a2e;padding:0.75rem;border-radius:6px"><div style="color:#81c784;font-size:1.5rem;font-weight:700">' + (byStatus.completed||0) + '</div><div style="color:#aaa;font-size:0.8rem">Concluídos</div></div>' +
+ '<div style="background:#1a1a2e;padding:0.75rem;border-radius:6px"><div style="color:#ffb74d;font-size:1.5rem;font-weight:700">' + (byStatus.scheduled||0) + '</div><div style="color:#aaa;font-size:0.8rem">Agendados</div></div>' +
+ '<div style="background:#1a1a2e;padding:0.75rem;border-radius:6px"><div style="color:#ce93d8;font-size:1.5rem;font-weight:700">' + (radar.total_runs||0) + '</div><div style="color:#aaa;font-size:0.8rem">Buscas Radar</div></div>' +
+ '</div>';
+ } catch(e) { el.innerHTML = '<div class="empty-state">Erro: ' + e.message + '</div>'; }
 }
 
 async function loadRadarMonitor() {
