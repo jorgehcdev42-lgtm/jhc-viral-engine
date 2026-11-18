@@ -2627,3 +2627,79 @@ async def pipeline_stats():
     from src.production.pipeline import ProductionPipeline
     pipeline = ProductionPipeline(data_root="data")
     return pipeline.get_stats()
+
+
+# =============================================================================
+# MISSÃO 040 FASE 1 — Importação por URL (yt-dlp)
+# =============================================================================
+
+@app.post("/api/import/url/metadata")
+async def import_url_metadata(request: Request):
+    """Busca metadados de um vídeo por URL sem baixar."""
+    from src.media.url_importer import UrlImporter
+    body = await request.json()
+    url = body.get("url", "").strip()
+    if not url:
+        return JSONResponse(status_code=400, content={"detail": "url obrigatória"})
+    importer = UrlImporter()
+    meta = importer.fetch_metadata(url)
+    meta["is_duplicate"] = importer.is_duplicate(url)
+    return meta
+
+
+@app.post("/api/import/url/download")
+async def import_url_download(request: Request):
+    """Inicia download de vídeo por URL. Retorna imediatamente com status."""
+    import threading
+    from src.media.url_importer import UrlImporter
+
+    body = await request.json()
+    url = body.get("url", "").strip()
+    if not url:
+        return JSONResponse(status_code=400, content={"detail": "url obrigatória"})
+
+    importer = UrlImporter()
+
+    if importer.is_duplicate(url):
+        return {"status": "duplicate", "message": "URL já importada anteriormente"}
+
+    # Download em background para não bloquear a resposta
+    def _do_download():
+        try:
+            importer.download_video(url)
+        except Exception as e:
+            logger.error(f"Background download failed for {url}: {e}")
+
+    thread = threading.Thread(target=_do_download, daemon=True)
+    thread.start()
+
+    return {"status": "downloading", "message": "Download iniciado em background"}
+
+
+@app.get("/api/import/url/history")
+async def import_url_history(limit: int = 50, status: str = ""):
+    """Histórico de importações por URL."""
+    from src.media.url_importer import UrlImporter
+    importer = UrlImporter()
+    return importer.get_history(limit=limit, status_filter=status)
+
+
+@app.get("/api/import/url/stats")
+async def import_url_stats():
+    """Estatísticas de importação por URL."""
+    from src.media.url_importer import UrlImporter
+    importer = UrlImporter()
+    return importer.get_stats()
+
+
+@app.delete("/api/import/url/entry")
+async def import_url_delete(request: Request):
+    """Remove entrada do histórico e arquivo associado."""
+    from src.media.url_importer import UrlImporter
+    body = await request.json()
+    url = body.get("url", "").strip()
+    if not url:
+        return JSONResponse(status_code=400, content={"detail": "url obrigatória"})
+    importer = UrlImporter()
+    deleted = importer.delete_entry(url)
+    return {"deleted": deleted}

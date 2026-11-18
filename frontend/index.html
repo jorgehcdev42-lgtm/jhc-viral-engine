@@ -663,6 +663,7 @@ body::after {
 <div class="nav-item" data-page="dual-market"><span class="nav-icon">🌐</span> Dual Market</div>
 <div class="nav-item" data-page="ssd-library"><span class="nav-icon">💾</span> Biblioteca SSD</div>
 <div class="nav-item" data-page="importer"><span class="nav-icon">📥</span> Importador</div>
+<div class="nav-item" data-page="url-import"><span class="nav-icon">🔗</span> Importar URL</div>
  </div>
 
  <div class="nav-section">
@@ -1582,6 +1583,7 @@ function loadPageData(page) {
  if (page === 'clipper') loadClips();
  if (page === 'stories') loadStories();
  if (page === 'importer') loadImporter();
+if (page === 'url-import') loadUrlImport();
  if (page === 'audiovisual') loadAudioVisual();
  if (page === 'export') loadExportProfiles();
  if (page === 'browser-pub') loadBrowserPub();
@@ -2105,6 +2107,114 @@ async function loadImporter() {
  if (!list.error && list.length) {
  listEl.innerHTML = list.map(i => `<div style="padding:6px 0;border-bottom:1px solid #222"><strong>${i.title || i.name}</strong> — ${i.platform} | ${i.duration_sec}s | ${i.size_mb}MB</div>`).join('');
  } else { listEl.textContent = 'Nenhum vídeo importado.'; }
+}
+
+// === MISSÃO 040 FASE 1 — Importar por URL ===
+async function loadUrlImport() {
+ const main = document.getElementById('main-content');
+ main.innerHTML = `
+ <h2 style="margin-bottom:1rem">🔗 Importar Vídeo por URL</h2>
+ <div class="card" style="margin-bottom:1rem">
+ <div class="card-header"><span class="card-icon">📥</span><div class="card-title">Importar Vídeo</div></div>
+ <div style="padding:1rem">
+ <div style="display:flex;gap:8px;margin-bottom:1rem">
+ <input type="text" id="url-input" placeholder="Cole a URL do YouTube, Instagram, TikTok..." style="flex:1;padding:10px;background:#1a1a2e;border:1px solid #333;color:#fff;border-radius:6px;font-size:0.95rem">
+ <button class="btn btn-primary" onclick="fetchUrlMetadata()">🔍 Analisar</button>
+ </div>
+ <div id="url-metadata-result" style="min-height:40px"></div>
+ </div>
+ </div>
+ <div class="card" style="margin-bottom:1rem">
+ <div class="card-header"><span class="card-icon">📊</span><div class="card-title">Estatísticas</div><button class="btn btn-sm" onclick="refreshUrlStats()" style="margin-left:auto;font-size:0.75rem">↻</button></div>
+ <div id="url-import-stats" style="padding:1rem">Carregando...</div>
+ </div>
+ <div class="card">
+ <div class="card-header"><span class="card-icon">📜</span><div class="card-title">Histórico de Importações</div><button class="btn btn-sm" onclick="refreshUrlHistory()" style="margin-left:auto;font-size:0.75rem">↻</button></div>
+ <div id="url-import-history" style="padding:1rem">Carregando...</div>
+ </div>`;
+ refreshUrlStats();
+ refreshUrlHistory();
+}
+
+async function fetchUrlMetadata() {
+ const url = document.getElementById('url-input').value.trim();
+ const el = document.getElementById('url-metadata-result');
+ if (!url) { el.innerHTML = '<span style="color:#f44">Cole uma URL primeiro</span>'; return; }
+ el.innerHTML = '<span style="color:#aaa">⏳ Buscando metadados...</span>';
+ try {
+ const resp = await fetch(`${API}/api/import/url/metadata`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({url})
+ });
+ const data = await resp.json();
+ if (data.error) {
+ el.innerHTML = `<span style="color:#f44">❌ ${data.error}</span>`;
+ return;
+ }
+ const dup = data.is_duplicate;
+ const thumb = data.thumbnail ? `<img src="${data.thumbnail}" style="max-width:200px;border-radius:6px;margin-top:8px;display:block">` : '';
+ el.innerHTML = `
+ <div style="background:#1a1a2e;padding:12px;border-radius:8px;border:1px solid ${dup ? '#f44' : '#0f0'}33">
+ <strong style="font-size:1.1rem">${data.title || 'Sem título'}</strong><br>
+ <span style="color:#aaa">👤 ${data.author || '?'} | ⏱️ ${Math.round(data.duration||0)}s | 📐 ${data.resolution||'?'} | 🎬 ${data.platform||'?'}</span><br>
+ ${data.view_count ? `<span style="color:#aaa">👁️ ${Number(data.view_count).toLocaleString()} views</span><br>` : ''}
+ ${dup ? '<span style="color:#f44;font-weight:bold">⚠️ JÁ IMPORTADO ANTERIORMENTE</span>' : `<button class="btn btn-primary" onclick="startUrlDownload()" style="margin-top:8px">⬇️ Baixar Vídeo</button>`}
+ ${thumb}
+ </div>`;
+ } catch(e) {
+ el.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
+ }
+}
+
+async function startUrlDownload() {
+ const url = document.getElementById('url-input').value.trim();
+ const el = document.getElementById('url-metadata-result');
+ if (!url) return;
+ el.innerHTML = '<span style="color:#ff0">⏳ Download iniciado em background...</span>';
+ try {
+ const resp = await fetch(`${API}/api/import/url/download`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({url})
+ });
+ const data = await resp.json();
+ if (data.status === 'duplicate') {
+ el.innerHTML = '<span style="color:#f44">⚠️ URL já foi importada anteriormente</span>';
+ } else {
+ el.innerHTML = '<span style="color:#0f0">✅ Download iniciado! Verifique o histórico abaixo.</span>';
+ setTimeout(refreshUrlHistory, 3000);
+ setTimeout(refreshUrlStats, 3000);
+ }
+ } catch(e) {
+ el.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
+ }
+}
+
+async function refreshUrlStats() {
+ const el = document.getElementById('url-import-stats');
+ if (!el) return;
+ try {
+ const data = await api('/api/import/url/stats');
+ if (data._error || data.error) { el.textContent = 'Offline'; return; }
+ const plats = Object.entries(data.platforms||{}).map(([k,v])=>`${k}: ${v}`).join(', ') || 'nenhum';
+ el.innerHTML = `Total: ${data.total} | ✅ Completos: ${data.completed} | ❌ Falhas: ${data.failed} | 🔄 Duplicatas: ${data.duplicates}<br>💾 Tamanho total: ${data.total_size_mb}MB | Plataformas: ${plats}`;
+ } catch(e) { el.textContent = 'Erro ao carregar'; }
+}
+
+async function refreshUrlHistory() {
+ const el = document.getElementById('url-import-history');
+ if (!el) return;
+ try {
+ const list = await api('/api/import/url/history?limit=20');
+ if (!Array.isArray(list)) { el.textContent = 'Erro ao carregar'; return; }
+ if (!list.length) { el.textContent = 'Nenhuma importação ainda.'; return; }
+ el.innerHTML = '<table class="data-table"><thead><tr><th>Título</th><th>Plataforma</th><th>Status</th><th>Tamanho</th><th>Data</th></tr></thead><tbody>' +
+ list.map(h => {
+ const st = h.status === 'completed' ? '✅' : h.status === 'failed' ? '❌' : h.status === 'duplicate' ? '🔄' : '⏳';
+ const sz = h.file_size ? `${(h.file_size/1048576).toFixed(1)}MB` : '-';
+ const dt = h.imported_at ? new Date(h.imported_at).toLocaleString('pt-BR') : '-';
+ return `<tr><td>${(h.title||h.url||'?').substring(0,50)}</td><td>${h.platform||'?'}</td><td>${st} ${h.status}</td><td>${sz}</td><td>${dt}</td></tr>`;
+ }).join('') + '</tbody></table>';
+ } catch(e) { el.textContent = 'Erro ao carregar'; }
 }
 
 // === MISSÃO 017 — Audiovisual ===
