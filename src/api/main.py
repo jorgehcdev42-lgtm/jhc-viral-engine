@@ -1224,6 +1224,37 @@ async def youtube_auto_publish_status():
         "recent_logs": last_logs,
     }
 
+@app.post("/api/youtube/auto-publish/pause")
+async def youtube_auto_publish_pause(reason: str = Query("manual")):
+    """Pause the YouTube auto-publisher worker."""
+    queue_file = DATA_ROOT / "scheduler" / "publish_queue.json"
+    if not queue_file.exists():
+        return {"error": "No publish queue found"}
+    try:
+        q = json.loads(queue_file.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {"error": "Could not read queue"}
+    q["paused"] = True
+    q["pause_reason"] = reason
+    q["paused_at"] = time.time()
+    queue_file.write_text(json.dumps(q, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"status": "paused", "reason": reason}
+
+@app.post("/api/youtube/auto-publish/resume")
+async def youtube_auto_publish_resume():
+    """Resume the YouTube auto-publisher worker."""
+    queue_file = DATA_ROOT / "scheduler" / "publish_queue.json"
+    if not queue_file.exists():
+        return {"error": "No publish queue found"}
+    try:
+        q = json.loads(queue_file.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {"error": "Could not read queue"}
+    q["paused"] = False
+    q["pause_reason"] = None
+    q["resumed_at"] = time.time()
+    queue_file.write_text(json.dumps(q, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"status": "resumed"}
 
 @app.post("/api/autopublish/submit")
 async def autopublish_submit(

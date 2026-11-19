@@ -45,5 +45,12 @@
     "data/autoreel/output/0d13f09a230e_br_reels.mp4",
     "data/autoreel/output/e8096e670840_br_reels.mp4"
   ],
-  "total_eligible": 101
+  "total_eligible": 101,
+  "paused": false,
+  "pause_reason": null,
+  "published_hashes": [
+    "4fd65c793b9109c7"
+  ],
+  "paused_at": 1795069864.90722,
+  "resumed_at": 1795069864.989543
 }

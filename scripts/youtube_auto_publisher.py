@@ -193,6 +193,12 @@ def single_run(force: bool = False) -> dict:
         logger.info("Auto-publish disabled, skipping")
         return {"published": 0, "reason": "auto_publish_disabled"}
 
+    # Check pause flag
+    if queue.get("paused", False) and not force:
+        reason = queue.get("pause_reason", "unknown")
+        logger.info("Publisher paused (reason: %s), skipping", reason)
+        return {"published": 0, "reason": "paused", "pause_reason": reason}
+
     profile_id = queue.get("profile_id", "leonidagta6flashbr")
     max_per_day = queue.get("max_per_day", 3)
     schedule_hours = queue.get("schedule_hours", [11, 16, 20])
@@ -229,13 +235,23 @@ def single_run(force: bool = False) -> dict:
 
     logger.info("Channel verified: %s", channel_info)
 
-    # Publish next video
+    # Publish next video (with dedup by content hash)
+    import hashlib
     video_path = pending[0]
     if not Path(video_path).exists():
         logger.warning("Video file not found: %s", video_path)
         queue["pending"] = pending[1:]
         save_queue(queue)
         return {"published": 0, "error": "file_not_found"}
+
+    # Deduplication: skip if same content already published
+    published_hashes = set(queue.get("published_hashes", []))
+    file_hash = hashlib.sha256(Path(video_path).read_bytes()).hexdigest()[:16]
+    if file_hash in published_hashes:
+        logger.info("Skipping duplicate content (hash=%s): %s", file_hash, Path(video_path).name)
+        queue["pending"] = pending[1:]
+        save_queue(queue)
+        return {"published": 0, "reason": "duplicate_content", "hash": file_hash}
 
     video_filename = Path(video_path).name
     title, description, tags = generate_metadata(video_filename)
@@ -250,15 +266,17 @@ def single_run(force: bool = False) -> dict:
 
         logger.info("Published: %s -> %s", video_filename, result["url"])
 
-        # Update queue: remove from pending, add to published_today
+        # Update queue: remove from pending, add to published_today, record hash
         queue["pending"] = pending[1:]
         published_entry = {
             "video_id": video_id,
             "file": video_filename,
             "published_at": time.time(),
             "url": result["url"],
+            "content_hash": file_hash,
         }
         queue.setdefault("published_today", []).append(published_entry)
+        queue.setdefault("published_hashes", []).append(file_hash)
         save_queue(queue)
 
         # Update daily stats
