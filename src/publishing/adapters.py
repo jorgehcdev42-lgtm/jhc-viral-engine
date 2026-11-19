@@ -273,6 +273,12 @@ class TikTokAdapter(BaseAdapter):
             return PublishState.ERROR
 
     async def upload(self, job: PublishJob) -> PublishJob:
+        """Upload video via TikTok Content Posting API v2.
+
+        Flow: init publish → upload video bytes → poll status.
+        Requires approved app with video.publish + video.upload scopes.
+        Falls back to PERMISSION_REQUIRED if app not yet approved.
+        """
         state = await self.check_connection()
         if state != PublishState.CONNECTED:
             return PublishJob(**{
@@ -281,26 +287,160 @@ class TikTokAdapter(BaseAdapter):
                 "error_message": f"TikTok not connected: {state.value}",
             })
 
-        # TODO: Implement real TikTok Content Posting API
-        # POST https://open.tiktokapis.com/v2/post/publish/inbox/video/init/
-        # Then upload video bytes
-        # Note: May require app audit approval for Direct Post
+        token_path = self.credentials_dir / "tiktok_token.json"
+        try:
+            token_data = json.loads(token_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return PublishJob(**{**job.to_dict(), "state": PublishState.ERROR.value, "error_message": "Cannot read TikTok token"})
 
-        logger.info(
-            "TikTok upload prepared for %s (real API requires approved app + OAuth)",
-            job.title[:40],
-        )
-        return PublishJob(**{
-            **job.to_dict(),
-            "state": PublishState.PERMISSION_REQUIRED.value,
-            "error_message": "TikTok API integration ready — requires TikTok Developer app approval and OAuth token. See dashboard Connections page.",
-        })
+        access_token = token_data.get("access_token", "")
+        video_path = Path(job.video_path) if job.video_path else None
+
+        if not video_path or not video_path.exists():
+            return PublishJob(**{**job.to_dict(), "state": PublishState.FAILED.value, "error_message": f"Video file not found: {job.video_path}"})
+
+        file_size = video_path.stat().st_size
+        chunk_size = min(file_size, 10 * 1024 * 1024)  # max 10MB per chunk
+
+        # Step 1: Init publish
+        init_url = "https://open.tiktokapis.com/v2/post/publish/content/init/"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json; charset=UTF-8",
+        }
+
+        caption = job.description or ""
+        if job.tags:
+            tag_str = " ".join(f"#{t}" for t in job.tags[:30])
+            caption = f"{caption} {tag_str}".strip()
+
+        init_body = {
+            "post_info": {
+                "title": caption[:150],
+                "description": caption[:2200],
+                "privacy_level": "SELF_ONLY",  # Safe default; change to PUBLIC when app approved
+                "disable_comment": False,
+                "disable_duet": False,
+                "disable_stitch": False,
+            },
+            "source_info": {
+                "source": "FILE_UPLOAD",
+                "video_size": file_size,
+                "chunk_size": chunk_size,
+                "total_chunk_count": max(1, (file_size + chunk_size - 1) // chunk_size),
+            },
+        }
+
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                init_resp = await client.post(init_url, json=init_body, headers=headers)
+                init_data = init_resp.json()
+
+            if init_resp.status_code != 200 or init_data.get("data", {}).get("publish_id") is None:
+                error_msg = init_data.get("error", {}).get("message", str(init_data))
+                # App not approved → fall back gracefully
+                if "not_authorized" in error_msg.lower() or "permission" in error_msg.lower():
+                    return PublishJob(**{
+                        **job.to_dict(),
+                        "state": PublishState.PERMISSION_REQUIRED.value,
+                        "error_message": f"TikTok app not approved for Direct Post: {error_msg}",
+                    })
+                return PublishJob(**{**job.to_dict(), "state": PublishState.FAILED.value, "error_message": f"Init failed: {error_msg}"})
+
+            publish_id = init_data["data"]["publish_id"]
+            upload_url = init_data["data"].get("upload_url", "")
+
+            if not upload_url:
+                return PublishJob(**{**job.to_dict(), "state": PublishState.FAILED.value, "error_message": "No upload_url in init response"})
+
+            # Step 2: Upload video bytes
+            upload_headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "video/mp4",
+                "Content-Length": str(file_size),
+            }
+
+            async with httpx.AsyncClient(timeout=120) as client:
+                with open(video_path, "rb") as f:
+                    upload_resp = await client.put(upload_url, content=f.read(), headers=upload_headers)
+
+            if upload_resp.status_code not in (200, 201):
+                return PublishJob(**{
+                    **job.to_dict(),
+                    "state": PublishState.FAILED.value,
+                    "error_message": f"Upload failed: HTTP {upload_resp.status_code}",
+                    "remote_id": publish_id,
+                })
+
+            logger.info("TikTok upload complete: publish_id=%s", publish_id)
+            return PublishJob(**{
+                **job.to_dict(),
+                "state": PublishState.PROCESSING.value,
+                "remote_id": publish_id,
+                "published_url": "",  # Available after processing
+            })
+
+        except Exception as e:
+            logger.error("TikTok upload error: %s", e)
+            return PublishJob(**{**job.to_dict(), "state": PublishState.FAILED.value, "error_message": str(e)[:200]})
 
     async def poll_status(self, job: PublishJob) -> PublishJob:
+        """Poll TikTok publish status via /v2/post/publish/status/fetch/."""
         if job.state == PublishState.PUBLISHED.value:
             return job
-        # TODO: POST https://open.tiktokapis.com/v2/post/publish/status/fetch/
-        return job
+        if not job.remote_id:
+            return job
+
+        token_path = self.credentials_dir / "tiktok_token.json"
+        if not token_path.exists():
+            return job
+
+        try:
+            token_data = json.loads(token_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return job
+
+        access_token = token_data.get("access_token", "")
+        status_url = "https://open.tiktokapis.com/v2/post/publish/status/fetch/"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json; charset=UTF-8",
+        }
+        body = {"publish_id": job.remote_id}
+
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.post(status_url, json=body, headers=headers)
+                data = resp.json()
+
+            status_data = data.get("data", {})
+            status = status_data.get("status", "")
+            fail_reason = status_data.get("fail_reason", "")
+
+            if status == "PUBLISH_COMPLETE":
+                item_id = status_data.get("item_id", "")
+                published_url = f"https://www.tiktok.com/@user/video/{item_id}" if item_id else ""
+                return PublishJob(**{
+                    **job.to_dict(),
+                    "state": PublishState.PUBLISHED.value,
+                    "published_url": published_url,
+                    "remote_id": job.remote_id,
+                })
+            elif status == "FAILED":
+                return PublishJob(**{
+                    **job.to_dict(),
+                    "state": PublishState.FAILED.value,
+                    "error_message": f"TikTok publish failed: {fail_reason}",
+                    "remote_id": job.remote_id,
+                })
+            # SEND_TO_USER_INBOX, PROCESSING_DOWNLOAD, etc. → still processing
+            return job
+
+        except Exception as e:
+            logger.warning("TikTok poll_status error: %s", e)
+            return job
 
 
 # Adapter registry
