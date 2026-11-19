@@ -1256,6 +1256,121 @@ async def youtube_auto_publish_resume():
     queue_file.write_text(json.dumps(q, ensure_ascii=False, indent=2), encoding="utf-8")
     return {"status": "resumed"}
 
+
+@app.get("/api/tiktok/auto-publish/status")
+async def tiktok_auto_publish_status():
+    """Get TikTok hybrid publisher status for dashboard (Mission 020)."""
+    import subprocess
+    from pathlib import Path as _Path
+
+    queue_file = DATA_ROOT / "scheduler" / "publish_queue.json"
+    stats_file = DATA_ROOT / "scheduler" / "daily_stats.json"
+    token_path = DATA_ROOT / "credentials" / "leonidagta6flashbr" / "tiktok_token.json"
+    cookies_path = DATA_ROOT / "browser_sessions" / "tiktok_cookies.json"
+    log_file = _Path("/tmp/jhc_tiktok_publisher.log")
+
+    # API adapter state
+    api_state = "not_configured"
+    token_health = {"exists": False, "has_refresh": False, "expiry": None}
+    if token_path.exists():
+        try:
+            tdata = json.loads(token_path.read_text(encoding="utf-8"))
+            token_health["exists"] = True
+            token_health["has_refresh"] = bool(tdata.get("refresh_token"))
+            token_health["expiry"] = tdata.get("expires_at")
+            if tdata.get("access_token"):
+                expires = tdata.get("expires_at", 0)
+                if expires and time.time() > expires:
+                    api_state = "token_expired"
+                else:
+                    api_state = "connected"
+            else:
+                api_state = "auth_required"
+        except (json.JSONDecodeError, OSError):
+            api_state = "error"
+
+    # Browser session state
+    browser_session_active = cookies_path.exists()
+    browser_cookie_count = 0
+    if browser_session_active:
+        try:
+            cdata = json.loads(cookies_path.read_text(encoding="utf-8"))
+            browser_cookie_count = len(cdata) if isinstance(cdata, list) else 0
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Playwright installed check
+    playwright_available = False
+    try:
+        result = subprocess.run(
+            [str(_PROJECT_ROOT.parent / ".venv/bin/python3"), "-c", "from playwright.async_api import async_playwright; print('OK')"],
+            capture_output=True, text=True, timeout=10
+        )
+        playwright_available = "OK" in result.stdout
+    except Exception:
+        pass
+
+    # Queue state (shared with YouTube)
+    queue = {}
+    if queue_file.exists():
+        try:
+            queue = json.loads(queue_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Daily stats for TikTok
+    today = time.strftime("%Y-%m-%d")
+    key = f"leonidagta6flashbr:{today}"
+    daily = {"approved": 0, "failed": 0, "published_videos": []}
+    if stats_file.exists():
+        try:
+            all_stats = json.loads(stats_file.read_text(encoding="utf-8"))
+            daily = all_stats.get(key, daily)
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Count eligible TikTok videos
+    tiktok_videos = list((DATA_ROOT / "autoreel" / "output").glob("*_br_tiktok.mp4"))
+    eligible_count = sum(1 for v in tiktok_videos if v.stat().st_size > 100_000)
+
+    # Recent logs
+    last_logs = []
+    if log_file.exists():
+        try:
+            lines = log_file.read_text(encoding="utf-8").strip().split("\n")
+            last_logs = lines[-5:] if len(lines) >= 5 else lines
+        except OSError:
+            pass
+
+    # Hybrid method availability
+    api_available = api_state == "connected"
+    browser_available = browser_session_active and playwright_available
+    hybrid_ready = api_available or browser_available
+
+    return {
+        "platform": "tiktok",
+        "handle": "@leonidagta6flashbr",
+        "api_state": api_state,
+        "api_available": api_available,
+        "browser_session_active": browser_session_active,
+        "browser_cookie_count": browser_cookie_count,
+        "playwright_available": playwright_available,
+        "browser_available": browser_available,
+        "hybrid_ready": hybrid_ready,
+        "token_health": token_health,
+        "today": today,
+        "published_today": daily.get("approved", 0),
+        "failed_today": daily.get("failed", 0),
+        "published_video_ids": daily.get("published_videos", []),
+        "eligible_videos": eligible_count,
+        "total_tiktok_videos": len(tiktok_videos),
+        "max_per_day": queue.get("max_per_day", 3),
+        "auto_publish_enabled": queue.get("auto_publish", False),
+        "paused": queue.get("paused", False),
+        "recent_logs": last_logs,
+    }
+
+
 @app.post("/api/autopublish/submit")
 async def autopublish_submit(
     profile_id: str = Query(...),

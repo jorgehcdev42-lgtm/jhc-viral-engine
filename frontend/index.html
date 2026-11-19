@@ -1118,7 +1118,17 @@ body::after {
  </div>
  </div>
 
- <!-- ===== CONTAS CONECTADAS ===== -->
+ 
+ <!-- ===== TIKTOK HYBRID PUBLISHER PANEL (MISSAO 020) ===== -->
+ <div class="card" style="border:1px solid #00f2ea;border-radius:12px">
+ <div class="card-header"><span class="card-icon">🎵</span><div class="card-title" style="color:#00f2ea">TikTok Hybrid Publisher — @leonidagta6flashbr</div></div>
+ <div id="tt-auto-status"><div class="loading-state"><div class="loading-spinner"></div>Carregando status...</div></div>
+ <div id="tt-auto-controls" style="display:none;margin-top:1rem;gap:0.5rem;flex-wrap:wrap">
+ <button class="btn btn-secondary" onclick="loadTtAutoStatus()">🔄 Atualizar</button>
+ </div>
+ </div>
+
+<!-- ===== CONTAS CONECTADAS ===== -->
  <div id="page-accounts" class="page">
  <div class="page-header"><div class="page-title">Contas Conectadas</div></div>
  <div class="card">
@@ -4268,6 +4278,71 @@ document.addEventListener('DOMContentLoaded', () => {
  loadYtAutoStatus();
  }
 });
+
+// ===== TIKTOK HYBRID PUBLISHER DASHBOARD (MISSAO 020) =====
+async function loadTtAutoStatus() {
+ const container = document.getElementById('tt-auto-status');
+ const controls = document.getElementById('tt-auto-controls');
+ try {
+ const resp = await fetch('/api/tiktok/auto-publish/status');
+ if (!resp.ok) { container.innerHTML = '<div class="empty-state" style="color:#ff4444">Erro ao carregar status TikTok</div>'; return; }
+ const d = await resp.json();
+
+ const apiColor = d.api_available ? '#00C851' : '#ffaa00';
+ const browserColor = d.browser_available ? '#00C851' : '#ffaa00';
+ const hybridColor = d.hybrid_ready ? '#00C851' : '#ff4444';
+ const pausedBadge = d.paused
+ ? '<span style="background:#ff4444;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.75rem;margin-left:8px">PAUSADO</span>'
+ : '<span style="background:#00C851;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.75rem;margin-left:8px">ATIVO</span>';
+
+ let videosHtml = '';
+ if (d.published_video_ids && d.published_video_ids.length > 0) {
+ videosHtml = d.published_video_ids.map(vid =>
+ `<a href="https://www.tiktok.com/@user/video/${vid}" target="_blank" style="color:#00f2ea;text-decoration:none;display:block;margin:2px 0">▶ ${vid}</a>`
+ ).join('');
+ } else {
+ videosHtml = '<span style="color:#888">Nenhum video publicado hoje</span>';
+ }
+
+ let logsHtml = '';
+ if (d.recent_logs && d.recent_logs.length > 0) {
+ logsHtml = d.recent_logs.map(l => `<div style="font-family:monospace;font-size:0.7rem;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l}</div>`).join('');
+ }
+
+ container.innerHTML = `
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1rem">
+ <div style="background:#1a1a2e;padding:1rem;border-radius:8px">
+ <div style="font-size:0.7rem;color:#888;text-transform:uppercase">API Oficial</div>
+ <div style="color:${apiColor};font-weight:bold;font-size:1.1rem">${d.api_available ? '🟢 Conectada' : '🟡 ' + d.api_state}${pausedBadge}</div>
+ <div style="font-size:0.75rem;color:#666">Token: ${d.token_health.exists ? '✅' : '❌'} | Refresh: ${d.token_health.has_refresh ? '✅' : '❌'}</div>
+ </div>
+ <div style="background:#1a1a2e;padding:1rem;border-radius:8px">
+ <div style="font-size:0.7rem;color:#888;text-transform:uppercase">Playwright Browser</div>
+ <div style="color:${browserColor};font-weight:bold;font-size:1.1rem">${d.browser_available ? '🟢 Pronto' : '🟡 Indisponivel'}</div>
+ <div style="font-size:0.75rem;color:#666">Sessao: ${d.browser_session_active ? '✅' : '❌'} | PW: ${d.playwright_available ? '✅' : '❌'} | Cookies: ${d.browser_cookie_count}</div>
+ </div>
+ <div style="background:#1a1a2e;padding:1rem;border-radius:8px">
+ <div style="font-size:0.7rem;color:#888;text-transform:uppercase">Modo Hibrido</div>
+ <div style="color:${hybridColor};font-weight:bold;font-size:1.2rem">${d.hybrid_ready ? '✅ PRONTO' : '❌ BLOQUEADO'}</div>
+ <div style="font-size:0.75rem;color:#666">Metodo: ${d.api_available ? 'API prioritaria' : (d.browser_available ? 'Playwright fallback' : 'Nenhum disponivel')}</div>
+ </div>
+ <div style="background:#1a1a2e;padding:1rem;border-radius:8px">
+ <div style="font-size:0.7rem;color:#888;text-transform:uppercase">Videos</div>
+ <div style="color:#fff;font-weight:bold;font-size:1.2rem">${d.eligible_videos} elegiveis</div>
+ <div style="font-size:0.75rem;color:#666">Total: ${d.total_tiktok_videos} | Publicados hoje: ${d.published_today}/${d.max_per_day}</div>
+ </div>
+ <div style="background:#1a1a2e;padding:1rem;border-radius:8px">
+ <div style="font-size:0.7rem;color:#888;text-transform:uppercase">Publicacoes Hoje</div>
+ <div style="margin-top:4px">${videosHtml}</div>
+ </div>
+ </div>
+ ${logsHtml ? '<div style="background:#0d0d1a;padding:0.75rem;border-radius:8px;margin-top:0.5rem"><div style="font-size:0.7rem;color:#666;margin-bottom:4px">LOGS RECENTES</div>' + logsHtml + '</div>' : ''}
+ `;
+ controls.style.display = 'flex';
+ } catch (e) {
+ container.innerHTML = `<div class="empty-state" style="color:#ff4444">Erro: ${e.message}</div>`;
+ }
+}
 </script>
 </body>
 </html>
