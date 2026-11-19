@@ -202,7 +202,8 @@ class OAuthManager:
                 "scope": ",".join(config["scopes"]),
                 "response_type": "code",
                 "state": state,
-                "code_verifier": code_verifier,
+                "code_challenge": code_challenge,
+                "code_challenge_method": "S256",
             }
 
         auth_url = f"{config['auth_url']}?{urllib.parse.urlencode(params)}"
@@ -340,10 +341,40 @@ class OAuthManager:
 
         if platform == "instagram":
             access_token = token_response.get("access_token", "")
-            # Instagram short-lived tokens need exchange for long-lived
             user_id = token_response.get("user_id", "")
             account_id = str(user_id)
             expires_in = 3600  # Short-lived: 1 hour
+
+            # Exchange short-lived token for long-lived (60 days) via fb_exchange_token
+            client_secret = os.environ.get(config["client_secret_env"], "")
+            if client_secret and access_token:
+                try:
+                    import httpx as _httpx
+                    exchange_resp = _httpx.get(
+                        "https://graph.facebook.com/v21.0/oauth/access_token",
+                        params={
+                            "grant_type": "fb_exchange_token",
+                            "client_id": client_id,
+                            "client_secret": client_secret,
+                            "fb_exchange_token": access_token,
+                        },
+                        timeout=30,
+                    )
+                    exchange_data = exchange_resp.json()
+                    if "access_token" in exchange_data:
+                        access_token = exchange_data["access_token"]
+                        expires_in = exchange_data.get("expires_in", 5184000)  # 60 days
+                        logger.info(
+                            "Instagram token exchanged: short-lived → long-lived (%ds)",
+                            expires_in,
+                        )
+                    else:
+                        logger.warning(
+                            "Instagram token exchange failed: %s",
+                            json.dumps(exchange_data)[:200],
+                        )
+                except Exception as exc:
+                    logger.warning("Instagram token exchange error: %s", str(exc)[:200])
         elif platform == "youtube":
             access_token = token_response.get("access_token", "")
             refresh_token = token_response.get("refresh_token", "")

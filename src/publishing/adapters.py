@@ -141,11 +141,14 @@ class InstagramAdapter(BaseAdapter):
     PLATFORM = "instagram"
 
     async def check_connection(self) -> PublishState:
-        token_path = self.credentials_dir / "instagram_token.json"
-        if not token_path.exists():
+        # OAuth saves to instagram_oauth.json; legacy path was instagram_token.json
+        token_path = self.credentials_dir / "instagram_oauth.json"
+        legacy_path = self.credentials_dir / "instagram_token.json"
+        path = token_path if token_path.exists() else legacy_path
+        if not path.exists():
             return PublishState.AUTH_REQUIRED
         try:
-            data = json.loads(token_path.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8"))
             expires = data.get("expires_at", 0)
             if expires and time.time() > expires:
                 return PublishState.TOKEN_EXPIRED

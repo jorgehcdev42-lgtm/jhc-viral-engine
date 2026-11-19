@@ -32,8 +32,8 @@ from src.core.profile_config import ProfileConfig
 
 logger = logging.getLogger(__name__)
 
-GRAPH_API_VERSION = "v27.0"
-BASE_URL = "https://graph.instagram.com"
+GRAPH_API_VERSION = "v21.0"
+BASE_URL = "https://graph.facebook.com"
 MAX_POLL_ATTEMPTS = 5
 POLL_INTERVAL_SECONDS = 60
 
@@ -61,6 +61,22 @@ class InstagramPublisher:
         self.profile = profile
         self.access_token = profile.publishing.access_token
         self.ig_user_id = profile.publishing.instagram_account_id
+
+        # Fallback: read from OAuth credentials file if ProfileConfig lacks token
+        if not self.access_token or not self.ig_user_id:
+            import json as _json
+            oauth_path = Path("data/credentials") / profile.profile_id / "instagram_oauth.json"
+            if oauth_path.exists():
+                try:
+                    creds = _json.loads(oauth_path.read_text(encoding="utf-8"))
+                    self.access_token = self.access_token or creds.get("access_token", "")
+                    self.ig_user_id = self.ig_user_id or creds.get("account_id", "")
+                    logger.info(
+                        "InstagramPublisher loaded OAuth creds: account=%s",
+                        self.ig_user_id,
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to load OAuth creds: %s", exc)
 
     async def publish_reel(
         self,
