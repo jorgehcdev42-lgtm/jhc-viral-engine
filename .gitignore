@@ -94,3 +94,6 @@ LOGOS E FOTOS DE CAPA E PERFIL/
 # Browser sessions — NEVER commit platform credentials or cookies
 data/browser_sessions/
 data/.jwt_secret
+data/credentials/
+data/publishing/credentials/
+data/publishing/tokens/

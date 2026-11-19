@@ -1061,7 +1061,7 @@ async def check_connection(profile_id: str, platform: str):
 async def oauth_start(
     profile_id: str,
     platform: str,
-    redirect_base: str = Query("http://127.0.0.1:8765"),
+    redirect_base: str = Query("http://127.0.0.1:8001"),
 ):
     """Generate OAuth authorization URL with PKCE for profile + platform."""
     from src.publishing.oauth import OAuthManager
@@ -1100,7 +1100,15 @@ async def get_all_oauth_connections():
     """Get connection states for all active profiles × all platforms."""
     from src.publishing.oauth import OAuthManager
     manager = OAuthManager(DATA_ROOT)
-    return manager.get_all_connections(["gta6-br", "gta6-global"])
+    # Include all known profiles + any with stored credentials on disk
+    known_profiles = ["gta6-br", "gta6-global", "leonidagta6flashbr"]
+    # Auto-discover additional profiles from credentials directory
+    creds_dir = DATA_ROOT / "credentials"
+    if creds_dir.exists():
+        for p in creds_dir.iterdir():
+            if p.is_dir() and p.name not in known_profiles:
+                known_profiles.append(p.name)
+    return manager.get_all_connections(known_profiles)
 
 # --- AutoPublish Scheduler Endpoints (PRIORIDADE 3+4) ---
 

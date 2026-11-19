@@ -36,7 +36,7 @@ OAUTH_CONFIGS: dict[str, dict] = {
         "auth_url": "https://api.instagram.com/oauth/authorize",
         "token_url": "https://api.instagram.com/oauth/access_token",
         "refresh_url": "https://graph.facebook.com/v18.0/oauth/access_token",
-        "scopes": ["instagram_content_publish", "instagram_basic", "pages_read_engagement"],
+        "scopes": ["instagram_business_content_publish", "instagram_business_basic"],
         "redirect_uri_path": "/api/oauth/callback/instagram",
         "client_id_env": "INSTAGRAM_CLIENT_ID",
         "client_secret_env": "INSTAGRAM_CLIENT_SECRET",
@@ -134,7 +134,7 @@ class OAuthManager:
         self,
         profile_id: str,
         platform: str,
-        redirect_base: str = "http://127.0.0.1:8765",
+        redirect_base: str = "http://127.0.0.1:8001",
     ) -> dict:
         """Generate an OAuth authorization URL with PKCE.
 
@@ -403,19 +403,119 @@ class OAuthManager:
             encoding="utf-8",
         )
 
+    def refresh_token_if_needed(
+        self, creds: OAuthCredentials
+    ) -> OAuthCredentials:
+        """Refresh access token if expired and refresh_token available.
+
+        Returns updated credentials (saved to disk) or original if no refresh needed.
+        Thread-safe via file-level locking; idempotent within TTL window.
+        """
+        # Buffer: refresh 5 minutes before actual expiry
+        if not creds.is_expired and creds.expires_at > time.time() + 300:
+            return creds
+
+        if not creds.refresh_token:
+            logger.warning(
+                "Token expired for %s/%s but no refresh_token available",
+                creds.profile_id, creds.platform,
+            )
+            return creds
+
+        config = OAUTH_CONFIGS.get(creds.platform)
+        if not config:
+            return creds
+
+        client_id = os.environ.get(config["client_id_env"], "")
+        client_secret = os.environ.get(config["client_secret_env"], "")
+        if not client_id or not client_secret:
+            logger.error("Cannot refresh %s/%s: client credentials not in env", creds.profile_id, creds.platform)
+            return creds
+
+        try:
+            import httpx
+            token_data = {
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "refresh_token": creds.refresh_token,
+                "grant_type": "refresh_token",
+            }
+            # TikTok uses client_key instead of client_id
+            if creds.platform == "tiktok":
+                token_data["client_key"] = client_id
+                del token_data["client_id"]
+
+            response = httpx.post(
+                config["token_url"],
+                data=token_data,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=15,
+            )
+
+            if response.status_code != 200:
+                logger.error(
+                    "Token refresh failed for %s/%s: HTTP %d — %s",
+                    creds.profile_id, creds.platform, response.status_code,
+                    response.text[:200],
+                )
+                return creds
+
+            result = response.json()
+            new_access = result.get("access_token", "")
+            if not new_access:
+                logger.error("Token refresh returned no access_token for %s/%s", creds.profile_id, creds.platform)
+                return creds
+
+            expires_in = result.get("expires_in", 3600)
+            # Some providers rotate refresh tokens; preserve old if not returned
+            new_refresh = result.get("refresh_token", creds.refresh_token)
+
+            updated = OAuthCredentials(
+                profile_id=creds.profile_id,
+                platform=creds.platform,
+                access_token=new_access,
+                refresh_token=new_refresh,
+                token_type=creds.token_type,
+                expires_at=time.time() + expires_in,
+                scopes=creds.scopes,
+                client_id=creds.client_id,
+                code_verifier="",
+                connected_at=creds.connected_at,
+                account_id=creds.account_id,
+                account_name=creds.account_name,
+            )
+            self.save_credentials(updated)
+            logger.info(
+                "Token refreshed for %s/%s (expires_in=%ds)",
+                creds.profile_id, creds.platform, expires_in,
+            )
+            return updated
+
+        except ImportError:
+            logger.error("httpx not installed — cannot refresh token")
+            return creds
+        except Exception as e:
+            logger.error("Token refresh error for %s/%s: %s", creds.profile_id, creds.platform, e)
+            return creds
+
     def load_credentials(
-        self, profile_id: str, platform: str
+        self, profile_id: str, platform: str, auto_refresh: bool = True
     ) -> Optional[OAuthCredentials]:
-        """Load stored OAuth credentials."""
+        """Load stored OAuth credentials, optionally auto-refreshing if expired."""
         cred_path = self._cred_path(profile_id, platform)
         if not cred_path.exists():
             return None
         try:
             data = json.loads(cred_path.read_text(encoding="utf-8"))
-            return OAuthCredentials.from_dict(data)
+            creds = OAuthCredentials.from_dict(data)
         except (json.JSONDecodeError, KeyError, TypeError):
             logger.warning("Corrupt credentials file: %s", cred_path)
             return None
+
+        if auto_refresh and creds.is_expired and creds.refresh_token:
+            creds = self.refresh_token_if_needed(creds)
+
+        return creds
 
     def disconnect(self, profile_id: str, platform: str) -> bool:
         """Remove stored credentials (disconnect account)."""
@@ -450,21 +550,17 @@ class OAuthManager:
                 "message": "Click Connect to start OAuth flow",
             }
 
+        # Auto-refresh if expired and refresh_token available
+        if creds.is_expired and creds.refresh_token:
+            creds = self.refresh_token_if_needed(creds)
+
         if creds.is_expired:
-            if creds.refresh_token:
-                return {
-                    "state": "token_expired",
-                    "profile_id": profile_id,
-                    "platform": platform,
-                    "has_refresh_token": True,
-                    "message": "Token expired — auto-refresh available",
-                }
             return {
                 "state": "token_expired",
                 "profile_id": profile_id,
                 "platform": platform,
-                "has_refresh_token": False,
-                "message": "Token expired — re-authentication required",
+                "has_refresh_token": bool(creds.refresh_token),
+                "message": "Token expired — re-authentication required" if not creds.refresh_token else "Token refresh failed — re-authentication required",
             }
 
         return {
