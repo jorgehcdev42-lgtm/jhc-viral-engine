@@ -1119,6 +1119,112 @@ async def autopublish_status():
     scheduler = AutoPublishScheduler(DATA_ROOT)
     return scheduler.get_status_summary()
 
+
+@app.get("/api/youtube/auto-publish/status")
+async def youtube_auto_publish_status():
+    """Get YouTube auto-publisher worker status for dashboard."""
+    import subprocess
+    from pathlib import Path as _Path
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+
+    BRAZIL_TZ = _tz(_td(hours=-3))
+    queue_file = DATA_ROOT / "scheduler" / "publish_queue.json"
+    stats_file = DATA_ROOT / "scheduler" / "daily_stats.json"
+    log_file = _Path("/tmp/jhc_yt_publisher.log")
+
+    # Worker process check
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", "youtube_auto_publisher.*daemon"],
+            capture_output=True, text=True, timeout=5
+        )
+        worker_running = bool(result.stdout.strip())
+        worker_pid = result.stdout.strip().split("\n")[0] if worker_running else None
+    except Exception:
+        worker_running = False
+        worker_pid = None
+
+    # Launchd status
+    try:
+        result = subprocess.run(
+            ["launchctl", "list", "com.jhc.youtube-publisher"],
+            capture_output=True, text=True, timeout=5
+        )
+        launchd_active = result.returncode == 0
+    except Exception:
+        launchd_active = False
+
+    # Queue state
+    queue = {}
+    if queue_file.exists():
+        try:
+            queue = json.loads(queue_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Daily stats
+    today = _dt.now(BRAZIL_TZ).strftime("%Y-%m-%d")
+    key = f"leonidagta6flashbr:{today}"
+    daily = {"approved": 0, "failed": 0, "published_videos": []}
+    if stats_file.exists():
+        try:
+            all_stats = json.loads(stats_file.read_text(encoding="utf-8"))
+            daily = all_stats.get(key, daily)
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Last log lines
+    last_logs = []
+    if log_file.exists():
+        try:
+            lines = log_file.read_text(encoding="utf-8").strip().split("\n")
+            last_logs = lines[-5:] if len(lines) >= 5 else lines
+        except OSError:
+            pass
+
+    # OAuth token health
+    token_path = DATA_ROOT / "credentials" / "leonidagta6flashbr" / "youtube_oauth.json"
+    token_health = {"exists": token_path.exists(), "has_refresh": False, "expiry": None}
+    if token_path.exists():
+        try:
+            tdata = json.loads(token_path.read_text(encoding="utf-8"))
+            token_health["has_refresh"] = bool(tdata.get("refresh_token"))
+            token_health["expiry"] = tdata.get("expiry")
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Next scheduled hour
+    schedule_hours = queue.get("schedule_hours", [11, 16, 20])
+    now_hour = _dt.now(BRAZIL_TZ).hour
+    next_slot = None
+    for h in sorted(schedule_hours):
+        if h > now_hour:
+            next_slot = h
+            break
+    if next_slot is None and schedule_hours:
+        next_slot = schedule_hours[0]  # wraps to first slot tomorrow
+
+    return {
+        "worker_running": worker_running,
+        "worker_pid": worker_pid,
+        "launchd_active": launchd_active,
+        "auto_publish_enabled": queue.get("auto_publish", False),
+        "channel_id": queue.get("channel_id", ""),
+        "max_per_day": queue.get("max_per_day", 3),
+        "schedule_hours": schedule_hours,
+        "next_scheduled_hour": next_slot,
+        "timezone": queue.get("timezone", "America/Sao_Paulo"),
+        "today": today,
+        "published_today": daily.get("approved", 0),
+        "failed_today": daily.get("failed", 0),
+        "published_video_ids": daily.get("published_videos", []),
+        "pending_count": len(queue.get("pending", [])),
+        "total_eligible": queue.get("total_eligible", 0),
+        "token_health": token_health,
+        "recent_logs": last_logs,
+    }
+
+
 @app.post("/api/autopublish/submit")
 async def autopublish_submit(
     profile_id: str = Query(...),
