@@ -694,6 +694,7 @@ body::after {
  <div class="sidebar-brand">
  <div class="brand-title">Leonida GTA VI Flash</div>
  <div class="brand-subtitle">JHC Viral Engine</div>
+ <div style="margin-top:6px;font-size:0.7rem;opacity:0.6"><a href="/terms.html" style="color:inherit;text-decoration:none;margin-right:8px">Termos de Uso</a> | <a href="/privacy.html" style="color:inherit;text-decoration:none;margin-left:8px">Política de Privacidade</a></div>
  <div class="brand-version">✦ v1.0 · Dual Market ✦</div>
  </div>
 
@@ -3730,6 +3731,24 @@ async function queueAction(action) {
  } catch(e) { alert('Erro: ' + e.message); }
 }
 
+async function connectOAuth(platform) {
+ try {
+ const data = await api('/api/oauth/start/leonidagta6flashbr/' + platform + '?redirect_base=' + window.location.origin.replace(/:\d+$/, ':8001'));
+ if (data.error) { alert('Erro OAuth: ' + data.error); return; }
+ if (data.url) { window.open(data.url, '_blank'); }
+ else { alert('URL de autorização não gerada.'); }
+ } catch(e) { alert('Erro ao iniciar OAuth: ' + e.message); }
+}
+
+async function disconnectOAuth(platform) {
+ if (!confirm('Desconectar ' + platform + '?')) return;
+ try {
+ const data = await api('/api/oauth/disconnect/leonidagta6flashbr/' + platform, {method:'POST'});
+ if (data.error) { alert('Erro: ' + data.error); return; }
+ loadAccounts();
+ } catch(e) { alert('Erro: ' + e.message); }
+}
+
 async function loadAccounts() {
  const el = document.getElementById('accounts-list');
  if (!el) return;
@@ -3750,11 +3769,15 @@ async function loadAccounts() {
  const verified = acc.last_verified ? new Date(acc.last_verified).toLocaleString('pt-BR') : 'Nunca';
  const statusColor = status === 'connected' ? '#4caf50' : status === 'configured' ? '#ff9800' : '#f44336';
  const statusLabel = status === 'connected' ? 'Conectado' : status === 'configured' ? 'Configurado' : 'Não configurado';
+ const connectBtn = status === 'connected'
+ ? `<button onclick="disconnectOAuth('${p.key}')" style="background:#f44336;color:#fff;border:none;border-radius:4px;padding:0.4rem 0.8rem;font-size:0.75rem;cursor:pointer;margin-top:0.3rem">Desconectar</button>`
+ : `<button onclick="connectOAuth('${p.key}')" style="background:#4caf50;color:#fff;border:none;border-radius:4px;padding:0.4rem 0.8rem;font-size:0.75rem;cursor:pointer;margin-top:0.3rem">🔗 Conectar</button>`;
  html += `<div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:1rem;display:flex;align-items:center;gap:1rem">
  <span style="font-size:2rem">${p.icon}</span>
  <div style="flex:1">
  <div style="font-weight:600;color:#fff">${p.name}</div>
  <div style="color:#aaa;font-size:0.85rem">${handle}</div>
+ ${connectBtn}
  </div>
  <div style="text-align:right">
  <div style="color:${statusColor};font-weight:600;font-size:0.85rem">${statusLabel}</div>

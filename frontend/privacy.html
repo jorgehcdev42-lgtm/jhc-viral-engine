@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Política de Privacidade — JHC Viral Engine</title>
+<style>
+:root{--bg:#0f1117;--surface:#1a1d27;--text:#e4e4e7;--muted:#9ca3af;--accent:#f59e0b;--border:#2d3348}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;padding:2rem 1rem}
+.container{max-width:800px;margin:0 auto}
+h1{font-size:2rem;color:var(--accent);margin-bottom:.5rem}
+.updated{color:var(--muted);font-size:.875rem;margin-bottom:2rem}
+h2{font-size:1.25rem;color:var(--accent);margin:2rem 0 .75rem;border-bottom:1px solid var(--border);padding-bottom:.5rem}
+p,li{margin-bottom:.75rem;font-size:.95rem}
+ul{padding-left:1.5rem}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.footer{margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--border);color:var(--muted);font-size:.8rem;text-align:center}
+.footer a{margin:0 .5rem}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Política de Privacidade</h1>
+<p class="updated">Última atualização: 19 de novembro de 2026</p>
+
+<h2>1. Introdução</h2>
+<p>Esta Política de Privacidade descreve como o <strong>JHC Viral Engine</strong> ("Serviço") coleta, usa, armazena e protege informações quando você utiliza nossa plataforma de automação de conteúdo digital.</p>
+<p>O Serviço é operado por Jorge Henrique Custódio ("Operador", "nós"). Ao utilizar o Serviço, você concorda com as práticas descritas nesta política.</p>
+
+<h2>2. Informações que Coletamos</h2>
+
+<h3>2.1 Informações Fornecidas por Você</h3>
+<ul>
+<li><strong>Credenciais de Login:</strong> nome de usuário e senha para acesso ao dashboard (armazenados com hash seguro).</li>
+<li><strong>Dados de Contas Conectadas:</strong> identificadores de perfil, nomes de canal/conta e tokens OAuth 2.0 das plataformas que você autorizar (YouTube, Instagram, TikTok).</li>
+<li><strong>Preferências de Configuração:</strong> palavras-chave do radar viral, perfis ativos, configurações de publicação.</li>
+</ul>
+
+<h3>2.2 Informações Coletadas Automaticamente</h3>
+<ul>
+<li><strong>Metadados de Vídeos:</strong> títulos, descrições, thumbnails, contadores de visualizações e curtidas obtidos via APIs públicas das plataformas.</li>
+<li><strong>Logs de Operação:</strong> registros de importações, produções, publicações e erros para diagnóstico e auditoria.</li>
+<li><strong>Dados de Navegação:</strong> endereço IP, tipo de navegador e páginas acessadas no dashboard (coletados pelo provedor de hospedagem Netlify).</li>
+</ul>
+
+<h3>2.3 Informações que NÃO Coletamos</h3>
+<ul>
+<li>Não coletamos dados bancários, cartões de crédito ou informações financeiras.</li>
+<li>Não rastreamos sua atividade fora do Serviço.</li>
+<li>Não vendemos, alugamos ou compartilhamos dados pessoais com terceiros para fins comerciais.</li>
+</ul>
+
+<h2>3. Como Usamos Suas Informações</h2>
+<ul>
+<li><strong>Fornecer o Serviço:</strong> autenticar seu acesso, conectar contas de redes sociais, executar buscas, importar vídeos, produzir cortes e publicar conteúdo conforme suas instruções.</li>
+<li><strong>Manutenção e Segurança:</strong> detectar falhas, prevenir acesso não autorizado, renovar tokens OAuth automaticamente.</li>
+<li><strong>Melhoria do Serviço:</strong> analisar padrões de uso agregados e anônimos para aprimorar funcionalidades.</li>
+<li><strong>Comunicação:</strong> responder a solicitações de suporte enviadas por email.</li>
+</ul>
+
+<h2>4. Tokens OAuth e Credenciais de Plataformas</h2>
+<p>Quando você conecta uma conta de rede social via OAuth 2.0:</p>
+<ul>
+<li><strong>Tokens de Acesso:</strong> são armazenados exclusivamente no servidor do Operador, em arquivos JSON protegidos por permissões de sistema operacional restritas (<code>chmod 600</code>). Nunca são expostos no frontend, em logs públicos ou em repositórios de código.</li>
+<li><strong>Refresh Tokens:</strong> são utilizados para renovar automaticamente o acesso sem exigir nova autorização. São armazenados com as mesmas proteções dos tokens de acesso.</li>
+<li><strong>Escopos:</strong> solicitamos apenas as permissões mínimas necessárias para cada funcionalidade (ex: <code>youtube.upload</code> e <code>youtube.readonly</code> para publicação no YouTube).</li>
+<li><strong>Revogação:</strong> você pode desconectar qualquer conta a qualquer momento pelo dashboard, o que remove imediatamente todos os tokens associados. Também pode revogar o acesso diretamente nas configurações de segurança da plataforma (Google, Meta, TikTok).</li>
+</ul>
+
+<h2>5. Armazenamento e Retenção de Dados</h2>
+<ul>
+<li><strong>Vídeos Importados:</strong> armazenados temporariamente no servidor para processamento. Podem ser excluídos manualmente pelo usuário ou automaticamente após publicação.</li>
+<li><strong>Tokens OAuth:</strong> retidos enquanto a conta permanecer conectada. Excluídos imediatamente upon desconexão.</li>
+<li><strong>Logs de Operação:</strong> retidos por até 90 dias para diagnóstico, depois sobrescritos automaticamente.</li>
+<li><strong>Dados de Analytics:</strong> métricas agregadas derivadas de APIs públicas; não contêm dados pessoais identificáveis.</li>
+</ul>
+
+<h2>6. Compartilhamento de Informações</h2>
+<p>Não compartilhamos informações pessoais com terceiros, exceto:</p>
+<ul>
+<li><strong>Plataformas de Redes Sociais:</strong> ao publicar conteúdo, metadados do vídeo (título, descrição, hashtags) são enviados à plataforma selecionada via API oficial, conforme sua autorização explícita.</li>
+<li><strong>Provedores de Infraestrutura:</strong> Netlify (hospedagem frontend) e Render (hospedagem backend) têm acesso a dados técnicos necessários para operar o serviço (logs de requisição, endereços IP). Ambos possuem políticas de privacidade próprias e estão em conformidade com a LGPD.</li>
+<li><strong>Obrigação Legal:</strong> se exigido por ordem judicial ou autoridade competente nos termos da legislação brasileira.</li>
+</ul>
+
+<h2>7. Segurança dos Dados</h2>
+<p>Implementamos medidas técnicas e organizacionais para proteger suas informações:</p>
+<ul>
+<li>Autenticação JWT com tokens de curta duração (24h) e httpOnly cookies.</li>
+<li>Tokens OAuth armazenados com permissões restritas de arquivo (<code>600</code>).</li>
+<li>Comunicação HTTPS obrigatória em todas as conexões.</li>
+<li>Cabeçalhos de segurança HTTP: X-Frame-Options, X-Content-Type-Options, Referrer-Policy.</li>
+<li>Credenciais e segredos excluídos do versionamento Git (.gitignore).</li>
+<li>Acesso administrativo restrito ao Operador.</li>
+</ul>
+
+<h2>8. Seus Direitos (LGPD)</h2>
+<p>Conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018), você tem direito a:</p>
+<ul>
+<li><strong>Acesso:</strong> solicitar cópia dos dados pessoais que mantemos sobre você.</li>
+<li><strong>Correção:</strong> solicitar retificação de dados incompletos ou desatualizados.</li>
+<li><strong>Exclusão:</strong> solicitar eliminação de dados pessoais, exceto quando houver base legal para retenção.</li>
+<li><strong>Portabilidade:</strong> solicitar transferência de dados em formato estruturado.</li>
+<li><strong>Revogação de Consentimento:</strong> desconectar contas e revogar autorizações a qualquer momento.</li>
+<li><strong>Informação:</strong> ser informado sobre o compartilhamento de dados com terceiros.</li>
+</ul>
+<p>Para exercer esses direitos, entre em contato pelo email: <strong>jorgehcdev42@gmail.com</strong>. Respondemos em até 15 dias úteis.</p>
+
+<h2>9. Transferência Internacional de Dados</h2>
+<p>O Serviço utiliza infraestrutura hospedada fora do Brasil (Netlify e Render operam servidores globais). Ao utilizar o Serviço, você consente com a transferência internacional de dados técnicos necessários para operação, sempre em conformidade com o Art. 33 da LGPD.</p>
+
+<h2>10. Cookies e Tecnologias Similares</h2>
+<p>O Serviço utiliza:</p>
+<ul>
+<li><strong>Cookies Essenciais:</strong> token JWT httpOnly para manter sua sessão ativa no dashboard. Sem este cookie, o login não funciona.</li>
+<li><strong>LocalStorage:</strong> preferências de interface e estado de navegação. Não contém dados sensíveis.</li>
+</ul>
+<p>Não utilizamos cookies de rastreamento, publicidade ou analytics de terceiros.</p>
+
+<h2>11. Menores de Idade</h2>
+<p>O Serviço não é destinado a menores de 18 anos. Não coletamos intencionalmente dados de menores. Se tomarmos conhecimento de tal situação, os dados serão excluídos imediatamente.</p>
+
+<h2>12. Alterações desta Política</h2>
+<p>Podemos atualizar esta Política periodicamente. A data da última alteração será sempre indicada no topo desta página. Alterações significativas serão comunicadas através do dashboard ou por email.</p>
+
+<h2>13. Contato</h2>
+<p>Para questões sobre privacidade, exercício de direitos ou denúncias:</p>
+<p><strong>Email:</strong> jorgehcdev42@gmail.com<br>
+<strong>Operador:</strong> Jorge Henrique Custódio<br>
+<strong>Localização:</strong> Taguatinga Norte, Brasília/DF, Brasil</p>
+
+<div class="footer">
+<p>&copy; 2026 JHC Viral Engine. Todos os direitos reservados.</p>
+<p><a href="/">Página Inicial</a> | <a href="/terms.html">Termos de Uso</a></p>
+</div>
+</div>
+</body>
+</html>
