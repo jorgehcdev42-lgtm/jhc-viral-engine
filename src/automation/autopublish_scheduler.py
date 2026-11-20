@@ -270,6 +270,167 @@ class AutoPublishScheduler:
             result["error"] = error_msg
             return result
 
+    async def execute_instagram_hybrid(self, job: AutoPublishJob) -> dict:
+        """Hybrid Instagram publisher: API first → Playwright fallback.
+
+        Selection policy (mirrors execute_tiktok_hybrid / execute_youtube_hybrid):
+        1. Check InstagramAdapter (API) connection state.
+        2. If CONNECTED → attempt API upload via adapters.InstagramAdapter.
+        3. If API returns PERMISSION_REQUIRED or AUTH_REQUIRED → check BrowserPublisher session.
+        4. If browser session valid → attempt Playwright upload via BrowserPublisher._publish_instagram.
+        5. If both fail → mark job as failed with detailed error.
+        6. NEVER auto-fallback after uncertain result (upload started but no confirmation).
+
+        Pre-publish: auto-refresh token if near expiry via OAuthManager.refresh_instagram_token().
+
+        Returns dict with 'status', 'method', 'job_id', 'error' keys.
+        """
+        from src.publishing.adapters import InstagramAdapter, PublishJob, PublishState
+        from src.publishing.browser_publisher import BrowserPublisher, PublishRequest
+        from src.publishing.oauth import OAuthManager
+
+        result = {"job_id": job.job_id, "method": None, "status": None, "error": None}
+
+        # Pre-publish: attempt automatic token refresh if near expiry
+        oauth_mgr = OAuthManager(self.data_root)
+        refresh_result = oauth_mgr.refresh_instagram_token(job.profile_id)
+        if not refresh_result.get("success") and refresh_result.get("state") == "token_expired":
+            logger.warning("Instagram token expired for %s — re-auth required", job.profile_id)
+            self.check_auth(job.job_id, "token_expired")
+            result["status"] = "auth_required"
+            result["error"] = refresh_result.get("error", "Token expired")
+            return result
+
+        # Step 1: Try API adapter
+        api_adapter = InstagramAdapter(
+            data_root=self.data_root / "credentials",
+            profile_id=job.profile_id,
+        )
+        api_state = await api_adapter.check_connection()
+
+        if api_state == PublishState.CONNECTED:
+            logger.info("Instagram hybrid: attempting API upload for %s", job.job_id)
+            publish_job = PublishJob(
+                job_id=job.job_id,
+                profile_id=job.profile_id,
+                platform="instagram",
+                video_path=job.video_path,
+                title=job.title,
+                description=job.description or "",
+                hashtags=tuple(job.hashtags) if job.hashtags else (),
+                thumbnail_path=job.thumbnail_path or "",
+                state="queued",
+            )
+            api_result = await api_adapter.upload(publish_job)
+            result["method"] = "api"
+
+            if api_result.state == PublishState.PUBLISHED.value:
+                self.mark_published(
+                    job.job_id,
+                    platform_post_id=api_result.platform_post_id or "",
+                    permalink=api_result.permalink or "",
+                )
+                result["status"] = "published"
+                result["remote_id"] = api_result.platform_post_id
+                result["url"] = api_result.permalink
+                return result
+            elif api_result.state == PublishState.PROCESSING.value:
+                # Container still processing — poll once, do NOT fallback
+                polled = await api_adapter.poll_status(api_result)
+                if polled.state == PublishState.PUBLISHED.value:
+                    self.mark_published(
+                        job.job_id,
+                        platform_post_id=polled.platform_post_id or "",
+                        permalink=polled.permalink or "",
+                    )
+                    result["status"] = "published"
+                    result["remote_id"] = polled.platform_post_id
+                    result["url"] = polled.permalink
+                    return result
+                elif polled.state == PublishState.ERROR.value:
+                    self.mark_failed(job.job_id, polled.error_message or "API publish failed", retry=True)
+                    result["status"] = "failed"
+                    result["error"] = polled.error_message
+                    return result
+                else:
+                    # Still processing — do NOT fallback to Playwright
+                    self._jobs[job.job_id].state = "processing"
+                    self._jobs[job.job_id].platform_post_id = api_result.platform_post_id
+                    self._save_jobs()
+                    result["status"] = "processing"
+                    result["remote_id"] = api_result.platform_post_id
+                    return result
+
+            elif api_result.state == PublishState.PERMISSION_REQUIRED.value:
+                logger.info("Instagram hybrid: API permission_required, checking browser session")
+                result["method"] = "api_denied"
+            elif api_result.state in (PublishState.TOKEN_EXPIRED.value, PublishState.AUTH_REQUIRED.value):
+                logger.info("Instagram hybrid: API %s, checking browser session", api_result.state)
+                result["method"] = f"api_{api_result.state}"
+            elif api_result.state == PublishState.ERROR.value:
+                result["status"] = "failed"
+                result["error"] = api_result.error_message
+                self.mark_failed(job.job_id, api_result.error_message or "API upload failed", retry=True)
+                return result
+            else:
+                # Unknown state — do NOT fallback
+                result["status"] = "uncertain"
+                result["error"] = f"API returned unexpected state: {api_result.state}"
+                return result
+        else:
+            logger.info("Instagram hybrid: API state=%s, checking browser session", api_state.value)
+            result["method"] = f"api_{api_state.value}"
+
+        # Step 2: Check BrowserPublisher session for Playwright fallback
+        browser_pub = BrowserPublisher(self.data_root)
+        session_ok = await browser_pub.check_session("instagram")
+
+        if not session_ok.get("active", False):
+            error_msg = f"API unavailable ({result['method']}) and no active browser session. Login required."
+            self.mark_failed(job.job_id, error_msg, retry=False)
+            result["status"] = "auth_required"
+            result["error"] = error_msg
+            return result
+
+        # Step 3: Attempt Playwright upload
+        logger.info("Instagram hybrid: attempting Playwright upload for %s", job.job_id)
+        result["method"] = "playwright"
+        try:
+            req = PublishRequest(
+                platform="instagram",
+                video_path=job.video_path,
+                title=job.title,
+                description=job.description or "",
+                tags=list(job.hashtags) if job.hashtags else [],
+                privacy=job.privacy or "public",
+                content_type="reel",
+            )
+            pub_result = await browser_pub.publish(req)
+
+            if pub_result.success:
+                self.mark_published(
+                    job.job_id,
+                    platform_post_id=pub_result.post_id or "",
+                    permalink=pub_result.url or "",
+                )
+                result["status"] = "published"
+                result["url"] = pub_result.url
+                return result
+            else:
+                error_msg = pub_result.error or "Playwright upload failed"
+                self.mark_failed(job.job_id, error_msg, retry=True)
+                result["status"] = "failed"
+                result["error"] = error_msg
+                return result
+
+        except Exception as e:
+            error_msg = f"Playwright error: {str(e)[:200]}"
+            logger.error("Instagram hybrid Playwright error: %s", e)
+            self.mark_failed(job.job_id, error_msg, retry=True)
+            result["status"] = "failed"
+            result["error"] = error_msg
+            return result
+
     async def execute_youtube_hybrid(self, job: AutoPublishJob) -> dict:
         """Hybrid YouTube publisher: API first → Playwright fallback.
 
@@ -644,6 +805,58 @@ class AutoPublishScheduler:
         if profile_id:
             history = [h for h in history if h.get("profile_id") == profile_id]
         return history[-limit:]
+
+    # --- Automatic token refresh scheduling ---
+
+    TOKEN_REFRESH_STATE_FILE = "token_refresh_state.json"
+
+    def schedule_token_refresh(self, profile_id: str = "leonidagta6flashbr") -> dict:
+        """Schedule automatic Instagram token refresh if near expiry.
+
+        Checks all stored Instagram credentials and refreshes any token
+        within the 1-day buffer window. Persists last-check timestamp to
+        prevent redundant refresh attempts across scheduler cycles.
+
+        Designed to be called from the autopublish worker loop (every 5 min).
+        Thread-safe via file-level atomic writes in OAuthManager.
+        """
+        from src.publishing.oauth import OAuthManager
+
+        state_path = self.scheduler_dir / self.TOKEN_REFRESH_STATE_FILE
+        now = time.time()
+
+        # Load last-check state
+        last_check: dict = {}
+        if state_path.exists():
+            try:
+                last_check = json.loads(state_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                last_check = {}
+
+        # Skip if checked less than 4 hours ago (avoid excessive API calls)
+        last_checked_at = last_check.get("last_checked_at", 0)
+        if now - last_checked_at < 14400:  # 4 hours
+            return {"skipped": True, "reason": "checked recently", "last_checked_at": last_checked_at}
+
+        oauth_mgr = OAuthManager(self.data_root)
+        result = oauth_mgr.refresh_instagram_token(profile_id)
+
+        # Persist check timestamp
+        last_check["last_checked_at"] = now
+        last_check["last_result"] = {
+            "success": result.get("success"),
+            "state": result.get("state"),
+            "expires_at": result.get("expires_at"),
+        }
+        state_path.write_text(
+            json.dumps(last_check, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+        logger.info(
+            "Token refresh scheduled check for %s: success=%s state=%s",
+            profile_id, result.get("success"), result.get("state"),
+        )
+        return result
 
     # --- Global queue control (persistent) ---
 

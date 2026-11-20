@@ -99,7 +99,34 @@ Sessões pesadas (300MB+) permanecem no backup SSD externo (`/Volumes/SSD EXT MA
 
 ---
 
-## 5. PENDÊNCIAS REAIS
+## 6. UPLOAD DE VÍDEOS LOCAIS — VideoHost (P3)
+
+### Problema Resolvido
+A Instagram Content Publishing API exige `video_url` HTTPS pública — **não suporta upload direto de arquivo local nem resumable upload** ([documentação oficial](https://developers.facebook.com/docs/instagram-platform/content-publishing)).
+
+### Solução: `src/publishing/video_host.py`
+- Hospedagem temporária via Netlify estático (`https://jhc-viral-engine.netlify.app/tmp_media/`)
+- URLs não previsíveis (UUID4 hex de 16 caracteres)
+- TTL configurável (padrão 2 horas) com limpeza automática
+- Validação: rejeita arquivos <1KB ou >100MB
+- Arquivos originais nunca modificados ou deletados
+- Integrado ao `InstagramAdapter.upload()`: caminhos locais são hospedados automaticamente antes do upload à Meta
+
+### Estratégia Híbrida no Scheduler (P3)
+- `execute_instagram_hybrid()` implementado em `autopublish_scheduler.py`
+- Fluxo: API Meta prioritária → se PERMISSION_REQUIRED/AUTH_REQUIRED → verifica sessão Browser Publisher → Playwright fallback
+- Renovação automática de token integrada ao fluxo híbrido (pré-publish)
+- Estados incertos NÃO disparam fallback automático (segurança contra publicação duplicada)
+
+### Renovação Automática Agendada (P3)
+- `schedule_token_refresh()` adicionado ao `AutoPublishScheduler`
+- Verifica a cada 4 horas (evita chamadas excessivas à API)
+- Persiste estado em `scheduler_state/token_refresh_state.json`
+- Projetado para ser chamado pelo worker loop (cada 5 min via launchd)
+
+---
+
+## 7. PENDÊNCIAS REAIS
 
 | # | Pendência | Severidade | Ação Necessária |
 |---|-----------|------------|-----------------|
@@ -107,8 +134,9 @@ Sessões pesadas (300MB+) permanecem no backup SSD externo (`/Volumes/SSD EXT MA
 | 2 | Converter `httpx.get()` síncrono em `oauth.py:handle_callback` para async | Warning | Refatorar para `httpx.AsyncClient` |
 | 3 | Wire `check_rate_limit()` antes de publicações em escala | Info | Adicionar pré-check no scheduler |
 | 4 | Delegar `InstagramAdapter.check_connection` para `OAuthManager.get_connection_state()` | Info | Eliminar duplicação de parsing de credenciais |
-| 5 | Integração Instagram → Browser Publisher (Missão 019) | Info | Conectar adapter ao fallback Playwright compartilhado |
-| 6 | Aprovação Meta para produção (app em modo desenvolvimento) | Bloqueio externo | Submeter app review quando pronto |
+| 5 | Playwright não instalado no ambiente principal | Info | Instalar via `pip install playwright && playwright install chromium` quando Missão 019 estiver pronta |
+| 6 | Deploy do Netlify necessário após adição de `frontend/tmp_media/` | Info | Commit + push para tornar URLs de vídeo acessíveis externamente |
+| 7 | Aprovação Meta para produção (app em modo desenvolvimento) | Bloqueio externo | Submeter app review quando pronto |
 
 ---
 

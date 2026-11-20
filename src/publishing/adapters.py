@@ -195,18 +195,52 @@ class InstagramAdapter(BaseAdapter):
             return PublishJob(**{**job.to_dict(), "state": PublishState.AUTH_REQUIRED.value, "error_message": "Missing access_token or account_id in Instagram credentials"})
 
         import httpx
-
-        # Validate video_url: Meta Content Publishing API requires a publicly accessible HTTPS URL
         import re as _re
-        if not job.video_path or not _re.match(r'^https?://', job.video_path):
+
+        # Resolve video URL: if local path, host temporarily via Netlify; if already HTTPS, use directly
+        video_url = job.video_path
+        hosted_filename = None
+        if not video_url:
             return PublishJob(**{
                 **job.to_dict(),
                 "state": PublishState.ERROR.value,
-                "error_message": (
-                    f"Instagram Content Publishing API requires a publicly accessible HTTPS URL. "
-                    f"Got: {job.video_path!r}. Upload the video to a public host first."
-                ),
+                "error_message": "video_path is empty",
             })
+
+        if not _re.match(r'^https?://', video_url):
+            # Local file — host temporarily via VideoHost (Netlify static site)
+            from pathlib import Path as _Path
+            local_path = _Path(video_url)
+            if not local_path.exists():
+                return PublishJob(**{
+                    **job.to_dict(),
+                    "state": PublishState.ERROR.value,
+                    "error_message": f"Local video file not found: {video_url}",
+                })
+            try:
+                from src.publishing.video_host import VideoHost
+                project_root = self.credentials_dir.parent.parent  # data/credentials → project root
+                host = VideoHost(project_root)
+                host_result = host.host_video(local_path)
+                if not host_result.get("success"):
+                    return PublishJob(**{
+                        **job.to_dict(),
+                        "state": PublishState.ERROR.value,
+                        "error_message": f"Failed to host video: {host_result.get('error', 'unknown')}",
+                    })
+                video_url = host_result["url"]
+                hosted_filename = host_result.get("filename", "")
+                logger.info(
+                    "Local video hosted for Instagram upload: %s → %s (%.1fMB)",
+                    local_path.name, hosted_filename, host_result.get("size_mb", 0),
+                )
+            except Exception as e:
+                logger.error("Video hosting failed: %s", e)
+                return PublishJob(**{
+                    **job.to_dict(),
+                    "state": PublishState.ERROR.value,
+                    "error_message": f"Video hosting error: {str(e)[:200]}",
+                })
 
         # Build caption with hashtags
         caption = job.description or ""
