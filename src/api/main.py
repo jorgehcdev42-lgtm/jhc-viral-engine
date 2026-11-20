@@ -3676,26 +3676,133 @@ async def instagram_radar_search(profile: str = "", hashtag: str = "", max_resul
 
 @app.get("/api/instagram-radar/discover")
 async def instagram_radar_discover(max_per_source: int = 5):
-    """Descoberta automática no Instagram com timeout graceful — retorna cache se scraping demorar."""
+    """Descoberta automática com fontes múltiplas: Instagram (yt-dlp) → RSS → YouTube cross-platform.
+
+    Quando o scraping direto do Instagram falha ou retorna vazio (limitação conhecida do yt-dlp),
+    o endpoint busca automaticamente em fontes alternativas legítimas:
+    - RSS feeds de gaming (Eurogamer, VGC) filtrados por GTA VI
+    - YouTube search por termos cross-platform (GTA VI Instagram/Reels/Shorts)
+    Resultados incluem campo 'source' indicando a origem real de cada item.
+    """
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
     from src.research.instagram_radar import InstagramRadar
-    def _do():
+
+    def _do_ig_scrape():
         radar = InstagramRadar()
         r = radar.search_all(max_per_source=max_per_source)
         r = radar.check_already_imported(r)
-        radar.save_cache(r, "latest")
+        if r:
+            radar.save_cache(r, "latest")
         return r
+
+    def _do_alternative_sources():
+        """Busca em fontes alternativas quando Instagram direto falha."""
+        alt_results = []
+
+        # Fonte 1: RSS feeds de gaming filtrados por GTA VI
+        try:
+            from src.research.rss_source import fetch_rss
+            rss_feeds = [
+                ("Eurogamer", "https://www.eurogamer.net/?format=rss"),
+                ("VGC", "https://www.videogameschronicle.com/feed"),
+            ]
+            gta_keywords = ["gta", "rockstar", "vice city", "leonida"]
+            for source_name, url in rss_feeds:
+                try:
+                    items = fetch_rss(url, source_name=source_name, timeout=10)
+                    for item in items:
+                        title_lower = item.title.lower()
+                        if any(kw in title_lower for kw in gta_keywords):
+                            alt_results.append({
+                                "url": item.url,
+                                "title": item.title,
+                                "author": item.source,
+                                "source": f"rss:{item.source}",
+                                "source_type": "rss",
+                                "published_at": getattr(item, "published", ""),
+                                "confidence": 1.0,
+                                "rights_status": "reference_only",
+                            })
+                except Exception:
+                    continue
+        except ImportError:
+            pass
+
+        # Fonte 2: YouTube search por termos cross-platform IG/GTA
+        try:
+            from src.research.youtube_radar import YouTubeRadar
+            yt_radar = YouTubeRadar()
+            ig_terms = ["GTA VI Instagram", "GTA 6 Reels viral", "GTA VI Shorts"]
+            for term in ig_terms:
+                try:
+                    yt_results = yt_radar.search(query=term, max_results=5)
+                    for r in yt_results:
+                        if isinstance(r, dict):
+                            alt_results.append({
+                                "url": r.get("url", ""),
+                                "title": r.get("title", ""),
+                                "author": r.get("author", ""),
+                                "view_count": r.get("view_count", 0),
+                                "source": "youtube:cross_platform",
+                                "source_type": "youtube",
+                                "confidence": 0.9,
+                                "rights_status": "reference_only",
+                            })
+                except Exception:
+                    continue
+        except ImportError:
+            pass
+
+        return alt_results
+
     loop = asyncio.get_event_loop()
+
+    # Tentar scraping Instagram direto primeiro
+    ig_results = []
     try:
         with ThreadPoolExecutor(max_workers=1) as ex:
-            future = loop.run_in_executor(ex, _do)
-            results = await asyncio.wait_for(future, timeout=30)
-        return {"results": results, "count": len(results)}
+            future = loop.run_in_executor(ex, _do_ig_scrape)
+            ig_results = await asyncio.wait_for(future, timeout=30)
     except asyncio.TimeoutError:
+        pass
+
+    # Se Instagram retornou resultados reais, usar diretamente
+    if ig_results:
+        return {"results": ig_results, "count": len(ig_results), "source": "instagram_direct"}
+
+    # Fallback: buscar em fontes alternativas
+    try:
+        with ThreadPoolExecutor(max_workers=1) as ex:
+            future = loop.run_in_executor(ex, _do_alternative_sources)
+            alt_results = await asyncio.wait_for(future, timeout=20)
+    except asyncio.TimeoutError:
+        alt_results = []
+
+    if alt_results:
+        # Salvar no cache do Instagram Radar para uso futuro
+        try:
+            radar = InstagramRadar()
+            radar.save_cache(alt_results, "latest")
+        except Exception:
+            pass
+        return {
+            "results": alt_results,
+            "count": len(alt_results),
+            "source": "alternative_sources",
+            "note": "instagram_scraping_unavailable_using_rss_and_youtube",
+        }
+
+    # Último fallback: cache antigo
+    try:
         radar = InstagramRadar()
         cached = radar.load_cache("latest", max_age_hours=48)
-        return {"results": cached, "count": len(cached), "note": "timeout_fallback_cache"}
+        if cached:
+            return {"results": cached, "count": len(cached), "source": "cache", "note": "all_sources_empty_using_cache"}
+    except Exception:
+        pass
+
+    return {"results": [], "count": 0, "source": "none", "note": "no_results_from_any_source"}
 
 @app.get("/api/instagram-radar/cache")
 async def instagram_radar_cache(max_age_hours: int = 24):

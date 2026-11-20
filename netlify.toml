@@ -22,6 +22,15 @@
   to = "/privacy.html"
   status = 200
 
+# Temporary media hosting for Instagram Content Publishing API
+# Must be BEFORE the SPA fallback so .mp4 files are served directly (not as HTML)
+[[headers]]
+  for = "/tmp_media/*"
+  [headers.values]
+    Cache-Control = "public, max-age=7200"
+    X-Frame-Options = ""
+    X-Content-Type-Options = ""
+
 # SPA fallback: todas as outras rotas não-API servem index.html
 [[redirects]]
   from = "/*"
