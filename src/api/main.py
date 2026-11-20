@@ -3240,7 +3240,7 @@ async def radar_search(
 
 @app.get("/api/radar/discover")
 async def radar_discover(max_per_term: int = 5, date_filter: str = "7d"):
-    """Busca automática usando todos os termos pré-definidos (assíncrono)."""
+    """Busca automática usando todos os termos pré-definidos (assíncrono com timeout graceful)."""
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
     from src.research.youtube_radar import YouTubeRadar
@@ -3253,9 +3253,16 @@ async def radar_discover(max_per_term: int = 5, date_filter: str = "7d"):
         return results
 
     loop = asyncio.get_event_loop()
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        results = await loop.run_in_executor(executor, _do_discover)
-    return {"results": results, "count": len(results), "terms_used": 12}
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = loop.run_in_executor(executor, _do_discover)
+            results = await asyncio.wait_for(future, timeout=30)
+        return {"results": results, "count": len(results), "terms_used": 12}
+    except asyncio.TimeoutError:
+        # Fallback para cache se scraping demorar demais
+        radar = YouTubeRadar()
+        cached = radar.get_cached_results(max_age_hours=48)
+        return {"results": cached, "count": len(cached), "terms_used": 0, "note": "timeout_fallback_cache"}
 
 
 @app.get("/api/radar/cache")
@@ -3643,6 +3650,7 @@ async def auto_publish_history(limit: int = 50):
 
 @app.get("/api/instagram-radar/search")
 async def instagram_radar_search(profile: str = "", hashtag: str = "", max_results: int = 10):
+    """Busca no Instagram com timeout graceful — retorna cache se scraping demorar."""
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
     from src.research.instagram_radar import InstagramRadar
@@ -3655,13 +3663,20 @@ async def instagram_radar_search(profile: str = "", hashtag: str = "", max_resul
         else:
             return radar.search_all(max_per_source=max_results)
     loop = asyncio.get_event_loop()
-    with ThreadPoolExecutor(max_workers=1) as ex:
-        results = await loop.run_in_executor(ex, _do)
-    results = InstagramRadar().check_already_imported(results)
-    return {"results": results, "count": len(results)}
+    try:
+        with ThreadPoolExecutor(max_workers=1) as ex:
+            future = loop.run_in_executor(ex, _do)
+            results = await asyncio.wait_for(future, timeout=30)
+        results = InstagramRadar().check_already_imported(results)
+        return {"results": results, "count": len(results)}
+    except asyncio.TimeoutError:
+        radar = InstagramRadar()
+        cached = radar.load_cache("latest", max_age_hours=48)
+        return {"results": cached, "count": len(cached), "note": "timeout_fallback_cache"}
 
 @app.get("/api/instagram-radar/discover")
 async def instagram_radar_discover(max_per_source: int = 5):
+    """Descoberta automática no Instagram com timeout graceful — retorna cache se scraping demorar."""
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
     from src.research.instagram_radar import InstagramRadar
@@ -3672,9 +3687,15 @@ async def instagram_radar_discover(max_per_source: int = 5):
         radar.save_cache(r, "latest")
         return r
     loop = asyncio.get_event_loop()
-    with ThreadPoolExecutor(max_workers=1) as ex:
-        results = await loop.run_in_executor(ex, _do)
-    return {"results": results, "count": len(results)}
+    try:
+        with ThreadPoolExecutor(max_workers=1) as ex:
+            future = loop.run_in_executor(ex, _do)
+            results = await asyncio.wait_for(future, timeout=30)
+        return {"results": results, "count": len(results)}
+    except asyncio.TimeoutError:
+        radar = InstagramRadar()
+        cached = radar.load_cache("latest", max_age_hours=48)
+        return {"results": cached, "count": len(cached), "note": "timeout_fallback_cache"}
 
 @app.get("/api/instagram-radar/cache")
 async def instagram_radar_cache(max_age_hours: int = 24):
