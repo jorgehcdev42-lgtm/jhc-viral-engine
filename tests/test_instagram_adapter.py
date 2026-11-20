@@ -315,6 +315,122 @@ class TestPollStatus:
 # --- Integração com OAuth credentials existentes ---
 
 
+class TestInstagramTokenRefresh:
+    """Testes do método refresh_instagram_token via ig_refresh_token grant."""
+
+    @pytest.fixture
+    def oauth_manager(self, tmp_path: Path):
+        from src.publishing.oauth import OAuthManager
+        return OAuthManager(data_root=tmp_path)
+
+    @pytest.fixture
+    def instagram_creds(self, oauth_manager, tmp_path: Path) -> Path:
+        """Salva credenciais Instagram válidas para teste de renovação."""
+        from src.publishing.oauth import OAuthCredentials
+        creds = OAuthCredentials(
+            profile_id="test_profile",
+            platform="instagram",
+            access_token="EAAOldToken123",
+            refresh_token="",
+            token_type="bearer",
+            expires_at=time.time() + 86400,  # Expira em 1 dia (dentro do buffer de 1 dia)
+            scopes=("instagram_business_basic", "instagram_business_content_publish"),
+            client_id="1819988955893243",
+            code_verifier="",
+            connected_at=time.time(),
+            account_id="17841479885114087",
+            account_name="leonidagta6flashbr",
+        )
+        oauth_manager.save_credentials(creds)
+        return oauth_manager._cred_path("test_profile", "instagram")
+
+    def test_refresh_skips_when_token_still_valid(self, oauth_manager, tmp_path: Path):
+        """Token com >1 dia de validade não deve ser renovado."""
+        from src.publishing.oauth import OAuthCredentials
+        creds = OAuthCredentials(
+            profile_id="test_profile",
+            platform="instagram",
+            access_token="EAAValidToken",
+            refresh_token="",
+            token_type="bearer",
+            expires_at=time.time() + 172800,  # 2 dias
+            scopes=("instagram_business_basic",),
+            client_id="1819988955893243",
+            code_verifier="",
+            connected_at=time.time(),
+            account_id="17841479885114087",
+            account_name="test",
+        )
+        oauth_manager.save_credentials(creds)
+
+        result = oauth_manager.refresh_instagram_token("test_profile")
+        assert result["success"] is True
+        assert result.get("skipped") is True
+        assert "no refresh needed" in result.get("message", "").lower()
+
+    def test_refresh_returns_auth_required_when_no_creds(self, oauth_manager):
+        """Sem credenciais → auth_required."""
+        result = oauth_manager.refresh_instagram_token("nonexistent_profile")
+        assert result["success"] is False
+        assert result["state"] == "auth_required"
+
+    def test_refresh_calls_ig_endpoint_when_token_near_expiry(self, oauth_manager, instagram_creds):
+        """Token dentro do buffer de 1 dia deve chamar endpoint ig_refresh_token."""
+        mock_response = MagicMock(
+            status_code=200,
+            json=MagicMock(return_value={
+                "access_token": "EAANewRefreshedToken456",
+                "expires_in": 5184000,  # 60 dias
+            }),
+        )
+
+        with patch("httpx.get", return_value=mock_response) as mock_get:
+            result = oauth_manager.refresh_instagram_token("test_profile")
+
+        assert result["success"] is True
+        assert result["state"] == "connected"
+        assert result["expires_in_days"] == 60
+        # Verifica que o endpoint correto foi chamado
+        mock_get.assert_called_once()
+        call_args = mock_get.call_args
+        assert "graph.instagram.com/refresh_access_token" in call_args[0][0]
+        assert call_args[1]["params"]["grant_type"] == "ig_refresh_token"
+
+    def test_refresh_handles_expired_token_error(self, oauth_manager, instagram_creds):
+        """Token revogado/expirado → state=token_expired."""
+        mock_response = MagicMock(
+            status_code=400,
+            text='{"error":{"message":"Invalid OAuth access token"}}',
+            json=MagicMock(return_value={"error": {"message": "Invalid OAuth access token"}}),
+        )
+
+        with patch("httpx.get", return_value=mock_response):
+            result = oauth_manager.refresh_instagram_token("test_profile")
+
+        assert result["success"] is False
+        assert result["state"] == "token_expired"
+
+    def test_refresh_persists_new_token_to_disk(self, oauth_manager, instagram_creds):
+        """Token renovado deve ser persistido atomicamente no disco."""
+        mock_response = MagicMock(
+            status_code=200,
+            json=MagicMock(return_value={
+                "access_token": "EAAPersistedToken789",
+                "expires_in": 5184000,
+            }),
+        )
+
+        with patch("httpx.get", return_value=mock_response):
+            result = oauth_manager.refresh_instagram_token("test_profile")
+
+        assert result["success"] is True
+        # Ler credenciais do disco e verificar novo token
+        saved = oauth_manager.load_credentials("test_profile", "instagram", auto_refresh=False)
+        assert saved is not None
+        assert saved.access_token == "EAAPersistedToken789"
+        assert saved.account_id == "17841479885114087"  # Preservado
+
+
 class TestRealCredentials:
     """Testes que verificam leitura das credenciais reais do projeto (sem API calls)."""
 

@@ -81,7 +81,25 @@ Sessões pesadas (300MB+) permanecem no backup SSD externo (`/Volumes/SSD EXT MA
 
 ---
 
-## 4. PENDÊNCIAS REAIS
+## 4. RENOVAÇÃO AUTOMÁTICA DE TOKEN (P2)
+
+### Implementado: `OAuthManager.refresh_instagram_token()`
+- **Endpoint:** `GET https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=<token>`
+- **Buffer:** Renova quando faltam ≤1 dia para expiração
+- **Persistência atômica:** Preserva account_id, scopes, connected_at; atualiza apenas access_token e expires_at
+- **Estados diferenciados:** `connected` (sucesso), `token_expired` (revogado/expirado → re-auth), `error` (falha temporária)
+- **Endpoint API:** `POST /api/oauth/instagram/refresh` com body `{"profile_id": "..."}`
+- **Testes:** 5 casos cobrindo skip, auth_required, chamada ao endpoint ig, erro de token expirado e persistência em disco
+
+### Estado Atual do Token
+- ✅ Válido, ~59 dias restantes
+- ✅ Scopes: `instagram_business_basic`, `instagram_business_content_publish`
+- ✅ Account ID: `17841479885114087`
+- ⚠️ Sem refresh_token no arquivo (modalidade Instagram Login usa ig_refresh_token via access_token)
+
+---
+
+## 5. PENDÊNCIAS REAIS
 
 | # | Pendência | Severidade | Ação Necessária |
 |---|-----------|------------|-----------------|
@@ -89,7 +107,7 @@ Sessões pesadas (300MB+) permanecem no backup SSD externo (`/Volumes/SSD EXT MA
 | 2 | Converter `httpx.get()` síncrono em `oauth.py:handle_callback` para async | Warning | Refatorar para `httpx.AsyncClient` |
 | 3 | Wire `check_rate_limit()` antes de publicações em escala | Info | Adicionar pré-check no scheduler |
 | 4 | Delegar `InstagramAdapter.check_connection` para `OAuthManager.get_connection_state()` | Info | Eliminar duplicação de parsing de credenciais |
-| 5 | Renovação manual do token quando expirar (~59 dias) | Info | Monitorar expiry; re-executar flow OAuth |
+| 5 | Integração Instagram → Browser Publisher (Missão 019) | Info | Conectar adapter ao fallback Playwright compartilhado |
 | 6 | Aprovação Meta para produção (app em modo desenvolvimento) | Bloqueio externo | Submeter app review quando pronto |
 
 ---

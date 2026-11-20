@@ -1110,6 +1110,34 @@ async def get_all_oauth_connections():
                 known_profiles.append(p.name)
     return manager.get_all_connections(known_profiles)
 
+
+@app.post("/api/oauth/instagram/refresh")
+async def refresh_instagram_token(request: Request):
+    """Refresh Instagram long-lived token via ig_refresh_token grant.
+
+    Requires JSON body with profile_id. Returns new expiry or error state.
+    Does NOT require user re-authentication for valid long-lived tokens.
+    """
+    from src.publishing.oauth import OAuthManager
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"detail": "Invalid JSON body"})
+
+    profile_id = body.get("profile_id", "").strip()
+    if not profile_id:
+        return JSONResponse(status_code=400, content={"detail": "profile_id is required"})
+
+    manager = OAuthManager(DATA_ROOT)
+    result = manager.refresh_instagram_token(profile_id)
+
+    if result.get("success"):
+        return result
+    else:
+        status_code = 401 if result.get("state") in ("token_expired", "auth_required") else 502
+        return JSONResponse(status_code=status_code, content=result)
+
+
 # --- AutoPublish Scheduler Endpoints (PRIORIDADE 3+4) ---
 
 @app.get("/api/autopublish/status")

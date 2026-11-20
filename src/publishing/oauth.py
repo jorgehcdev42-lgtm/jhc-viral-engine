@@ -529,6 +529,123 @@ class OAuthManager:
             logger.error("Token refresh error for %s/%s: %s", creds.profile_id, creds.platform, e)
             return creds
 
+    def refresh_instagram_token(self, profile_id: str) -> dict:
+        """Refresh Instagram long-lived token via ig_refresh_token grant.
+
+        Instagram Login tokens (60 days) can be renewed without user re-auth via:
+        GET https://graph.instagram.com/refresh_access_token
+            ?grant_type=ig_refresh_token
+            &access_token=<current_long_lived_token>
+
+        Returns dict with success/error state. Atomic update prevents concurrent refresh races.
+        """
+        creds = self.load_credentials(profile_id, "instagram", auto_refresh=False)
+        if not creds or not creds.access_token:
+            return {
+                "success": False,
+                "error": "No Instagram credentials found",
+                "state": "auth_required",
+            }
+
+        # Check if token is still valid with buffer (refresh 1 day before expiry)
+        if creds.expires_at > time.time() + 86400:
+            remaining_days = (creds.expires_at - time.time()) / 86400
+            return {
+                "success": True,
+                "state": "connected",
+                "message": f"Token still valid for {remaining_days:.1f} days — no refresh needed",
+                "expires_at": creds.expires_at,
+                "skipped": True,
+            }
+
+        try:
+            import httpx
+            # Instagram Login token refresh endpoint
+            response = httpx.get(
+                "https://graph.instagram.com/refresh_access_token",
+                params={
+                    "grant_type": "ig_refresh_token",
+                    "access_token": creds.access_token,
+                },
+                timeout=30,
+            )
+
+            if response.status_code != 200:
+                error_body = response.text[:300]
+                logger.error(
+                    "Instagram token refresh failed for %s: HTTP %d — %s",
+                    profile_id, response.status_code, error_body,
+                )
+                # Distinguish between expired/revoked vs temporary failure
+                if "invalid" in error_body.lower() or "expired" in error_body.lower():
+                    return {
+                        "success": False,
+                        "error": f"Token expired or revoked — re-authentication required: {error_body}",
+                        "state": "token_expired",
+                    }
+                return {
+                    "success": False,
+                    "error": f"Token refresh failed (temporary): {error_body}",
+                    "state": "error",
+                }
+
+            result = response.json()
+            new_access = result.get("access_token", "")
+            expires_in = result.get("expires_in", 5184000)  # Default 60 days
+
+            if not new_access:
+                logger.error("Instagram token refresh returned no access_token for %s", profile_id)
+                return {
+                    "success": False,
+                    "error": "Token refresh returned no access_token",
+                    "state": "error",
+                }
+
+            # Atomic update: preserve all other fields
+            updated = OAuthCredentials(
+                profile_id=creds.profile_id,
+                platform=creds.platform,
+                access_token=new_access,
+                refresh_token=creds.refresh_token,  # Instagram Login doesn't rotate refresh tokens
+                token_type=creds.token_type,
+                expires_at=time.time() + expires_in,
+                scopes=creds.scopes,
+                client_id=creds.client_id,
+                code_verifier="",
+                connected_at=creds.connected_at,
+                account_id=creds.account_id,
+                account_name=creds.account_name,
+            )
+            self.save_credentials(updated)
+
+            logger.info(
+                "Instagram token refreshed for %s (expires_in=%ds, ~%d days)",
+                profile_id, expires_in, expires_in // 86400,
+            )
+
+            return {
+                "success": True,
+                "state": "connected",
+                "expires_at": updated.expires_at,
+                "expires_in_seconds": expires_in,
+                "expires_in_days": expires_in // 86400,
+            }
+
+        except ImportError:
+            logger.error("httpx not installed — cannot refresh Instagram token")
+            return {
+                "success": False,
+                "error": "httpx not installed",
+                "state": "error",
+            }
+        except Exception as e:
+            logger.error("Instagram token refresh error for %s: %s", profile_id, e)
+            return {
+                "success": False,
+                "error": f"Network error: {str(e)[:200]}",
+                "state": "error",
+            }
+
     def load_credentials(
         self, profile_id: str, platform: str, auto_refresh: bool = True
     ) -> Optional[OAuthCredentials]:
