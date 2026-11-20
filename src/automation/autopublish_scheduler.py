@@ -245,7 +245,7 @@ class AutoPublishScheduler:
                 video_path=job.video_path,
                 title=job.title,
                 description=job.description or "",
-                tags=job.tags or [],
+                tags=list(job.hashtags) if job.hashtags else [],
                 privacy="private",  # Safe default
             )
             pub_result = await browser_pub.publish(req)
@@ -265,6 +265,148 @@ class AutoPublishScheduler:
         except Exception as e:
             error_msg = f"Playwright error: {str(e)[:200]}"
             logger.error("TikTok hybrid Playwright error: %s", e)
+            self.mark_failed(job.job_id, error_msg, retry=True)
+            result["status"] = "failed"
+            result["error"] = error_msg
+            return result
+
+    async def execute_youtube_hybrid(self, job: AutoPublishJob) -> dict:
+        """Hybrid YouTube publisher: API first → Playwright fallback.
+
+        Selection policy (mirrors execute_tiktok_hybrid):
+        1. Check YouTubeAdapter (API) connection state.
+        2. If CONNECTED → attempt API upload via adapters.YouTubeAdapter.
+        3. If API returns PERMISSION_REQUIRED or AUTH_REQUIRED → check BrowserPublisher session.
+        4. If browser session valid → attempt Playwright upload via BrowserPublisher._publish_youtube.
+        5. If both fail → mark job as failed with detailed error.
+        6. NEVER auto-fallback after uncertain result (upload started but no confirmation).
+
+        Returns dict with 'status', 'method', 'job_id', 'error' keys.
+        """
+        from src.publishing.adapters import YouTubeAdapter, PublishJob, PublishState
+        from src.publishing.browser_publisher import BrowserPublisher, PublishRequest
+
+        result = {"job_id": job.job_id, "method": None, "status": None, "error": None}
+
+        # Step 1: Try API adapter
+        api_adapter = YouTubeAdapter(self.data_root, job.profile_id)
+        api_state = await api_adapter.check_connection()
+
+        if api_state == PublishState.CONNECTED:
+            logger.info("YouTube hybrid: attempting API upload for %s", job.job_id)
+            publish_job = PublishJob(
+                job_id=job.job_id,
+                profile_id=job.profile_id,
+                platform="youtube",
+                video_path=job.video_path,
+                title=job.title,
+                description=job.description or "",
+                hashtags=tuple(job.hashtags) if job.hashtags else (),
+                privacy=job.privacy or "public",
+                scheduled_at=job.scheduled_at,
+                state="queued",
+            )
+            api_result = await api_adapter.upload(publish_job)
+            result["method"] = "api"
+
+            if api_result.state == PublishState.PROCESSING.value:
+                # Upload accepted, poll for confirmation
+                polled = await api_adapter.poll_status(api_result)
+                if polled.state == PublishState.PUBLISHED.value:
+                    self.mark_published(
+                        job.job_id,
+                        platform_post_id=polled.platform_post_id or "",
+                        permalink=polled.permalink or "",
+                    )
+                    result["status"] = "published"
+                    result["remote_id"] = polled.platform_post_id
+                    result["url"] = polled.permalink
+                    return result
+                elif polled.state == PublishState.ERROR.value:
+                    self.mark_failed(job.job_id, polled.error_message or "API publish failed", retry=True)
+                    result["status"] = "failed"
+                    result["error"] = polled.error_message
+                    return result
+                else:
+                    # Still processing — do NOT fallback to Playwright
+                    self._jobs[job.job_id].state = "processing"
+                    self._jobs[job.job_id].platform_post_id = api_result.platform_post_id
+                    self._save_jobs()
+                    result["status"] = "processing"
+                    result["remote_id"] = api_result.platform_post_id
+                    return result
+
+            elif api_result.state == PublishState.PERMISSION_REQUIRED.value:
+                # App not approved or quota exceeded — fall through to Playwright check
+                logger.info("YouTube hybrid: API permission_required, checking browser session")
+                result["method"] = "api_denied"
+            elif api_result.state == PublishState.TOKEN_EXPIRED.value:
+                # Token expired and refresh failed — fall through to Playwright check
+                logger.info("YouTube hybrid: API token_expired, checking browser session")
+                result["method"] = "api_token_expired"
+            elif api_result.state == PublishState.AUTH_REQUIRED.value:
+                logger.info("YouTube hybrid: API auth_required, checking browser session")
+                result["method"] = "api_auth_required"
+            elif api_result.state == PublishState.ERROR.value:
+                result["status"] = "failed"
+                result["error"] = api_result.error_message
+                self.mark_failed(job.job_id, api_result.error_message or "API upload failed", retry=True)
+                return result
+            else:
+                # Unknown state — do NOT fallback
+                result["status"] = "uncertain"
+                result["error"] = f"API returned unexpected state: {api_result.state}"
+                return result
+        else:
+            logger.info("YouTube hybrid: API state=%s, checking browser session", api_state.value)
+            result["method"] = f"api_{api_state.value}"
+
+        # Step 2: Check BrowserPublisher session for Playwright fallback
+        browser_pub = BrowserPublisher(self.data_root)
+        session_ok = await browser_pub.check_session("youtube")
+
+        if not session_ok.get("active", False):
+            # No valid browser session — cannot fallback
+            error_msg = f"API unavailable ({result['method']}) and no active browser session. Login required."
+            self.mark_failed(job.job_id, error_msg, retry=False)
+            result["status"] = "auth_required"
+            result["error"] = error_msg
+            return result
+
+        # Step 3: Attempt Playwright upload
+        logger.info("YouTube hybrid: attempting Playwright upload for %s", job.job_id)
+        result["method"] = "playwright"
+        try:
+            req = PublishRequest(
+                platform="youtube",
+                video_path=job.video_path,
+                title=job.title,
+                description=job.description or "",
+                tags=list(job.hashtags) if job.hashtags else [],
+                privacy=job.privacy or "private",  # Safe default
+                content_type="short",
+            )
+            pub_result = await browser_pub.publish(req)
+
+            if pub_result.success:
+                self.mark_published(
+                    job.job_id,
+                    platform_post_id=pub_result.post_id or "",
+                    permalink=pub_result.url or "",
+                )
+                result["status"] = "published"
+                result["url"] = pub_result.url
+                return result
+            else:
+                error_msg = pub_result.error or "Playwright upload failed"
+                self.mark_failed(job.job_id, error_msg, retry=True)
+                result["status"] = "failed"
+                result["error"] = error_msg
+                return result
+
+        except Exception as e:
+            error_msg = f"Playwright error: {str(e)[:200]}"
+            logger.error("YouTube hybrid Playwright error: %s", e)
             self.mark_failed(job.job_id, error_msg, retry=True)
             result["status"] = "failed"
             result["error"] = error_msg

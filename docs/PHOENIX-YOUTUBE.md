@@ -2,7 +2,8 @@
 **Data:** 2026-11-20  
 **Branch:** `feat/missao-028-auth-persistent-session`  
 **Último commit:** `6420330` (FASE 9 — TikTok Hybrid Publisher)  
-**Status:** RECUPERAÇÃO CONCLUÍDA — PRONTA PARA IMPLEMENTAÇÃO  
+**Status:** MISSÃO YT-006 CONCLUÍDA — PUBLICADOR HÍBRIDO OPERACIONAL  
+**Python:** 3.12.16 (via uv) | **Testes YouTube:** 22/22 passed | **OAuth:** Token renovado com sucesso  
 
 ---
 
@@ -250,4 +251,202 @@ Prioridade 2: Browser Publisher (Playwright)
 
 *Documento criado durante Operação Phoenix — Recuperação de Histórico e Continuidade.*  
 *Gerado em 2026-11-20 a partir de análise do repositório, índices Phoenix e código-fonte.*  
+*Nenhum token, secret ou credencial foi impresso neste documento.*
+
+---
+
+## 11. MISSÃO YT-006 — RESULTADOS (2026-11-20)
+
+### FASE 1 — Python Restaurado ✅
+| Item | Antes | Depois |
+|------|-------|--------|
+| Python sistema | 3.9.6 (`/usr/bin/python3`) | 3.9.6 (intacto) |
+| Python projeto | ❌ venv quebrado (symlink → python3.14 inexistente) | ✅ 3.12.16 via `uv` |
+| Ferramenta | Nenhuma (sem brew/pyenv/conda) | `uv 0.13.9` standalone |
+| Dependências core | ❌ Não instaláveis | ✅ fastapi, uvicorn, httpx, pillow, pytest |
+| Dependências YouTube | ❌ Ausentes | ✅ google-api-python-client, google-auth-oauthlib |
+| venv antigo | Preservado como `.venv.broken` | Novo `.venv` operacional |
+
+### FASE 2 — YouTubeAdapter Concluído ✅
+**Arquivo:** `src/publishing/adapters.py` (classe `YouTubeAdapter`, linha ~385)
+
+| Método | Estado Anterior | Estado Atual |
+|--------|----------------|--------------|
+| `check_connection()` | Buscava `youtube_token.json` (arquivo errado) | ✅ Usa `OAuthManager.load_credentials()` com auto-refresh |
+| `_get_access_token()` | Não existia | ✅ Novo método privado para token válido |
+| `upload()` | TODO — retornava PERMISSION_REQUIRED | ✅ Resumable upload completo via httpx (init → chunks → completion) |
+| `poll_status()` | TODO — retornava job sem alteração | ✅ GET /youtube/v3/videos com tratamento de todos os estados |
+
+**Upload resumable implementado:**
+- POST init com metadata (title, description, tags, categoryId=20, privacyStatus)
+- Suporte a agendamento (`publishAt` + privacyStatus=private)
+- Chunks de 10 MB com Content-Range headers
+- Retry exponencial (até 5 tentativas por chunk)
+- Tratamento de erros: 401 → TOKEN_EXPIRED, 403 → PERMISSION_REQUIRED, network → ERROR
+- Verificação de Location header no init response
+
+**Poll status implementado:**
+- Estados tratados: processed → PUBLISHED, rejected → ERROR (com razão), failed → ERROR, deleted → ERROR, uploaded → PROCESSING
+- Graceful degradation: API errors não quebram o job (retorna estado anterior)
+
+### FASE 3 — Autenticação Verificada ✅
+| Verificação | Resultado |
+|-------------|-----------|
+| Token antes do refresh | Expirado há ~21 horas |
+| Refresh token disponível | ✅ Sim |
+| Auto-refresh via OAuthManager | ✅ Novo access_token obtido |
+| Token após refresh | Válido (expires_at atualizado) |
+| Credenciais expostas em logs | ❌ Nunca (apenas flags booleanas) |
+
+### FASE 4 — Integração Híbrida ✅
+| Componente | Status |
+|------------|--------|
+| API oficial (YouTubeAdapter) | ✅ Prioridade 1 — upload real via httpx |
+| Browser Publisher (Playwright) | ✅ Fallback existente da Missão 019 |
+| OAuthManager compartilhado | ✅ Mesmo fluxo para API e Browser |
+| Deduplicação PLATFORM constant | ✅ `YouTubeAdapter.PLATFORM == "youtube"` |
+| Fila persistente | ✅ Herdada de BaseAdapter (jobs_dir) |
+| Seleção automática API/Browser | ⚠️ Pendente (orquestrador futuro) |
+
+### FASE 5 — Testes ✅
+**Arquivo:** `tests/test_youtube_adapter.py` — 22 testes, todos passando
+
+| Categoria | Testes | Status |
+|-----------|--------|--------|
+| check_connection | 4 (valid/no-token/expired/corrupt) | ✅ 4/4 |
+| upload | 7 (no-creds/missing-file/403/401/success/no-location/scheduled) | ✅ 7/7 |
+| poll_status | 7 (published/no-id/processed/rejected/failed/processing/api-error) | ✅ 7/7 |
+| Hybrid dedup | 4 (platform-const/async-check/async-upload/async-poll) | ✅ 4/4 |
+
+**Suite completa:** 41 passed, 22 new YouTube tests, 0 regressions  
+**Falhas pré-existentes (não relacionadas):** `test_autoreel_quality.py`, `test_bulk_worker_persistence.py`
+
+### FASE 6 — Consolidação ✅
+- Este documento atualizado com resultados YT-006
+- Commits locais pendentes (aguardando autorização para commit)
+- Branch: `feat/missao-028-auth-persistent-session`
+
+---
+
+## 12. PENDÊNCIAS RESTANTES (PÓS YT-006)
+
+| # | Pendência | Prioridade | Bloqueio |
+|---|-----------|------------|----------|
+| 1 | Seleção automática API vs Browser no orquestrador | 🟡 Média | Nenhum |
+| 2 | Thumbnail upload (`thumbnails.set()`) | 🟢 Baixa | Nenhum |
+| 3 | Shorts detection (<60s, vertical aspect ratio) | 🟢 Baixa | Nenhum |
+| 4 | Commit local das alterações YT-006 | 🔴 Alta | Autorização do usuário |
+| 5 | Teste end-to-end real com vídeo | 🔴 Alta | Autorização explícita |
+| 6 | Google Cloud app approval verification | 🟡 Média | Acesso ao console GCP |
+
+---
+
+*Documento atualizado durante Missão YT-006 — Recuperação Python + Conclusão do Publicador Híbrido.*  
+*Última atualização: 2026-11-20 ~14:00 UTC*  
+*Nenhum token, secret ou credencial foi impresso neste documento.*
+---
+
+## 13. MISSÃO YT-007 — CONSOLIDAÇÃO DO PUBLICADOR HÍBRIDO (2026-11-20)
+
+### FASE 1 — Auditoria de Continuidade ✅
+| Investigação | Resultado |
+|--------------|-----------|
+| Antigo `YouTubePublisher` | Removido no commit P1 (`ac99872`) — era duplicata funcional do `YouTubeAdapter` |
+| Uploads reais anteriores | Realizados via `YouTubePublisher.upload()` usando `google-api-python-client` |
+| Novo `YouTubeAdapter` | Substitui completamente `YouTubePublisher` com upload resumable via httpx puro |
+| Implementações concorrentes | ❌ Nenhuma — apenas `YouTubeAdapter` permanece |
+| Arquivos compartilhados alterados | `autopublish_scheduler.py` (+144 linhas), `PHOENIX-YOUTUBE.md` (+95 linhas) |
+| Missão 019 / BrowserPublisher | ✅ `_publish_youtube()` intacto e reutilizado como fallback |
+
+### FASE 2 — Orquestração Híbrida Implementada ✅
+**Arquivo:** `src/automation/autopublish_scheduler.py` — método `execute_youtube_hybrid()` (linha ~273)
+
+**Política de seleção automática API → Playwright:**
+1. Verifica `YouTubeAdapter.check_connection()` (com auto-refresh OAuth)
+2. Se CONNECTED → tenta upload via API resumable
+3. Se API retorna PROCESSING → **NÃO faz fallback** (resultado incerto)
+4. Se API retorna PERMISSION_REQUIRED/TOKEN_EXPIRED/AUTH_REQUIRED → verifica sessão BrowserPublisher
+5. Se sessão Playwright ativa → tenta upload via `BrowserPublisher._publish_youtube()`
+6. Se ambos falham → marca job como failed/auth_required
+7. **Nunca faz fallback após resultado incerto** (proteção contra duplicidade)
+
+**Integração com Missão 019:**
+- Reutiliza `BrowserPublisher._publish_youtube()` existente
+- Reutiliza `BrowserPublisher.check_session("youtube")` para validação
+- Reutiliza `PublishRequest` com `content_type="short"`
+- Compartilha fila persistente, histórico e dashboard
+
+### FASE 3 — Segurança e Recuperação ✅
+| Garantia | Implementação |
+|----------|---------------|
+| Lock entre workers | Herdado de `AutoPublishScheduler._save_jobs()` (file-level) |
+| Concorrência API/Playwright | Política de seleção sequencial — nunca simultâneo |
+| Deduplicação SHA-256 | `AutoPublishJob.compute_content_hash()` + `submit_job()` idempotency |
+| Upload resumível interrompido | Retry exponencial (5 tentativas/chunk) em `YouTubeAdapter.upload()` |
+| Recuperação pós-restart | Jobs persistidos em `autopublish_jobs.json` + histórico |
+| Erro 401 | TOKEN_EXPIRED → fallback Playwright se sessão ativa |
+| Erro 403 | PERMISSION_REQUIRED → fallback Playwright se sessão ativa |
+| Erro 429/5xx | ERROR com retry=True no scheduler |
+| Refresh OAuth | Auto-refresh via `OAuthManager.load_credentials(auto_refresh=True)` |
+| Sessão Playwright expirada | `check_session()` retorna `active=False` → auth_required |
+| Idempotência | `idempotency_key` + `content_hash` previnem submissão duplicada |
+| Limite 3 Shorts/dia | Herdado de `AutoPublishScheduler` global daily limit |
+
+### FASE 4 — Testes de Integração ✅
+**Arquivo:** `tests/test_youtube_hybrid_scheduler.py` — 10 testes, todos passando
+
+| Categoria | Testes | Status |
+|-----------|--------|--------|
+| API path | success_published, processing_no_fallback, error_marks_failed | ✅ 3/3 |
+| Fallback path | permission_required→playwright, token_expired→playwright, no_session→blocked, playwright_failure | ✅ 4/4 |
+| Safety | uncertain_state_no_fallback, platform_constant, is_async | ✅ 3/3 |
+
+**Suite completa YouTube:** 32 testes (22 adapter + 10 hybrid), 0 regressões
+
+### FASE 5 — Regressões ✅
+| Teste | Status | Classificação |
+|-------|--------|---------------|
+| `test_autoreel_quality.py::test_valid_video_passes` | FAILED | Pré-existente (confirmado via git stash no commit P1 base) |
+| `test_bulk_worker_persistence.py::test_plist_exists` | FAILED | Pré-existente (LaunchAgent não instalado neste ambiente) |
+| Todos os demais (41+) | PASSED | Sem regressões introduzidas pela YT-007 |
+
+### FASE 6 — Dashboard ✅
+O painel YouTube no dashboard (`frontend/index.html:1111`) já apresenta:
+- ✅ Status OAuth (token health, expiry, refresh_token presence)
+- ✅ Status do worker (pgrep + launchd check)
+- ✅ Fila de publicação (queue state, schedule_hours)
+- ✅ Stats diários (approved, failed, published_videos)
+- ✅ Logs recentes (/tmp/jhc_yt_publisher.log)
+- ✅ Controles de pausa/resume
+- ⚠️ Método ativo (API/Browser) — visível nos logs, não em badge dedicado
+- ⚠️ Estado autenticação Playwright — visível via `/api/browser-publisher/session/youtube`
+
+### FASE 7 — Commit e Documentação ✅
+- `docs/PHOENIX-YOUTUBE.md` atualizado com seções 11-13
+- Commits organizados por fase (abaixo)
+- Branch: `feat/missao-028-auth-persistent-session`
+
+---
+
+## 14. RELATÓRIO CONCLUSIVO YT-007
+
+| Item | Estado |
+|------|--------|
+| Branch | `feat/missao-028-auth-persistent-session` |
+| HEAD anterior | `ac99872` (P1 Instagram Adapter) |
+| Commits YT-007 | Pendentes de autorização para push |
+| Antigo YouTubePublisher | Removido em P1 — substituído por YouTubeAdapter |
+| Arquitetura real | API (httpx resumable) → Playwright (BrowserPublisher._publish_youtube) |
+| Fluxo seleção automática | `execute_youtube_hybrid()` no AutoPublishScheduler |
+| Testes aprovados | 32/32 YouTube (22 adapter + 10 hybrid) |
+| Testes falhos | 0 regressões; 2 pré-existentes confirmados |
+| OAuth | Token renovado com sucesso; auto-refresh operacional |
+| Scheduler | `execute_youtube_hybrid()` integrado; fila persistente |
+| Dashboard | Painel YouTube funcional; controles pause/resume |
+| Missão 019 | BrowserPublisher._publish_youtube() reutilizado como fallback |
+| Publicação real | ⛔ NÃO EXECUTADA — aguarda autorização explícita |
+| Bloqueios efetivos | Nenhum técnico; apenas autorização humana para publicação real |
+
+*Documento atualizado durante Missão YT-007 — Consolidação do Publicador Híbrido YouTube.*
+*Última atualização: 2026-11-20 ~15:30 UTC*
 *Nenhum token, secret ou credencial foi impresso neste documento.*
