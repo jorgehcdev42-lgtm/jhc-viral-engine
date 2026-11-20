@@ -177,7 +177,7 @@ class AutoPublishScheduler:
                 video_path=job.video_path,
                 title=job.title,
                 description=job.description or "",
-                tags=job.tags or [],
+                hashtags=tuple(job.hashtags) if job.hashtags else (),
                 state="queued",
             )
             api_result = await api_adapter.upload(publish_job)
@@ -192,7 +192,7 @@ class AutoPublishScheduler:
                     result["remote_id"] = polled.remote_id
                     result["url"] = polled.published_url
                     return result
-                elif polled.state == PublishState.FAILED.value:
+                elif polled.state == PublishState.ERROR.value:
                     self.mark_failed(job.job_id, polled.error_message or "API publish failed", retry=True)
                     result["status"] = "failed"
                     result["error"] = polled.error_message
@@ -210,7 +210,7 @@ class AutoPublishScheduler:
                 # App not approved — fall through to Playwright check
                 logger.info("TikTok hybrid: API permission_required, checking browser session")
                 result["method"] = "api_denied"
-            elif api_result.state == PublishState.FAILED.value:
+            elif api_result.state == PublishState.ERROR.value:
                 result["status"] = "failed"
                 result["error"] = api_result.error_message
                 self.mark_failed(job.job_id, api_result.error_message or "API upload failed", retry=True)

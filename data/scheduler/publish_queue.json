@@ -22,10 +22,16 @@
       "file": "b7d4ce7e8669_br_reels.mp4",
       "published_at": 1795066646.360239,
       "url": "https://www.youtube.com/watch?v=orqNYcbvSuE"
+    },
+    {
+      "video_id": "v1MSvgSxMBQ",
+      "file": "9e16b55e3f19_br_reels.mp4",
+      "published_at": 1795097555.126431,
+      "url": "https://www.youtube.com/watch?v=v1MSvgSxMBQ",
+      "content_hash": "11e3b58c645781c6"
     }
   ],
   "pending": [
-    "data/autoreel/output/9e16b55e3f19_br_reels.mp4",
     "data/autoreel/output/647d0adf8086_br_reels.mp4",
     "data/autoreel/output/689b4dd3a7bb_br_reels.mp4",
     "data/autoreel/output/a2996df337fd_br_reels.mp4",
@@ -49,7 +55,8 @@
   "paused": false,
   "pause_reason": null,
   "published_hashes": [
-    "4fd65c793b9109c7"
+    "4fd65c793b9109c7",
+    "11e3b58c645781c6"
   ],
   "paused_at": 1795069864.90722,
   "resumed_at": 1795069864.989543

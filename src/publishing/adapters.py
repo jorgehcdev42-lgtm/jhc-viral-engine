@@ -158,7 +158,21 @@ class InstagramAdapter(BaseAdapter):
         except (json.JSONDecodeError, KeyError):
             return PublishState.ERROR
 
+    GRAPH_API_VERSION = "v21.0"
+    BASE_URL = "https://graph.facebook.com"
+    MAX_POLL_ATTEMPTS = 5
+    POLL_INTERVAL_SECONDS = 60
+
     async def upload(self, job: PublishJob) -> PublishJob:
+        """Upload Reel via Instagram Content Publishing API (3-step flow).
+
+        Step 1: POST /{ig_user_id}/media → create REELS container
+        Step 2: GET /{container_id}?fields=status_code → poll until FINISHED
+        Step 3: POST /{ig_user_id}/media_publish → publish finished container
+
+        Requires: instagram_business_basic + instagram_business_content_publish scopes.
+        Rate limit: 100 API-published posts per rolling 24h window.
+        """
         state = await self.check_connection()
         if state != PublishState.CONNECTED:
             return PublishJob(**{
@@ -167,27 +181,205 @@ class InstagramAdapter(BaseAdapter):
                 "error_message": f"Instagram not connected: {state.value}",
             })
 
-        # TODO: Implement real Instagram API call
-        # POST https://graph.facebook.com/v18.0/{ig_user_id}/media
-        # Body: video_url, caption, media_type=REELS
-        # Then poll GET /{container_id} until status_code=FINISHED
-        # Then POST /{ig_user_id}/media_publish with creation_id
+        token_path = self.credentials_dir / "instagram_oauth.json"
+        legacy_path = self.credentials_dir / "instagram_token.json"
+        path = token_path if token_path.exists() else legacy_path
+        try:
+            token_data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            return PublishJob(**{**job.to_dict(), "state": PublishState.ERROR.value, "error_message": f"Cannot read Instagram token: {e}"})
 
-        logger.info(
-            "Instagram upload prepared for %s (real API requires configured token)",
-            job.title[:40],
-        )
-        return PublishJob(**{
-            **job.to_dict(),
-            "state": PublishState.PERMISSION_REQUIRED.value,
-            "error_message": "Instagram API integration ready — requires Meta Business Account setup and OAuth token. See dashboard Connections page.",
-        })
+        access_token = token_data.get("access_token", "")
+        ig_user_id = token_data.get("account_id", "")
+        if not access_token or not ig_user_id:
+            return PublishJob(**{**job.to_dict(), "state": PublishState.AUTH_REQUIRED.value, "error_message": "Missing access_token or account_id in Instagram credentials"})
+
+        import httpx
+
+        # Build caption with hashtags
+        caption = job.description or ""
+        if job.hashtags:
+            tag_str = " ".join(f"#{t}" for t in job.hashtags[:30])
+            caption = f"{caption}\n\n{tag_str}".strip()
+
+        # --- Step 1: Create REELS media container ---
+        container_url = f"{self.BASE_URL}/{self.GRAPH_API_VERSION}/{ig_user_id}/media"
+        container_payload = {
+            "media_type": "REELS",
+            "video_url": job.video_path,  # Must be publicly accessible URL
+            "caption": caption[:2200],
+            "share_to_feed": "true",
+            "access_token": access_token,
+        }
+        if job.thumbnail_path:
+            container_payload["cover_url"] = job.thumbnail_path
+
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.post(container_url, data=container_payload)
+                data = resp.json()
+
+            if resp.status_code != 200 or "id" not in data:
+                error_msg = data.get("error", {}).get("message", str(data))[:300]
+                # Permission errors → explicit state
+                if "permission" in error_msg.lower() or "not authorized" in error_msg.lower():
+                    return PublishJob(**{
+                        **job.to_dict(),
+                        "state": PublishState.PERMISSION_REQUIRED.value,
+                        "error_message": f"Instagram API permission denied: {error_msg}",
+                    })
+                return PublishJob(**{
+                    **job.to_dict(),
+                    "state": PublishState.ERROR.value,
+                    "error_message": f"Container creation failed: {error_msg}",
+                })
+
+            container_id = data["id"]
+            logger.info("Instagram container created: %s for %s", container_id, job.title[:40])
+
+        except Exception as e:
+            logger.error("Instagram container creation error: %s", e)
+            return PublishJob(**{**job.to_dict(), "state": PublishState.ERROR.value, "error_message": f"Network error creating container: {str(e)[:200]}"})
+
+        # --- Step 2: Poll container status until FINISHED ---
+        status_url = f"{self.BASE_URL}/{self.GRAPH_API_VERSION}/{container_id}"
+        final_status = None
+        for attempt in range(self.MAX_POLL_ATTEMPTS):
+            try:
+                async with httpx.AsyncClient(timeout=15) as client:
+                    poll_resp = await client.get(
+                        status_url,
+                        params={"fields": "status_code", "access_token": access_token},
+                    )
+                    poll_data = poll_resp.json()
+
+                status_code = poll_data.get("status_code", "UNKNOWN")
+                logger.debug(
+                    "Instagram poll %d/%d: container=%s status=%s",
+                    attempt + 1, self.MAX_POLL_ATTEMPTS, container_id, status_code,
+                )
+
+                if status_code == "FINISHED":
+                    final_status = "FINISHED"
+                    break
+                elif status_code in ("ERROR", "EXPIRED"):
+                    error_info = poll_data.get("status_code", status_code)
+                    return PublishJob(**{
+                        **job.to_dict(),
+                        "state": PublishState.ERROR.value,
+                        "error_message": f"Container processing failed: {error_info}",
+                        "platform_post_id": container_id,
+                    })
+                # IN_PROGRESS → wait and retry
+                import asyncio
+                await asyncio.sleep(self.POLL_INTERVAL_SECONDS)
+
+            except Exception as e:
+                logger.warning("Instagram poll error (attempt %d): %s", attempt + 1, e)
+                import asyncio
+                await asyncio.sleep(self.POLL_INTERVAL_SECONDS)
+
+        if final_status != "FINISHED":
+            return PublishJob(**{
+                **job.to_dict(),
+                "state": PublishState.PROCESSING.value,
+                "error_message": f"Container still processing after {self.MAX_POLL_ATTEMPTS} polls — retry later",
+                "platform_post_id": container_id,
+            })
+
+        # --- Step 3: Publish the finished container ---
+        publish_url = f"{self.BASE_URL}/{self.GRAPH_API_VERSION}/{ig_user_id}/media_publish"
+        publish_payload = {
+            "creation_id": container_id,
+            "access_token": access_token,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                pub_resp = await client.post(publish_url, data=publish_payload)
+                pub_data = pub_resp.json()
+
+            if pub_resp.status_code != 200 or "id" not in pub_data:
+                error_msg = pub_data.get("error", {}).get("message", str(pub_data))[:300]
+                return PublishJob(**{
+                    **job.to_dict(),
+                    "state": PublishState.ERROR.value,
+                    "error_message": f"Publish failed: {error_msg}",
+                    "platform_post_id": container_id,
+                })
+
+            media_id = pub_data["id"]
+            permalink = f"https://www.instagram.com/reel/{media_id}/"
+            logger.info("Instagram Reel published: media_id=%s", media_id)
+
+            return PublishJob(**{
+                **job.to_dict(),
+                "state": PublishState.PUBLISHED.value,
+                "platform_post_id": media_id,
+                "permalink": permalink,
+            })
+
+        except Exception as e:
+            logger.error("Instagram publish error: %s", e)
+            return PublishJob(**{
+                **job.to_dict(),
+                "state": PublishState.ERROR.value,
+                "error_message": f"Network error publishing: {str(e)[:200]}",
+                "platform_post_id": container_id,
+            })
 
     async def poll_status(self, job: PublishJob) -> PublishJob:
+        """Poll container or post status from Instagram Graph API."""
         if job.state == PublishState.PUBLISHED.value:
             return job
-        # TODO: GET https://graph.facebook.com/v18.0/{container_id}
-        return job
+        if not job.platform_post_id:
+            return job
+
+        token_path = self.credentials_dir / "instagram_oauth.json"
+        legacy_path = self.credentials_dir / "instagram_token.json"
+        path = token_path if token_path.exists() else legacy_path
+        if not path.exists():
+            return job
+
+        try:
+            token_data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return job
+
+        access_token = token_data.get("access_token", "")
+        if not access_token:
+            return job
+
+        import httpx
+        status_url = f"{self.BASE_URL}/{self.GRAPH_API_VERSION}/{job.platform_post_id}"
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(
+                    status_url,
+                    params={"fields": "status_code", "access_token": access_token},
+                )
+                data = resp.json()
+
+            status_code = data.get("status_code", "")
+            if status_code == "FINISHED":
+                # Container ready but not yet published — caller should re-upload
+                return job
+            elif status_code == "PUBLISHED":
+                return PublishJob(**{
+                    **job.to_dict(),
+                    "state": PublishState.PUBLISHED.value,
+                })
+            elif status_code in ("ERROR", "EXPIRED"):
+                return PublishJob(**{
+                    **job.to_dict(),
+                    "state": PublishState.ERROR.value,
+                    "error_message": f"Instagram container status: {status_code}",
+                })
+            return job
+
+        except Exception as e:
+            logger.warning("Instagram poll_status error: %s", e)
+            return job
 
 
 class YouTubeAdapter(BaseAdapter):
@@ -297,7 +489,7 @@ class TikTokAdapter(BaseAdapter):
         video_path = Path(job.video_path) if job.video_path else None
 
         if not video_path or not video_path.exists():
-            return PublishJob(**{**job.to_dict(), "state": PublishState.FAILED.value, "error_message": f"Video file not found: {job.video_path}"})
+            return PublishJob(**{**job.to_dict(), "state": PublishState.ERROR.value, "error_message": f"Video file not found: {job.video_path}"})
 
         file_size = video_path.stat().st_size
         chunk_size = min(file_size, 10 * 1024 * 1024)  # max 10MB per chunk
@@ -310,8 +502,8 @@ class TikTokAdapter(BaseAdapter):
         }
 
         caption = job.description or ""
-        if job.tags:
-            tag_str = " ".join(f"#{t}" for t in job.tags[:30])
+        if job.hashtags:
+            tag_str = " ".join(f"#{t}" for t in job.hashtags[:30])
             caption = f"{caption} {tag_str}".strip()
 
         init_body = {
@@ -346,13 +538,13 @@ class TikTokAdapter(BaseAdapter):
                         "state": PublishState.PERMISSION_REQUIRED.value,
                         "error_message": f"TikTok app not approved for Direct Post: {error_msg}",
                     })
-                return PublishJob(**{**job.to_dict(), "state": PublishState.FAILED.value, "error_message": f"Init failed: {error_msg}"})
+                return PublishJob(**{**job.to_dict(), "state": PublishState.ERROR.value, "error_message": f"Init failed: {error_msg}"})
 
             publish_id = init_data["data"]["publish_id"]
             upload_url = init_data["data"].get("upload_url", "")
 
             if not upload_url:
-                return PublishJob(**{**job.to_dict(), "state": PublishState.FAILED.value, "error_message": "No upload_url in init response"})
+                return PublishJob(**{**job.to_dict(), "state": PublishState.ERROR.value, "error_message": "No upload_url in init response"})
 
             # Step 2: Upload video bytes
             upload_headers = {
@@ -368,7 +560,7 @@ class TikTokAdapter(BaseAdapter):
             if upload_resp.status_code not in (200, 201):
                 return PublishJob(**{
                     **job.to_dict(),
-                    "state": PublishState.FAILED.value,
+                    "state": PublishState.ERROR.value,
                     "error_message": f"Upload failed: HTTP {upload_resp.status_code}",
                     "remote_id": publish_id,
                 })
@@ -383,7 +575,7 @@ class TikTokAdapter(BaseAdapter):
 
         except Exception as e:
             logger.error("TikTok upload error: %s", e)
-            return PublishJob(**{**job.to_dict(), "state": PublishState.FAILED.value, "error_message": str(e)[:200]})
+            return PublishJob(**{**job.to_dict(), "state": PublishState.ERROR.value, "error_message": str(e)[:200]})
 
     async def poll_status(self, job: PublishJob) -> PublishJob:
         """Poll TikTok publish status via /v2/post/publish/status/fetch/."""
@@ -431,7 +623,7 @@ class TikTokAdapter(BaseAdapter):
             elif status == "FAILED":
                 return PublishJob(**{
                     **job.to_dict(),
-                    "state": PublishState.FAILED.value,
+                    "state": PublishState.ERROR.value,
                     "error_message": f"TikTok publish failed: {fail_reason}",
                     "remote_id": job.remote_id,
                 })
