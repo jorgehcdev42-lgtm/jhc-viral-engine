@@ -159,6 +159,26 @@ class TestUpload:
         assert result.permalink is not None
 
     @pytest.mark.asyncio
+    async def test_upload_rejects_local_file_path(self, adapter, valid_token):
+        """Local filesystem paths must be rejected — Meta API requires HTTPS URLs."""
+        local_job = PublishJob(
+            job_id="j-local", profile_id="test_profile", platform="instagram",
+            video_path="/tmp/video.mp4", title="Test", description="",
+        )
+        result = await adapter.upload(local_job)
+        assert result.state == PublishState.ERROR.value
+        assert "https" in result.error_message.lower() or "url" in result.error_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_upload_rejects_empty_video_path(self, adapter, valid_token):
+        empty_job = PublishJob(
+            job_id="j-empty", profile_id="test_profile", platform="instagram",
+            video_path="", title="Test", description="",
+        )
+        result = await adapter.upload(empty_job)
+        assert result.state == PublishState.ERROR.value
+
+    @pytest.mark.asyncio
     async def test_upload_permission_denied(self, adapter, valid_token, sample_job):
         """API retorna erro de permissão → PERMISSION_REQUIRED."""
         error_response = MagicMock(

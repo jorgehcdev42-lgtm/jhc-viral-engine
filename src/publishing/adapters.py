@@ -196,6 +196,18 @@ class InstagramAdapter(BaseAdapter):
 
         import httpx
 
+        # Validate video_url: Meta Content Publishing API requires a publicly accessible HTTPS URL
+        import re as _re
+        if not job.video_path or not _re.match(r'^https?://', job.video_path):
+            return PublishJob(**{
+                **job.to_dict(),
+                "state": PublishState.ERROR.value,
+                "error_message": (
+                    f"Instagram Content Publishing API requires a publicly accessible HTTPS URL. "
+                    f"Got: {job.video_path!r}. Upload the video to a public host first."
+                ),
+            })
+
         # Build caption with hashtags
         caption = job.description or ""
         if job.hashtags:
@@ -206,7 +218,7 @@ class InstagramAdapter(BaseAdapter):
         container_url = f"{self.BASE_URL}/{self.GRAPH_API_VERSION}/{ig_user_id}/media"
         container_payload = {
             "media_type": "REELS",
-            "video_url": job.video_path,  # Must be publicly accessible URL
+            "video_url": job.video_path,
             "caption": caption[:2200],
             "share_to_feed": "true",
             "access_token": access_token,
@@ -309,8 +321,24 @@ class InstagramAdapter(BaseAdapter):
                 })
 
             media_id = pub_data["id"]
-            permalink = f"https://www.instagram.com/reel/{media_id}/"
-            logger.info("Instagram Reel published: media_id=%s", media_id)
+
+            # Fetch shortcode for proper Reel permalink (media_id alone is not a valid URL slug)
+            shortcode = ""
+            try:
+                async with httpx.AsyncClient(timeout=15) as meta_client:
+                    meta_resp = await meta_client.get(
+                        f"{self.BASE_URL}/{self.GRAPH_API_VERSION}/{media_id}",
+                        params={"fields": "shortcode,permalink", "access_token": access_token},
+                    )
+                    meta_data = meta_resp.json()
+                    shortcode = meta_data.get("shortcode", "")
+                    if not shortcode:
+                        shortcode = meta_data.get("permalink", "").rstrip("/").split("/")[-1]
+            except Exception as e:
+                logger.warning("Failed to fetch shortcode for media_id=%s: %s", media_id, e)
+
+            permalink = f"https://www.instagram.com/reel/{shortcode}/" if shortcode else ""
+            logger.info("Instagram Reel published: media_id=%s shortcode=%s", media_id, shortcode)
 
             return PublishJob(**{
                 **job.to_dict(),
@@ -388,55 +416,319 @@ class YouTubeAdapter(BaseAdapter):
     Uses resumable upload for video files. Supports Shorts and standard videos.
     Requires: Google Cloud project with YouTube Data API enabled,
     OAuth 2.0 credentials with youtube.upload scope.
+
+    Upload flow (resumable):
+      1. POST /upload/youtube/v3/videos?uploadType=resumable → get upload_url
+      2. PUT chunks to upload_url with Content-Range headers
+      3. On completion, response contains video resource with id
+      4. Poll GET /youtube/v3/videos?id={id}&part=status for processing
     """
 
     PLATFORM = "youtube"
+    UPLOAD_INIT_URL = "https://www.googleapis.com/upload/youtube/v3/videos"
+    DATA_API_URL = "https://www.googleapis.com/youtube/v3/videos"
+    CHUNK_SIZE = 10 * 1024 * 1024  # 10 MB chunks (Google recommends multiples of 256KB)
+    MAX_POLL_ATTEMPTS = 30
+    POLL_INTERVAL = 10  # seconds between status polls
 
     async def check_connection(self) -> PublishState:
-        token_path = self.credentials_dir / "youtube_token.json"
-        if not token_path.exists():
+        """Check YouTube connection via OAuthManager (auto-refreshes expired tokens)."""
+        from src.publishing.oauth import OAuthManager
+
+        manager = OAuthManager(self.data_root)
+        creds = manager.load_credentials(self.profile_id, "youtube", auto_refresh=True)
+
+        if creds is None:
             return PublishState.AUTH_REQUIRED
-        try:
-            data = json.loads(token_path.read_text(encoding="utf-8"))
-            expires = data.get("expires_at", 0)
-            if expires and time.time() > expires:
-                return PublishState.TOKEN_EXPIRED
-            if not data.get("access_token"):
-                return PublishState.AUTH_REQUIRED
-            return PublishState.CONNECTED
-        except (json.JSONDecodeError, KeyError):
-            return PublishState.ERROR
+        if creds.is_expired:
+            return PublishState.TOKEN_EXPIRED
+        if not creds.access_token:
+            return PublishState.AUTH_REQUIRED
+        return PublishState.CONNECTED
+
+    async def _get_access_token(self) -> Optional[str]:
+        """Get a valid access token, refreshing if needed."""
+        from src.publishing.oauth import OAuthManager
+
+        manager = OAuthManager(self.data_root)
+        creds = manager.load_credentials(self.profile_id, "youtube", auto_refresh=True)
+
+        if creds is None or creds.is_expired or not creds.access_token:
+            return None
+        return creds.access_token
 
     async def upload(self, job: PublishJob) -> PublishJob:
-        state = await self.check_connection()
-        if state != PublishState.CONNECTED:
+        """Real YouTube resumable upload via httpx."""
+        import os
+        import httpx
+
+        access_token = await self._get_access_token()
+        if not access_token:
+            state = await self.check_connection()
             return PublishJob(**{
                 **job.to_dict(),
                 "state": state.value,
                 "error_message": f"YouTube not connected: {state.value}",
             })
 
-        # TODO: Implement real YouTube resumable upload
-        # POST https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status
-        # Body: snippet.title, snippet.description, snippet.tags, snippet.categoryId=20 (Gaming)
-        #       status.privacyStatus, status.publishAt (for scheduling)
-        # Then PUT chunks to upload_url
+        video_path = Path(job.video_path)
+        if not video_path.exists():
+            return PublishJob(**{
+                **job.to_dict(),
+                "state": PublishState.ERROR.value,
+                "error_message": f"Video file not found: {job.video_path}",
+            })
 
+        file_size = video_path.stat().st_size
         logger.info(
-            "YouTube upload prepared for %s (real API requires OAuth token)",
-            job.title[:40],
+            "YouTube resumable upload starting: %s (%.1f MB)",
+            job.title[:40], file_size / 1_048_576,
         )
+
+        # --- Step 1: Initiate resumable upload ---
+        body = {
+            "snippet": {
+                "title": (job.title or "Untitled")[:100],
+                "description": (job.description or "")[:5000],
+                "tags": list(job.hashtags[:30]) if job.hashtags else [],
+                "categoryId": "20",  # Gaming
+            },
+            "status": {
+                "privacyStatus": job.privacy or "public",
+                "selfDeclaredMadeForKids": False,
+            },
+        }
+
+        # Add scheduled publish time if specified
+        if job.scheduled_at and job.scheduled_at > time.time():
+            import datetime
+            dt = datetime.datetime.fromtimestamp(job.scheduled_at, tz=datetime.timezone.utc)
+            body["status"]["publishAt"] = dt.isoformat()
+            body["status"]["privacyStatus"] = "private"  # Required for scheduled videos
+
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                init_resp = await client.post(
+                    self.UPLOAD_INIT_URL,
+                    params={"uploadType": "resumable", "part": "snippet,status"},
+                    json=body,
+                    headers={
+                        "Authorization": f"Bearer {access_token}",
+                        "Content-Type": "application/json; charset=UTF-8",
+                        "X-Upload-Content-Type": "video/mp4",
+                        "X-Upload-Content-Length": str(file_size),
+                    },
+                )
+
+            if init_resp.status_code != 200:
+                error_msg = init_resp.text[:300]
+                if init_resp.status_code == 401:
+                    return PublishJob(**{
+                        **job.to_dict(),
+                        "state": PublishState.TOKEN_EXPIRED.value,
+                        "error_message": f"YouTube auth expired during upload init: {error_msg}",
+                    })
+                if init_resp.status_code == 403:
+                    return PublishJob(**{
+                        **job.to_dict(),
+                        "state": PublishState.PERMISSION_REQUIRED.value,
+                        "error_message": f"YouTube API permission denied: {error_msg}",
+                    })
+                return PublishJob(**{
+                    **job.to_dict(),
+                    "state": PublishState.ERROR.value,
+                    "error_message": f"Upload init failed (HTTP {init_resp.status_code}): {error_msg}",
+                })
+
+            upload_url = init_resp.headers.get("location")
+            if not upload_url:
+                return PublishJob(**{
+                    **job.to_dict(),
+                    "state": PublishState.ERROR.value,
+                    "error_message": "Upload init succeeded but no Location header returned",
+                })
+
+            logger.info("YouTube resumable upload session created for %s", job.title[:40])
+
+        except Exception as e:
+            logger.error("YouTube upload init error: %s", e)
+            return PublishJob(**{
+                **job.to_dict(),
+                "state": PublishState.ERROR.value,
+                "error_message": f"Network error during upload init: {str(e)[:200]}",
+            })
+
+        # --- Step 2: Upload video in chunks ---
+        uploaded = 0
+        max_retries = 5
+
+        try:
+            with open(video_path, "rb") as f:
+                while uploaded < file_size:
+                    chunk_end = min(uploaded + self.CHUNK_SIZE, file_size)
+                    chunk_size = chunk_end - uploaded
+                    chunk = f.read(chunk_size)
+
+                    content_range = f"bytes {uploaded}-{chunk_end - 1}/{file_size}"
+
+                    retry_count = 0
+                    while retry_count < max_retries:
+                        try:
+                            async with httpx.AsyncClient(timeout=120) as client:
+                                put_resp = await client.put(
+                                    upload_url,
+                                    content=chunk,
+                                    headers={
+                                        "Content-Range": content_range,
+                                        "Content-Type": "video/mp4",
+                                    },
+                                )
+
+                            # 308 = Resume Incomplete (more chunks expected)
+                            # 200/201 = Upload complete
+                            if put_resp.status_code in (200, 201):
+                                # Upload complete — parse response
+                                result_data = put_resp.json()
+                                video_id = result_data.get("id", "")
+                                permalink = f"https://www.youtube.com/watch?v={video_id}" if video_id else None
+
+                                logger.info(
+                                    "YouTube upload complete: %s → %s",
+                                    job.title[:40], video_id,
+                                )
+
+                                return PublishJob(**{
+                                    **job.to_dict(),
+                                    "state": PublishState.PROCESSING.value,
+                                    "platform_post_id": video_id,
+                                    "permalink": permalink,
+                                })
+
+                            elif put_resp.status_code == 308:
+                                # Chunk accepted, continue
+                                uploaded = chunk_end
+                                break  # Exit retry loop, continue outer while
+
+                            elif put_resp.status_code == 401:
+                                return PublishJob(**{
+                                    **job.to_dict(),
+                                    "state": PublishState.TOKEN_EXPIRED.value,
+                                    "error_message": "Token expired during chunk upload",
+                                })
+
+                            else:
+                                retry_count += 1
+                                if retry_count >= max_retries:
+                                    return PublishJob(**{
+                                        **job.to_dict(),
+                                        "state": PublishState.ERROR.value,
+                                        "error_message": f"Chunk upload failed after {max_retries} retries (HTTP {put_resp.status_code})",
+                                    })
+                                await asyncio.sleep(2 ** retry_count)
+
+                        except Exception as e:
+                            retry_count += 1
+                            if retry_count >= max_retries:
+                                return PublishJob(**{
+                                    **job.to_dict(),
+                                    "state": PublishState.ERROR.value,
+                                    "error_message": f"Chunk upload network error after {max_retries} retries: {str(e)[:200]}",
+                                })
+                            await asyncio.sleep(2 ** retry_count)
+
+        except Exception as e:
+            logger.error("YouTube chunk upload error: %s", e)
+            return PublishJob(**{
+                **job.to_dict(),
+                "state": PublishState.ERROR.value,
+                "error_message": f"File read error during upload: {str(e)[:200]}",
+            })
+
+        # Should not reach here, but safety net
         return PublishJob(**{
             **job.to_dict(),
-            "state": PublishState.PERMISSION_REQUIRED.value,
-            "error_message": "YouTube API integration ready — requires Google Cloud project setup and OAuth token. See dashboard Connections page.",
+            "state": PublishState.ERROR.value,
+            "error_message": "Upload completed without receiving video ID from YouTube",
         })
 
     async def poll_status(self, job: PublishJob) -> PublishJob:
+        """Poll YouTube Data API for video processing status."""
+        import httpx
+
         if job.state == PublishState.PUBLISHED.value:
             return job
-        # TODO: GET https://www.googleapis.com/youtube/v3/videos?id={video_id}&part=status
-        return job
+
+        video_id = job.platform_post_id
+        if not video_id:
+            return job
+
+        access_token = await self._get_access_token()
+        if not access_token:
+            logger.warning("Cannot poll YouTube status: no valid access token")
+            return job
+
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(
+                    self.DATA_API_URL,
+                    params={"id": video_id, "part": "status,snippet"},
+                    headers={"Authorization": f"Bearer {access_token}"},
+                )
+
+            if resp.status_code != 200:
+                logger.warning("YouTube status poll failed (HTTP %d) for %s", resp.status_code, video_id)
+                return job
+
+            data = resp.json()
+            items = data.get("items", [])
+            if not items:
+                logger.warning("YouTube video %s not found in API response", video_id)
+                return job
+
+            video = items[0]
+            status = video.get("status", {})
+            upload_status = status.get("uploadStatus", "")
+            privacy = status.get("privacyStatus", "")
+
+            # uploadStatus: uploaded, processed, rejected, failed, deleted
+            if upload_status == "processed":
+                logger.info("YouTube video %s fully processed and published", video_id)
+                return PublishJob(**{
+                    **job.to_dict(),
+                    "state": PublishState.PUBLISHED.value,
+                    "permalink": f"https://www.youtube.com/watch?v={video_id}",
+                })
+            elif upload_status == "rejected":
+                reason = status.get("rejectionReason", "unknown")
+                return PublishJob(**{
+                    **job.to_dict(),
+                    "state": PublishState.ERROR.value,
+                    "error_message": f"YouTube rejected video: {reason}",
+                })
+            elif upload_status == "failed":
+                reason = status.get("failureReason", "unknown")
+                return PublishJob(**{
+                    **job.to_dict(),
+                    "state": PublishState.ERROR.value,
+                    "error_message": f"YouTube processing failed: {reason}",
+                })
+            elif upload_status == "deleted":
+                return PublishJob(**{
+                    **job.to_dict(),
+                    "state": PublishState.ERROR.value,
+                    "error_message": "Video was deleted on YouTube",
+                })
+            else:
+                # Still processing or uploaded
+                logger.debug("YouTube video %s status: %s", video_id, upload_status)
+                return PublishJob(**{
+                    **job.to_dict(),
+                    "state": PublishState.PROCESSING.value,
+                })
+
+        except Exception as e:
+            logger.warning("YouTube status poll error for %s: %s", video_id, e)
+            return job
 
 
 class TikTokAdapter(BaseAdapter):

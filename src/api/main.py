@@ -3564,72 +3564,49 @@ async def publish_ready_jobs():
 
 @app.get("/api/auto-publish/status")
 async def auto_publish_status():
-    """Status dos conectores de publicação automática."""
-    from src.publishing.auto_publisher import AutoPublisher
-    publisher = AutoPublisher()
-    return publisher.get_status()
+    """DEPRECATED: Use /api/autopublish/status (AutoPublishScheduler with adapters.py)."""
+    return {
+        "deprecated": True,
+        "message": "Legacy AutoPublisher removed. Use /api/autopublish/status for the canonical scheduler.",
+        "replacement": "/api/autopublish/status",
+    }
 
 
 @app.post("/api/auto-publish/publish")
 async def auto_publish_execute(request: Request):
-    """Publica vídeo via API automática (simulado sem credenciais, real com OAuth)."""
-    from src.publishing.auto_publisher import AutoPublisher
-    body = await request.json()
-    platform = body.get("platform", "").strip().lower()
-    job_id = body.get("job_id", "").strip()
-    video_path = body.get("video_path", "").strip()
-    title = body.get("title", "")
-    description = body.get("description", "")
-    tags = body.get("tags", [])
-
-    if not platform or not video_path:
-        return JSONResponse(status_code=400, content={"detail": "platform e video_path obrigatórios"})
-
-    publisher = AutoPublisher()
-    result = publisher.publish(
-        platform=platform,
-        video_path=video_path,
-        title=title,
-        description=description,
-        tags=tags,
-        job_id=job_id,
+    """DEPRECATED: Use /api/autopublish/queue/add (AutoPublishScheduler with adapters.py)."""
+    return JSONResponse(
+        status_code=410,
+        content={
+            "deprecated": True,
+            "message": "Legacy AutoPublisher removed. Use /api/autopublish/queue/add with the canonical adapter-based scheduler.",
+            "replacement": "/api/autopublish/queue/add",
+        },
     )
-    return result.to_dict()
 
 
 @app.post("/api/auto-publish/publish-all")
 async def auto_publish_all(request: Request):
-    """Publica em todas as plataformas configuradas."""
-    from src.publishing.auto_publisher import AutoPublisher
-    body = await request.json()
-    job_id = body.get("job_id", "").strip()
-    video_path = body.get("video_path", "").strip()
-    title = body.get("title", "")
-    description = body.get("description", "")
-    tags = body.get("tags", [])
-    platforms = body.get("platforms", None)
-
-    if not video_path:
-        return JSONResponse(status_code=400, content={"detail": "video_path obrigatório"})
-
-    publisher = AutoPublisher()
-    results = publisher.publish_all(
-        video_path=video_path,
-        title=title,
-        description=description,
-        tags=tags,
-        job_id=job_id,
-        platforms=platforms,
+    """DEPRECATED: Use /api/autopublish/queue/add per platform (AutoPublishScheduler)."""
+    return JSONResponse(
+        status_code=410,
+        content={
+            "deprecated": True,
+            "message": "Legacy AutoPublisher removed. Queue jobs individually via /api/autopublish/queue/add.",
+            "replacement": "/api/autopublish/queue/add",
+        },
     )
-    return {"results": [r.to_dict() for r in results], "count": len(results)}
 
 
 @app.get("/api/auto-publish/history")
 async def auto_publish_history(limit: int = 50):
-    """Histórico de publicações automáticas."""
-    from src.publishing.auto_publisher import AutoPublisher
-    publisher = AutoPublisher()
-    return {"history": publisher.get_publish_history(limit=limit)}
+    """DEPRECATED: Use /api/autopublish/status for queue summary."""
+    return {
+        "deprecated": True,
+        "history": [],
+        "message": "Legacy AutoPublisher removed. Use /api/autopublish/status for current queue and history.",
+        "replacement": "/api/autopublish/status",
+    }
 
 
 # =============================================================================
