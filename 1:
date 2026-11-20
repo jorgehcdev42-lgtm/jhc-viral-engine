@@ -1,0 +1,112 @@
+import json, os, subprocess, time
+from pathlib import Path
+from datetime import datetime
+
+BASE = Path("/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6")
+ENTRIES = BASE / "data/bulk_import/state/download_entries.json"
+PROGRESS = BASE / "data/bulk_import/state/import_progress.json"
+WORKER_LOG = BASE / "data/bulk_import/logs/worker.log"
+
+print("=" * 60)
+print("MISSÃO 032.1 — PRIORIDADE 1: DIAGNÓSTICO COMPLETO")
+print("=" * 60)
+
+# 1. Checkpoint state
+with open(ENTRIES) as f:
+    entries = json.load(f)
+
+print(f"\n[1] CHECKPOINT: {len(entries)} entries")
+from collections import Counter
+states = Counter(e.get("state") for e in entries)
+for s, c in sorted(states.items()):
+    print(f"    {s}: {c}")
+
+# Mtime do checkpoint
+mt = os.path.getmtime(ENTRIES)
+print(f"\n[2] Checkpoint última modificação: {datetime.fromtimestamp(mt).isoformat()} ({time.time() - mt:.0f}s atrás)")
+
+# 3. Arquivos problemáticos
+print(f"\n[3] DIAGNÓSTICO DOS 3 DOWNLOADS:")
+targets = ["Vídeo 0117.mp4", "Vídeo 0772.mp4", "Vídeo 0174.mp4"]
+for t in targets:
+    found = [e for e in entries if e.get("filename") == t]
+    if not found:
+        print(f"  {t}: NÃO ENCONTRADO NO CHECKPOINT")
+        continue
+    e = found[0]
+    started = e.get("started_at")
+    completed = e.get("completed_at")
+    created = e.get("created_at")
+    age_min = (time.time() - started) / 60 if started else None
+    print(f"  {t}:")
+    print(f"    state={e.get('state')} retries={e.get('retries',0)}/{e.get('max_retries',0)}")
+    print(f"    size_bytes={e.get('size_bytes',0)} expected={e.get('expected_size',0)}")
+    print(f"    error='{e.get('error','')}'")
+    print(f"    started_at={datetime.fromtimestamp(started).isoformat() if started else None} ({age_min:.1f}min atrás)" if age_min else f"    started_at=None")
+    # Verifica arquivo físico parcial
+    fn = e.get("filename")
+    for base in [BASE / "VIDEOS CORTES", Path("/Volumes/SSD EXT MACBOOK/VIDEOS CORTES")]:
+        p = base / fn
+        if p.exists():
+            print(f"    arquivo físico: {p} ({p.stat().st_size} bytes)")
+
+# 4. Worker process + múltiplas instâncias
+print(f"\n[4] WORKER PROCESS:")
+r = subprocess.run(["ps", "aux"], capture_output=True, text=True)
+procs = [l for l in r.stdout.split("\n") if "bulk_worker" in l and "grep" not in l]
+print(f"  Processos bulk_worker ativos: {len(procs)}")
+for p in procs:
+    print(f"    {p[:120]}")
+
+# 5. Launchd
+print(f"\n[5] LAUNCHD:")
+r = subprocess.run(["launchctl", "list"], capture_output=True, text=True)
+jhc = [l for l in r.stdout.split("\n") if "jhc" in l.lower()]
+for j in jhc:
+    print(f"  {j}")
+
+# 6. SSD espaço
+print(f"\n[6] SSD ESPAÇO:")
+r = subprocess.run(["df", "-h", "/Volumes/SSD EXT MACBOOK"], capture_output=True, text=True)
+lines = r.stdout.strip().split("\n")
+if len(lines) > 1:
+    parts = lines[-1].split()
+    print(f"  Livre: {parts[3]} de {parts[1]}")
+
+# 7. Últimas 30 linhas do log
+print(f"\n[7] WORKER LOG (últimas 30 linhas):")
+if WORKER_LOG.exists():
+    lines = WORKER_LOG.read_text().strip().split("\n")
+    for line in lines[-30:]:
+        print(f"  {line}")
+else:
+    print("  ❌ Log não encontrado")
+
+# 8. Progresso último
+print(f"\n[8] PROGRESS FILE:")
+if PROGRESS.exists():
+    with open(PROGRESS) as f:
+        prog = json.load(f)
+    print(f"  bytes_downloaded: {prog.get('bytes_downloaded', 0) / (1024**2):.1f} MB")
+    print(f"  ssd_free: {prog.get('ssd_free_bytes', 0) / (1024**3):.1f} GB")
+    print(f"  is_running: {prog.get('is_running')}")
+    print(f"  last_updated: {datetime.fromtimestamp(prog.get('last_updated', 0)).isoformat()}")
+
+# 9. Watchdog: DOWNLOADING com age > 10min e size=0 => STALLED
+print(f"\n[9] WATCHDOG STALLED CHECK:")
+stalled = []
+for e in entries:
+    if e.get("state") == "DOWNLOADING":
+        st = e.get("started_at", 0)
+        age_min = (time.time() - st) / 60 if st else 0
+        size = e.get("size_bytes", 0)
+        print(f"  {e.get('filename')}: age={age_min:.1f}min size={size}")
+        if age_min > 10 and size == 0:
+            stalled.append(e.get("filename"))
+            print(f"    ⚠️ STALLED (>10min, 0 bytes) - candidato a reset")
+if stalled:
+    print(f"  AÇÃO RECOMENDADA: resetar {stalled} para PENDING")
+else:
+    print(f"  ✅ Nenhum download stalled detectado")
+
+print("\n" + "=" * 60)

@@ -212,12 +212,16 @@ class BrowserPublisher:
             )
 
         async with async_playwright() as p:
-            # Usa contexto persistente para manter cookies
+            # Instagram requer modo visivel (nao headless) para bypass anti-bot da Meta.
+            # TikTok e YouTube funcionam em headless; Instagram precisa de renderizacao completa.
+            is_instagram = request.platform == "instagram"
+            launch_args = ["--disable-blink-features=AutomationControlled"] if is_instagram else []
             context = await p.chromium.launch_persistent_context(
                 user_data_dir=str(self.sessions_dir / f"{request.platform}_profile"),
-                headless=True,
-                viewport={"width": 1280, "height": 800},
+                headless=not is_instagram,
+                viewport={"width": 1280, "height": 900 if is_instagram else 800},
                 locale="pt-BR",
+                args=launch_args,
             )
             page = context.pages[0] if context.pages else await context.new_page()
 

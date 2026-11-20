@@ -619,18 +619,82 @@ body::after {
 /* Responsive */
 @media (max-width: 900px) {
  :root { --sidebar-w: 0px; }
- .sidebar { display: none; }
- .main { padding: 1.5rem; }
- .stats-row { grid-template-columns: repeat(2, 1fr); }
+ .sidebar:not(.mobile-open) { display: none; }
+ .sidebar.mobile-open { display: flex !important; position: fixed; top: 0; left: 0; bottom: 0; width: 280px; z-index: 9999; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-top: env(safe-area-inset-top, 0); padding-bottom: env(safe-area-inset-bottom, 0); background: #0d0d1a; }
+ .mobile-menu-btn { display: flex !important; }
+ .main { margin-left: 0 !important; padding: 1rem; padding-top: 60px; }
+ .stats-row { grid-template-columns: 1fr; }
+ .page-header { padding-left: 50px; }
+ .input-row { flex-direction: column; }
+ .input-row input, .input-row select, .input-row button { width: 100%; min-width: unset; }
+ table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+ .btn { min-height: 44px; font-size: 0.9rem; }
+}
+
+/* Mobile Menu */
+.mobile-menu-btn {
+ display: none;
+ position: fixed;
+ top: 12px;
+ left: 12px;
+ z-index: 10001;
+ background: #1a1a2e;
+ border: 1px solid #4fc3f7;
+ color: #4fc3f7;
+ font-size: 1.5rem;
+ width: 44px;
+ height: 44px;
+ border-radius: 8px;
+ cursor: pointer;
+ align-items: center;
+ justify-content: center;
+ -webkit-tap-highlight-color: transparent;
+}
+.mobile-overlay {
+ display: none;
+ position: fixed;
+ top: 0; left: 0; right: 0; bottom: 0;
+ background: rgba(0,0,0,0.7);
+ z-index: 9998;
+ -webkit-tap-highlight-color: transparent;
+}
+.mobile-overlay.active { display: block; }
+.sidebar.mobile-open {
+ display: flex !important;
+ position: fixed;
+ top: 0; left: 0; bottom: 0;
+ width: 280px;
+ z-index: 9999;
+ transform: translateX(0);
+ transition: transform 0.3s ease;
+ overflow-y: auto;
+ -webkit-overflow-scrolling: touch;
+ padding-top: env(safe-area-inset-top, 0);
+ padding-bottom: env(safe-area-inset-bottom, 0);
+}
+@media (max-width: 900px) {
+ .mobile-menu-btn { display: flex; }
+ .main { margin-left: 0 !important; padding: 1rem; padding-top: 60px; }
+ .stats-row { grid-template-columns: 1fr; }
+ .card { margin-bottom: 0.75rem; }
+ .page-header { padding-left: 50px; }
+ .input-row { flex-direction: column; }
+ .input-row input, .input-row select, .input-row button { width: 100%; min-width: unset; }
+ table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+ .btn { min-height: 44px; font-size: 0.9rem; }
 }
 </style>
 </head>
 <body>
+<button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Menu">☰</button>
+<div class="mobile-overlay" id="mobile-overlay" onclick="closeMobileMenu()"></div>
+
 
 <nav class="sidebar">
  <div class="sidebar-brand">
  <div class="brand-title">Leonida GTA VI Flash</div>
  <div class="brand-subtitle">JHC Viral Engine</div>
+ <div style="margin-top:6px;font-size:0.7rem;opacity:0.6"><a href="/terms.html" style="color:inherit;text-decoration:none;margin-right:8px">Termos de Uso</a> | <a href="/privacy.html" style="color:inherit;text-decoration:none;margin-left:8px">Política de Privacidade</a></div>
  <div class="brand-version">✦ v1.0 · Dual Market ✦</div>
  </div>
 
@@ -650,6 +714,9 @@ body::after {
  <div class="nav-item" data-page="production"><span class="nav-icon">⚡</span> Produção</div>
  <div class="nav-item" data-page="quality"><span class="nav-icon">✅</span> Quality Gate</div>
  <div class="nav-item" data-page="publishing"><span class="nav-icon">📡</span> Publicações</div>
+<div class="nav-item" data-page="accounts"><span class="nav-icon">🔗</span> Contas Conectadas</div>
+<div class="nav-item" data-page="setup"><span class="nav-icon">📋</span> Setup & Config</div>
+<div class="nav-item" data-page="tutorials"><span class="nav-icon">📚</span> Tutoriais e Ajuda</div>
  </div>
 
  <div class="nav-section">
@@ -663,13 +730,17 @@ body::after {
 <div class="nav-item" data-page="dual-market"><span class="nav-icon">🌐</span> Dual Market</div>
 <div class="nav-item" data-page="ssd-library"><span class="nav-icon">💾</span> Biblioteca SSD</div>
 <div class="nav-item" data-page="importer"><span class="nav-icon">📥</span> Importador</div>
+<div class="nav-item" data-page="url-import"><span class="nav-icon">🔗</span> Importar URL</div>
+<div class="nav-item" data-page="radar"><span class="nav-icon">📡</span> Radar GTA VI</div>
+<div class="nav-item" data-page="ig-radar"><span class="nav-icon">📸</span> Radar Viral Instagram</div>
  </div>
 
  <div class="nav-section">
  <div class="nav-label">Distribuição</div>
  <div class="nav-item" data-page="audiovisual"><span class="nav-icon">🎵</span> Audiovisual</div>
  <div class="nav-item" data-page="export"><span class="nav-icon">📦</span> Multi-Formato</div>
- <div class="nav-item" data-page="browser-pub"><span class="nav-icon">🌐</span> Browser Pub</div>
+ <div class="nav-item" data-page="assisted-pub"><span class="nav-icon">🚀</span> Publicação Assistida</div>
+<div class="nav-item" data-page="browser-pub"><span class="nav-icon">🌐</span> Browser Pub</div>
  </div>
 
  <div class="nav-section">
@@ -693,6 +764,11 @@ body::after {
  <div class="stat-card"><div class="stat-number" id="stat-templates">—</div><div class="stat-label">Templates</div></div>
  <div class="stat-card"><div class="stat-number" id="stat-media">—</div><div class="stat-label">Vídeos Indexados</div></div>
  <div class="stat-card"><div class="stat-number" id="stat-uptime">—</div><div class="stat-label">Uptime</div></div>
+ </div>
+
+ <div class="card">
+ <div class="card-header"><span class="card-icon">📈</span><div class="card-title">Analytics em Tempo Real</div></div>
+ <div id="dashboard-analytics"><div class="loading-state"><div class="loading-spinner"></div>Carregando métricas...</div></div>
  </div>
 
  <div class="card">
@@ -738,6 +814,12 @@ body::after {
  <div class="card">
  <div class="card-header"><span class="card-icon">📊</span><div class="card-title">Estatísticas</div></div>
  <div id="media-stats"><div class="loading-state"><div class="loading-spinner"></div>Carregando...</div></div>
+ </div>
+
+ <!-- Analytics Dashboard -->
+ <div class="card" id="analytics-card">
+ <div class="card-header"><span class="card-icon">📈</span><div class="card-title">Analytics Multiplataforma</div><button class="btn btn-sm" onclick="loadAnalytics()" style="margin-left:auto;font-size:0.75rem;">↻ Atualizar</button></div>
+ <div id="analytics-content"><div class="loading-state"><div class="loading-spinner"></div>Carregando métricas...</div></div>
  </div>
 
  <div class="card">
@@ -1023,9 +1105,219 @@ body::after {
  </div>
  <div id="pub-queue"><div class="empty-state">Nenhuma publicação na fila</div></div>
  </div>
+
+ <!-- ===== YOUTUBE AUTO-PUBLISH PANEL ===== -->
+ <div class="card" style="border:1px solid #FF0000;border-radius:12px">
+ <div class="card-header"><span class="card-icon">🎬</span><div class="card-title" style="color:#FF0000">YouTube Auto-Publish — Leonida GTA VI Flash BR</div></div>
+ <div id="yt-auto-status"><div class="loading-state"><div class="loading-spinner"></div>Carregando status...</div></div>
+ <div id="yt-auto-controls" style="display:none;margin-top:1rem;gap:0.5rem;flex-wrap:wrap">
+ <button class="btn btn-secondary" onclick="ytAutoPause()">⏸️ Pausar</button>
+ <button class="btn btn-primary" onclick="ytAutoResume()" style="background:#00C851">▶️ Retomar</button>
+ <button class="btn btn-secondary" onclick="loadYtAutoStatus()">🔄 Atualizar</button>
+ </div>
+ </div>
  </div>
 
- <!-- ===== DIAGNOSTICS ===== -->
+ 
+ <!-- ===== TIKTOK HYBRID PUBLISHER PANEL (MISSAO 020) ===== -->
+ <div class="card" style="border:1px solid #00f2ea;border-radius:12px">
+ <div class="card-header"><span class="card-icon">🎵</span><div class="card-title" style="color:#00f2ea">TikTok Hybrid Publisher — @leonidagta6flashbr</div></div>
+ <div id="tt-auto-status"><div class="loading-state"><div class="loading-spinner"></div>Carregando status...</div></div>
+ <div id="tt-auto-controls" style="display:none;margin-top:1rem;gap:0.5rem;flex-wrap:wrap">
+ <button class="btn btn-secondary" onclick="loadTtAutoStatus()">🔄 Atualizar</button>
+ </div>
+ </div>
+
+<!-- ===== CONTAS CONECTADAS ===== -->
+ <div id="page-accounts" class="page">
+ <div class="page-header"><div class="page-title">Contas Conectadas</div></div>
+ <div class="card">
+ <div class="card-header"><span class="card-icon">🔗</span><div class="card-title">Perfis por Plataforma</div></div>
+ <div id="accounts-list"><div class="loading-state"><div class="loading-spinner"></div>Carregando contas...</div></div>
+	 <div class="card">
+	 <div class="card-header"><span class="card-icon">⚙️</span><div class="card-title">Controle da Fila de Publicação</div></div>
+	 <div id="queue-control"><div class="loading-state"><div class="loading-spinner"></div>Carregando...</div></div>
+	 </div>
+ </div>
+	 <div class="card">
+	 <div class="card-header"><span class="card-icon">⚙️</span><div class="card-title">Controle da Fila de Publicação</div></div>
+	 </div>
+ </div>
+
+ <div class="card">
+ <div class="card-header"><span class="card-icon">📡</span><div class="card-title">Monitor Radar YouTube</div></div>
+ <div id="radar-monitor-panel"><div class="loading-state"><div class="loading-spinner"></div>Carregando...</div></div>
+ </div>
+ 
+<!-- ===== SETUP & CONFIG ===== -->
+<div id="page-setup" class="page">
+<div class="page-header"><div class="page-title">📋 Setup & Configuração</div></div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">🔐</span><div class="card-title">Credenciais de Acesso</div></div>
+<div style="padding:1rem;color:#ccc;line-height:1.8">
+<strong>Dashboard:</strong> <code>admin</code> / <code>160669</code><br>
+<strong>URL Local (Mac):</strong> <code>http://localhost:8080</code><br>
+<strong>URL Mobile (Wi-Fi):</strong> <code>http://192.168.0.235:8080</code><br>
+<strong>API Backend:</strong> <code>http://192.168.0.235:8001</code>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">📱</span><div class="card-title">Acesso pelo Celular</div></div>
+<div style="padding:1rem;color:#ccc;line-height:1.8">
+1. MacBook e celular devem estar na <strong>mesma rede Wi-Fi</strong><br>
+2. No celular, abra o navegador e acesse: <code>http://192.168.0.235:8080</code><br>
+3. Faça login com <code>admin</code> / <code>160669</code><br>
+4. O MacBook precisa permanecer <strong>ligado e conectado</strong><br>
+5. Se o IP mudar (reinício do roteador), atualize a URL no celular<br>
+<strong>⚠️ Nota:</strong> O IP atual é detectado automaticamente. Se não funcionar, verifique seu IP com <code>ipconfig getifaddr en0</code> no Terminal.
+</div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">🔗</span><div class="card-title">Contas de Redes Sociais</div></div>
+<div style="padding:1rem;color:#ccc;line-height:1.8">
+<strong>Instagram:</strong> <code>@leonidagta6flashbr</code><br>
+<strong>TikTok:</strong> <code>@leonidagta6flashbr</code><br>
+<strong>YouTube:</strong> <code>@leonidagta6flashbr</code><br><br>
+<strong>Status:</strong> Configuradas (publicação assistida operacional)<br>
+<strong>Publicação Automática:</strong> Requer OAuth credentials (ver abaixo)
+</div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">🚀</span><div class="card-title">Publicação Real — OAuth Necessário</div></div>
+<div style="padding:1rem;color:#ccc;line-height:1.8">
+Para ativar publicação automática real, configure as credenciais OAuth:<br><br>
+<strong>▶️ YouTube:</strong><br>
+1. Acesse <a href="https://console.cloud.google.com" target="_blank" style="color:#4fc3f7">Google Cloud Console</a><br>
+2. Crie um projeto → Ative "YouTube Data API v3"<br>
+3. Crie credenciais OAuth 2.0 (Desktop app)<br>
+4. Salve client_id e client_secret em <code>data/publishing/credentials/youtube_oauth.json</code><br><br>
+<strong>📸 Instagram:</strong><br>
+1. Acesse <a href="https://developers.facebook.com" target="_blank" style="color:#4fc3f7">Meta for Developers</a><br>
+2. Crie app → Adicione produto "Instagram Graph API"<br>
+3. Gere Access Token de longa duração<br>
+4. Salve token em <code>data/publishing/credentials/instagram_token.txt</code><br><br>
+<strong>🎵 TikTok:</strong><br>
+1. Acesse <a href="https://developers.tiktok.com" target="_blank" style="color:#4fc3f7">TikTok for Developers</a><br>
+2. Aplique para "Content Posting API"<br>
+3. Após aprovação, obtenha client_key e client_secret<br>
+4. Salve em <code>data/publishing/credentials/tiktok_oauth.json</code>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">🍪</span><div class="card-title">Cookies do Instagram (para Radar)</div></div>
+<div style="padding:1rem;color:#ccc;line-height:1.8">
+O Radar Instagram requer cookies de sessão autenticada:<br><br>
+1. Abra o Safari → Faça login no instagram.com<br>
+2. Exporte cookies via extensão ou comando yt-dlp --cookies-from-browser safari<br>
+3. Salve cookies em <code>data/publishing/credentials/instagram_cookies.txt</code><br><br>
+<strong>Alternativa:</strong> Use a importação manual por URL na seção "Importar URL" quando o radar estiver bloqueado.
+</div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">⚙️</span><div class="card-title">Serviços e Portas</div></div>
+<div style="padding:1rem;color:#ccc;line-height:1.8">
+<strong>Frontend:</strong> Python HTTP Server porta <code>8080</code> (bind 0.0.0.0)<br>
+<strong>Backend:</strong> Uvicorn/FastAPI porta <code>8001</code> (bind 0.0.0.0)<br>
+<strong>AI Studios:</strong> Porta <code>8000</code> (preservado, não mexer)<br>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">📊</span><div class="card-title">Estado Atual do Sistema</div></div>
+<div id="setup-system-status"><div class="loading-state"><div class="loading-spinner"></div>Carregando...</div></div>
+</div>
+
+</div>
+
+
+<!-- ===== TUTORIAIS E AJUDA ===== -->
+<div id="page-tutorials" class="page">
+<div class="page-header"><div class="page-title">📚 Tutoriais e Ajuda</div></div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">🔍</span><div class="card-title">Buscar Tutorial</div></div>
+<div style="padding:1rem">
+<input type="text" id="tutorial-search" class="gta-input" placeholder="Digite para buscar: login, radar, publicação, corte..." oninput="filterTutorials()" style="width:100%;font-size:1rem">
+</div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">🚀</span><div class="card-title">Tutorial Guiado — Primeiro Acesso</div></div>
+<div id="guided-tutorial" style="padding:1rem">
+<div id="guided-step-0">
+<h3 style="color:#4fc3f7;margin-bottom:0.5rem">Bem-vindo ao JHC Viral Engine!</h3>
+<p style="color:#ccc;line-height:1.8">Este guia vai te apresentar todas as funcionalidades do sistema. Clique em <strong>Próximo</strong> para começar.</p>
+<button class="btn btn-primary" onclick="nextGuidedStep(1)">▶ Começar Tutorial</button>
+<button class="btn btn-secondary" onclick="skipGuidedTutorial()">⏭ Pular</button>
+</div>
+<div id="guided-step-1" style="display:none">
+<h3 style="color:#4fc3f7;margin-bottom:0.5rem">Passo 1/7 — Dashboard Principal</h3>
+<p style="color:#ccc;line-height:1.8">O Dashboard mostra métricas em tempo real: vídeos produzidos, jobs concluídos, agendados, falhas e status da fila. Os cards coloridos resumem o estado do sistema.</p>
+<button class="btn btn-secondary" onclick="nextGuidedStep(0)">◀ Voltar</button>
+<button class="btn btn-primary" onclick="nextGuidedStep(2)">Próximo ▶</button>
+</div>
+<div id="guided-step-2" style="display:none">
+<h3 style="color:#4fc3f7;margin-bottom:0.5rem">Passo 2/7 — Conectar Contas</h3>
+<p style="color:#ccc;line-height:1.8">Vá em <strong>Contas Conectadas</strong> no menu lateral. Lá você vê suas 3 contas (@leonidagta6flashbr) e o status de cada uma. Para publicação automática, configure OAuth na aba Setup.</p>
+<button class="btn btn-secondary" onclick="nextGuidedStep(1)">◀ Voltar</button>
+<button class="btn btn-primary" onclick="nextGuidedStep(3)">Próximo ▶</button>
+</div>
+<div id="guided-step-3" style="display:none">
+<h3 style="color:#4fc3f7;margin-bottom:0.5rem">Passo 3/7 — Importar Vídeo</h3>
+<p style="color:#ccc;line-height:1.8">Em <strong>Importar URL</strong>, cole um link do YouTube, Instagram ou TikTok. O sistema baixa, extrai metadados e registra automaticamente no SmartCatalog.</p>
+<button class="btn btn-secondary" onclick="nextGuidedStep(2)">◀ Voltar</button>
+<button class="btn btn-primary" onclick="nextGuidedStep(4)">Próximo ▶</button>
+</div>
+<div id="guided-step-4" style="display:none">
+<h3 style="color:#4fc3f7;margin-bottom:0.5rem">Passo 4/7 — Radar GTA VI</h3>
+<p style="color:#ccc;line-height:1.8">Em <strong>Radar GTA VI</strong>, busque vídeos recentes sobre GTA VI no YouTube. O Viral Score (0-100) indica potencial viral. Clique em "Abrir" para ver o vídeo original.</p>
+<button class="btn btn-secondary" onclick="nextGuidedStep(3)">◀ Voltar</button>
+<button class="btn btn-primary" onclick="nextGuidedStep(5)">Próximo ▶</button>
+</div>
+<div id="guided-step-5" style="display:none">
+<h3 style="color:#4fc3f7;margin-bottom:0.5rem">Passo 5/7 — Produzir e Aprovar</h3>
+<p style="color:#ccc;line-height:1.8">Na <strong>Produção</strong>, veja os jobs criados. Assista o preview, aprove ou rejeite. Jobs aprovados ficam prontos para publicação.</p>
+<button class="btn btn-secondary" onclick="nextGuidedStep(4)">◀ Voltar</button>
+<button class="btn btn-primary" onclick="nextGuidedStep(6)">Próximo ▶</button>
+</div>
+<div id="guided-step-6" style="display:none">
+<h3 style="color:#4fc3f7;margin-bottom:0.5rem">Passo 6/7 — Publicar</h3>
+<p style="color:#ccc;line-height:1.8">Em <strong>Publicações</strong>, use a Publicação Assistida: selecione o vídeo, escolha a plataforma, e o sistema prepara metadados e abre a página de upload no navegador.</p>
+<button class="btn btn-secondary" onclick="nextGuidedStep(5)">◀ Voltar</button>
+<button class="btn btn-primary" onclick="nextGuidedStep(7)">Próximo ▶</button>
+</div>
+<div id="guided-step-7" style="display:none">
+<h3 style="color:#4fc3f7;margin-bottom:0.5rem">Passo 7/7 — Monitorar Resultados</h3>
+<p style="color:#ccc;line-height:1.8">No <strong>Dashboard</strong> e em <strong>Analytics</strong>, acompanhe métricas de produção e publicação. A fila pode ser controlada em Contas Conectadas (Iniciar/Pausar/Parar).</p>
+<button class="btn btn-secondary" onclick="nextGuidedStep(6)">◀ Voltar</button>
+<button class="btn btn-primary" onclick="skipGuidedTutorial()">✅ Concluir Tutorial</button>
+</div>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">📖</span><div class="card-title">Todos os Tutoriais</div></div>
+<div id="tutorials-list" style="padding:1rem"></div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">❓</span><div class="card-title">Perguntas Frequentes</div></div>
+<div id="faq-list" style="padding:1rem"></div>
+</div>
+
+<div class="card">
+<div class="card-header"><span class="card-icon">📝</span><div class="card-title">Glossário</div></div>
+<div id="glossary-list" style="padding:1rem"></div>
+</div>
+</div>
+
+<!-- ===== DIAGNOSTICS ===== -->
  <div id="page-diagnostics" class="page">
  <div class="page-header"><div class="page-title">Diagnóstico do Sistema</div></div>
  <div class="card">
@@ -1098,8 +1390,30 @@ body::after {
 <div class="card-title">Resultado</div>
 <div id="ar-result-content"></div>
 </div>
+<!-- PRODUÇÃO INTELIGENTE — Pipeline + Catálogo -->
 <div class="card">
-<div class="card-title">Produções Recentes</div>
+<div class="card-header"><span class="card-icon">🧠</span><div class="card-title">Produção Inteligente</div><button class="btn btn-sm" onclick="loadPipelineJobs()" style="margin-left:auto;font-size:0.75rem;">↻ Atualizar</button></div>
+<div style="display:grid;gap:12px;">
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+<button onclick="createSmartJob()" style="padding:10px 16px;background:linear-gradient(135deg,#4ade80,#22c55e);border:none;color:#000;font-weight:700;border-radius:8px;cursor:pointer;font-size:13px;">🎯 Selecionar Automaticamente</button>
+<span style="color:#718096;font-size:12px;">Usa SmartCatalog para escolher o melhor material fresco</span>
+</div>
+<div id="pipeline-catalog-preview" style="display:none;padding:10px;background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.2);border-radius:8px;">
+<div style="font-weight:700;font-size:13px;margin-bottom:6px;color:#4ade80;">📋 Material Selecionado</div>
+<div id="pipeline-selected-material" style="font-size:12px;color:#a0aec0;"></div>
+</div>
+<div id="pipeline-status" style="color:#718096;font-size:12px;"></div>
+</div>
+</div>
+
+<!-- PIPELINE JOBS -->
+<div class="card">
+<div class="card-header"><span class="card-icon">📋</span><div class="card-title">Fila de Produção</div></div>
+<div id="pipeline-jobs-list" style="color:#718096;font-size:13px;">Carregando...</div>
+</div>
+
+<div class="card">
+<div class="card-title">Produções Recentes (Legacy)</div>
 <div id="ar-outputs-list" style="color:#718096;font-size:13px;">Carregando...</div>
 </div>
 </div>
@@ -1322,6 +1636,27 @@ body::after {
 </div>
 </div>
 
+<!-- ===== RADAR GTA VI ===== -->
+<div id="page-radar" class="page">
+<div class="page-header"><div class="page-title">📡 Radar GTA VI</div></div>
+<div class="card">
+<div class="card-header"><span class="card-icon">🔍</span><div class="card-title">Buscar Vídeos</div></div>
+<div class="input-row" style="flex-wrap:wrap;gap:0.75rem">
+<input type="text" id="radar-query" class="gta-input" placeholder="GTA VI, Rockstar Games, trailer..." style="flex:2;min-width:200px">
+<select id="radar-source" class="gta-select" style="flex:1;min-width:120px">
+<option value="youtube">YouTube</option>
+<option value="instagram">Instagram</option>
+</select>
+<button class="btn btn-primary" onclick="runRadarSearch()">🔍 Buscar</button>
+</div>
+<div id="radar-results"><div class="empty-state">Busque vídeos sobre GTA VI nas plataformas</div></div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-icon">🔥</span><div class="card-title">Tendências Recentes</div></div>
+<div id="radar-trending"><div class="loading-state"><div class="loading-spinner"></div>Carregando tendências...</div></div>
+</div>
+</div>
+
 <!-- ===== AUDIOVISUAL (MISSÃO 017) ===== -->
 <div id="page-audiovisual" class="page">
 <div class="page-header"><div class="page-title">🎵 Integração Audiovisual</div></div>
@@ -1378,6 +1713,44 @@ body::after {
 </div>
 </div>
 
+<!-- ===== PUBLICAÇÃO ASSISTIDA (MISSÃO 040.1 ETAPA 2) ===== -->
+<div id="page-assisted-pub" class="page">
+<div class="page-header"><div class="page-title">🚀 Publicação Assistida</div></div>
+<div class="card" style="margin-bottom:1rem">
+<div class="card-header"><span class="card-icon">🎬</span><div class="card-title">Reels Prontos para Publicar</div><button class="btn btn-sm" onclick="loadAssistedPub()" style="margin-left:auto;font-size:0.75rem">↻ Atualizar</button></div>
+<div id="assisted-jobs-list" style="padding:1rem">Carregando...</div>
+</div>
+<div class="card" style="margin-bottom:1rem">
+<div class="card-header"><span class="card-icon">📡</span><div class="card-title">Preparar Publicação</div></div>
+<div style="padding:1rem">
+<div id="assisted-selected-job" style="color:#aaa;margin-bottom:1rem">Selecione um reel acima para preparar a publicação.</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem">
+<button class="btn" onclick="prepareAssisted('instagram')" style="background:#E1306C;color:#fff;font-weight:bold">📸 PUBLICAR NO INSTAGRAM</button>
+<button class="btn" onclick="prepareAssisted('youtube')" style="background:#FF0000;color:#fff;font-weight:bold">▶️ PUBLICAR NO YOUTUBE</button>
+<button class="btn" onclick="prepareAssisted('tiktok')" style="background:#000;color:#fff;font-weight:bold;border:1px solid #333">🎵 PUBLICAR NO TIKTOK</button>
+<button class="btn" onclick="prepareAllPlatforms()" style="background:#1a5c2e;color:#fff;font-weight:bold">🌐 PREPARAR PARA AS 3 REDES</button>
+</div>
+<div id="assisted-prepare-result" style="min-height:40px"></div>
+</div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-icon">✅</span><div class="card-title">Confirmar Publicação</div></div>
+<div style="padding:1rem">
+<div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+<input type="text" id="confirm-job-id" class="gta-input" placeholder="Job ID" style="flex:1;min-width:120px">
+<select id="confirm-platform" class="gta-select" style="min-width:120px">
+<option value="instagram">Instagram</option>
+<option value="youtube">YouTube</option>
+<option value="tiktok">TikTok</option>
+</select>
+<input type="text" id="confirm-url" class="gta-input" placeholder="URL da publicação (opcional)" style="flex:2;min-width:200px">
+<button class="btn btn-primary" onclick="confirmAssistedPub()">✅ Confirmar Publicação</button>
+</div>
+<div id="confirm-result"></div>
+</div>
+</div>
+</div>
+
 <!-- ===== BROWSER PUBLISHER (MISSÃO 019) ===== -->
 <div id="page-browser-pub" class="page">
 <div class="page-header"><div class="page-title">🌐 Browser Publisher</div></div>
@@ -1417,7 +1790,7 @@ body::after {
 </main>
 
 <script>
-const API = window.location.origin;
+const API = window.location.protocol + '//' + window.location.hostname + ':8001';
 let authToken = null;
 
 // === AUTH SYSTEM ===
@@ -1436,6 +1809,23 @@ function showLoginScreen() {
  </div>`;
 }
 
+function toggleMobileMenu() {
+ const sidebar = document.querySelector('.sidebar');
+ const overlay = document.getElementById('mobile-overlay');
+ if (sidebar.classList.contains('mobile-open')) {
+ closeMobileMenu();
+ } else {
+ sidebar.classList.add('mobile-open');
+ overlay.classList.add('active');
+ }
+}
+function closeMobileMenu() {
+ const sidebar = document.querySelector('.sidebar');
+ const overlay = document.getElementById('mobile-overlay');
+ sidebar.classList.remove('mobile-open');
+ overlay.classList.remove('active');
+}
+
 async function doLogin() {
  const user = document.getElementById('login-user').value.trim();
  const pass = document.getElementById('login-pass').value;
@@ -1450,40 +1840,40 @@ async function doLogin() {
  const data = await r.json();
  if (!r.ok) { errEl.textContent = data.detail || 'Erro no login'; errEl.style.display = 'block'; return; }
  authToken = data.token;
- sessionStorage.setItem('jhc_token', data.token);
+ // Use localStorage instead of sessionStorage — survives page reload across origins
+ localStorage.setItem('jhc_token', data.token);
  location.reload();
  } catch(e) { errEl.textContent = 'Erro de conexão: ' + e.message; errEl.style.display = 'block'; }
 }
 
 function doLogout() {
  authToken = null;
- sessionStorage.removeItem('jhc_token');
- fetch(API + '/api/auth/logout', {method: 'POST'}).catch(() => {});
+ localStorage.removeItem('jhc_token');
+ localStorage.removeItem('jhc_token'); sessionStorage.removeItem('jhc_token');
+ fetch(API + '/api/auth/logout', {method: 'POST', credentials: 'include'}).catch(() => {});
  showLoginScreen();
 }
 
 async function checkAuth() {
- // 1. Try sessionStorage first (fast path)
- const stored = sessionStorage.getItem('jhc_token');
+ // 1. Try localStorage first (survives reload across cross-origin)
+ const stored = localStorage.getItem('jhc_token') || sessionStorage.getItem('jhc_token');
  if (stored) {
  authToken = stored;
  try {
  const r = await fetch(API + '/api/auth/me', {
  headers: {'Authorization': 'Bearer ' + authToken},
- credentials: 'include' // send httpOnly cookie too
+ credentials: 'include'
  });
  if (r.ok) return true;
  } catch(e) {}
- sessionStorage.removeItem('jhc_token');
+ localStorage.removeItem('jhc_token');
+ localStorage.removeItem('jhc_token'); sessionStorage.removeItem('jhc_token');
  authToken = null;
  }
- // 2. Fallback: try httpOnly cookie (survives tab close / session clear)
+ // 2. Fallback: try httpOnly cookie (same-origin only)
  try {
  const r = await fetch(API + '/api/auth/me', {credentials: 'include'});
  if (r.ok) {
- // Cookie is valid — server accepted it. We don't have the token in JS
- // but the browser will send the cookie automatically on subsequent requests.
- // Set a flag so api() knows to include credentials.
  authToken = '__cookie_session__';
  return true;
  }
@@ -1501,7 +1891,7 @@ async function api(path, opts = {}) {
  // Always include credentials so httpOnly cookie is sent automatically
  const r = await fetch(API + path, {...opts, headers, credentials: 'include'});
  if (r.status === 401) {
- sessionStorage.removeItem('jhc_token');
+ localStorage.removeItem('jhc_token'); sessionStorage.removeItem('jhc_token');
  authToken = null;
  showLoginScreen();
  return {error: 'Sessão expirada. Faça login novamente.'};
@@ -1554,6 +1944,13 @@ function loadPageData(page) {
  if (page === 'clipper') loadClips();
  if (page === 'stories') loadStories();
  if (page === 'importer') loadImporter();
+if (page === 'url-import') loadUrlImport();
+ if (page === 'accounts') { loadAccounts(); loadQueueControl(); loadRadarMonitor(); }
+ if (page === 'setup') { loadSetupStatus(); }
+ if (page === 'tutorials') { loadTutorials(); }
+if (page === 'radar') loadRadar();
+if (page === 'ig-radar') loadInstagramRadar();
+if (page === 'assisted-pub') loadAssistedPub();
  if (page === 'audiovisual') loadAudioVisual();
  if (page === 'export') loadExportProfiles();
  if (page === 'browser-pub') loadBrowserPub();
@@ -1614,21 +2011,56 @@ async function retryFailed() {
 async function loadPackProgress() {
  const el = document.getElementById('bi-progress-content');
  try {
- const d = await api('/api/import/pack/progress');
- const pct = d.total_discovered > 0 ? Math.round((d.total_downloaded / d.total_discovered) * 100) : 0;
+ const d = await api('/api/import/pack/dashboard');
+ const total = d.total_unique || d.total_discovered || 0;
+ const done = d.total_downloaded || 0;
+ const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+ const wStatus = d.worker_running ? '<span style="color:#4ade80">● Rodando</span>' : '<span style="color:#f44">● Parado</span>';
+ const wPid = d.worker_pid ? `(PID ${d.worker_pid})` : '';
+ const speedStr = d.speed_mbps ? `${d.speed_mbps} MB/s` : '—';
+ const failedList = (d.failed_entries || []).slice(0,5).map(f => `<div style="font-size:10px;color:#f44;padding:2px 0;">❌ ${f.filename}: ${f.error || '?'}</div>`).join('');
+ const errLog = (d.recent_errors || []).slice(-3).map(l => `<div style="font-size:9px;color:#a0aec0;font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${l}</div>`).join('');
  el.innerHTML = `
- <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
- <div>📦 Descobertos: <strong>${d.total_discovered}</strong></div>
- <div>✅ Baixados: <strong>${d.total_downloaded}</strong></div>
- <div>❌ Falhas: <strong>${d.total_failed}</strong></div>
- <div>🔒 Auth bloqueado: <strong>${d.total_blocked_auth}</strong></div>
- <div>♻️ Duplicatas: <strong>${d.total_duplicates}</strong></div>
- <div>💾 SSD livre: <strong>${d.ssd_free_gb} GB</strong></div>
+ <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;">
+ <div>🎬 Vídeos: <strong>${d.videos_completed||0}</strong></div>
+ <div>🖼️ Imagens: <strong>${d.images_completed||0}</strong></div>
+ <div>⏳ Pendentes: <strong>${d.total_pending||0}</strong></div>
+ <div>❌ Falhas: <strong>${d.total_failed||0}</strong></div>
+ <div>⚡ Velocidade: <strong>${speedStr}</strong></div>
+ <div>💾 SSD: <strong>${d.ssd_free_gb||'?'} GB</strong></div>
+ <div>🤖 Worker: ${wStatus} ${wPid}</div>
+ <div>📦 Total único: <strong>${total}</strong></div>
+ <div>🔄 Downloading: <strong>${(d.by_state&&d.by_state.DOWNLOADING)||0}</strong></div>
  </div>
  <div style="margin-top:8px;height:6px;background:#2d2d44;border-radius:3px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#667eea,#764ba2);transition:width 0.3s;"></div></div>
- <div style="text-align:center;font-size:11px;color:#718096;margin-top:2px;">${pct}% concluído</div>
+ <div style="text-align:center;font-size:11px;color:#718096;margin-top:2px;">${pct}% concluído (${done}/${total})</div>
+ <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
+ <button onclick="workerAction('start')" style="padding:4px 12px;background:#4ade80;color:#000;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;">▶ Iniciar</button>
+ <button onclick="workerAction('pause')" style="padding:4px 12px;background:#f59e0b;color:#000;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;">⏸ Pausar</button>
+ <button onclick="workerAction('resume')" style="padding:4px 12px;background:#667eea;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;">▶ Retomar</button>
+ <button onclick="workerAction('stop')" style="padding:4px 12px;background:#f44;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;">⏹ Parar</button>
+ <button onclick="retryFailed()" style="padding:4px 12px;background:#8b5cf6;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;">🔄 Retry Falhas</button>
+ </div>
+ ${failedList ? '<div style="margin-top:8px;border-top:1px solid #2d2d44;padding-top:4px;"><div style="font-size:10px;color:#a0aec0;margin-bottom:2px;">Últimas falhas:</div>'+failedList+'</div>' : ''}
+ ${errLog ? '<div style="margin-top:6px;border-top:1px solid #2d2d44;padding-top:4px;"><div style="font-size:10px;color:#a0aec0;margin-bottom:2px;">Log recente:</div>'+errLog+'</div>' : ''}
  `;
  } catch(e) { el.textContent = 'Erro: ' + e.message; }
+}
+async function workerAction(action) {
+ try {
+ const r = await fetch('/api/import/pack/worker/'+action, {method:'POST'});
+ const d = await r.json();
+ if(d.stdout) console.log('Worker '+action+':', d.stdout);
+ setTimeout(loadPackProgress, 1000);
+ } catch(e) { alert('Erro ao '+action+' worker: '+e.message); }
+}
+async function retryFailed() {
+ try {
+ const r = await fetch('/api/import/pack/retry-failed', {method:'POST'});
+ const d = await r.json();
+ alert('Reenfileirados para retry: '+(d.retried||0));
+ setTimeout(loadPackProgress, 1000);
+ } catch(e) { alert('Erro: '+e.message); }
 }
 async function loadPackEntries() {
  const el = document.getElementById('bi-entries-list');
@@ -2044,6 +2476,558 @@ async function loadImporter() {
  } else { listEl.textContent = 'Nenhum vídeo importado.'; }
 }
 
+// === MISSÃO 040 FASE 1 — Importar por URL ===
+async function loadUrlImport() {
+ const main = document.getElementById('main-content');
+ main.innerHTML = `
+ <h2 style="margin-bottom:1rem">🔗 Importar Vídeo por URL</h2>
+ <div class="card" style="margin-bottom:1rem">
+ <div class="card-header"><span class="card-icon">📥</span><div class="card-title">Importar Vídeo</div></div>
+ <div style="padding:1rem">
+ <div style="display:flex;gap:8px;margin-bottom:1rem">
+ <input type="text" id="url-input" placeholder="Cole a URL do YouTube, Instagram, TikTok..." style="flex:1;padding:10px;background:#1a1a2e;border:1px solid #333;color:#fff;border-radius:6px;font-size:0.95rem">
+ <button class="btn btn-primary" onclick="fetchUrlMetadata()">🔍 Analisar</button>
+ </div>
+ <div id="url-metadata-result" style="min-height:40px"></div>
+ </div>
+ </div>
+ <div class="card" style="margin-bottom:1rem">
+ <div class="card-header"><span class="card-icon">📊</span><div class="card-title">Estatísticas</div><button class="btn btn-sm" onclick="refreshUrlStats()" style="margin-left:auto;font-size:0.75rem">↻</button></div>
+ <div id="url-import-stats" style="padding:1rem">Carregando...</div>
+ </div>
+ <div class="card">
+ <div class="card-header"><span class="card-icon">📜</span><div class="card-title">Histórico de Importações</div><button class="btn btn-sm" onclick="refreshUrlHistory()" style="margin-left:auto;font-size:0.75rem">↻</button></div>
+ <div id="url-import-history" style="padding:1rem">Carregando...</div>
+ </div>`;
+ refreshUrlStats();
+ refreshUrlHistory();
+}
+
+async function fetchUrlMetadata() {
+ const url = document.getElementById('url-input').value.trim();
+ const el = document.getElementById('url-metadata-result');
+ if (!url) { el.innerHTML = '<span style="color:#f44">Cole uma URL primeiro</span>'; return; }
+ el.innerHTML = '<span style="color:#aaa">⏳ Buscando metadados...</span>';
+ try {
+ const resp = await fetch(`${API}/api/import/url/metadata`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({url})
+ });
+ const data = await resp.json();
+ if (data.error) {
+ el.innerHTML = `<span style="color:#f44">❌ ${data.error}</span>`;
+ return;
+ }
+ const dup = data.is_duplicate;
+ const thumb = data.thumbnail ? `<img src="${data.thumbnail}" style="max-width:200px;border-radius:6px;margin-top:8px;display:block">` : '';
+ el.innerHTML = `
+ <div style="background:#1a1a2e;padding:12px;border-radius:8px;border:1px solid ${dup ? '#f44' : '#0f0'}33">
+ <strong style="font-size:1.1rem">${data.title || 'Sem título'}</strong><br>
+ <span style="color:#aaa">👤 ${data.author || '?'} | ⏱️ ${Math.round(data.duration||0)}s | 📐 ${data.resolution||'?'} | 🎬 ${data.platform||'?'}</span><br>
+ ${data.view_count ? `<span style="color:#aaa">👁️ ${Number(data.view_count).toLocaleString()} views</span><br>` : ''}
+ ${dup ? '<span style="color:#f44;font-weight:bold">⚠️ JÁ IMPORTADO ANTERIORMENTE</span>' : `<button class="btn btn-primary" onclick="startUrlDownload()" style="margin-top:8px">⬇️ Baixar Vídeo</button>`}
+ ${thumb}
+ </div>`;
+ } catch(e) {
+ el.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
+ }
+}
+
+async function startUrlDownload() {
+ const url = document.getElementById('url-input').value.trim();
+ const el = document.getElementById('url-metadata-result');
+ if (!url) return;
+ el.innerHTML = '<span style="color:#ff0">⏳ Download iniciado em background...</span>';
+ try {
+ const resp = await fetch(`${API}/api/import/url/download`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({url})
+ });
+ const data = await resp.json();
+ if (data.status === 'duplicate') {
+ el.innerHTML = '<span style="color:#f44">⚠️ URL já foi importada anteriormente</span>';
+ } else {
+ el.innerHTML = '<span style="color:#0f0">✅ Download iniciado! Verifique o histórico abaixo.</span>';
+ setTimeout(refreshUrlHistory, 3000);
+ setTimeout(refreshUrlStats, 3000);
+ }
+ } catch(e) {
+ el.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
+ }
+}
+
+async function refreshUrlStats() {
+ const el = document.getElementById('url-import-stats');
+ if (!el) return;
+ try {
+ const data = await api('/api/import/url/stats');
+ if (data._error || data.error) { el.textContent = 'Offline'; return; }
+ const plats = Object.entries(data.platforms||{}).map(([k,v])=>`${k}: ${v}`).join(', ') || 'nenhum';
+ el.innerHTML = `Total: ${data.total} | ✅ Completos: ${data.completed} | ❌ Falhas: ${data.failed} | 🔄 Duplicatas: ${data.duplicates}<br>💾 Tamanho total: ${data.total_size_mb}MB | Plataformas: ${plats}`;
+ } catch(e) { el.textContent = 'Erro ao carregar'; }
+}
+
+async function refreshUrlHistory() {
+ const el = document.getElementById('url-import-history');
+ if (!el) return;
+ try {
+ const list = await api('/api/import/url/history?limit=20');
+ if (!Array.isArray(list)) { el.textContent = 'Erro ao carregar'; return; }
+ if (!list.length) { el.textContent = 'Nenhuma importação ainda.'; return; }
+ el.innerHTML = '<table class="data-table"><thead><tr><th>Título</th><th>Plataforma</th><th>Status</th><th>Tamanho</th><th>Data</th></tr></thead><tbody>' +
+ list.map(h => {
+ const st = h.status === 'completed' ? '✅' : h.status === 'failed' ? '❌' : h.status === 'duplicate' ? '🔄' : '⏳';
+ const sz = h.file_size ? `${(h.file_size/1048576).toFixed(1)}MB` : '-';
+ const dt = h.imported_at ? new Date(h.imported_at).toLocaleString('pt-BR') : '-';
+ return `<tr><td>${(h.title||h.url||'?').substring(0,50)}</td><td>${h.platform||'?'}</td><td>${st} ${h.status}</td><td>${sz}</td><td>${dt}</td></tr>`;
+ }).join('') + '</tbody></table>';
+ } catch(e) { el.textContent = 'Erro ao carregar'; }
+}
+
+// === MISSÃO 040 FASE 2 — Radar GTA VI ===
+async function runRadarSearch() {
+ const query = document.getElementById('radar-query').value.trim();
+ const source = document.getElementById('radar-source').value;
+ const el = document.getElementById('radar-results');
+ if (!query) { el.innerHTML = '<div class="empty-state">Digite um termo de busca</div>'; return; }
+ el.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div>Buscando...</div>';
+ try {
+  const endpoint = source === 'instagram' ? '/api/instagram-radar/search' : '/api/radar/search';
+  const data = await api(`${endpoint}?q=${encodeURIComponent(query)}&limit=10`);
+  if (data.error) { el.innerHTML = '<div class="empty-state">Erro: ' + data.error + '</div>'; return; }
+  const results = data.results || data.items || [];
+  if (!results.length) { el.innerHTML = '<div class="empty-state">Nenhum resultado encontrado para "' + query + '"</div>'; return; }
+  let html = '<div style="display:grid;gap:0.75rem">';
+  for (const r of results) {
+   const title = r.title || r.caption || 'Sem título';
+   const views = r.views || r.view_count || 0;
+   const score = r.viral_score || r.score || 0;
+   const url = r.url || r.link || '#';
+   const thumb = r.thumbnail || r.image || '';
+   html += `<div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:0.75rem;display:flex;gap:0.75rem;align-items:center">`;
+   if (thumb) html += `<img src="${thumb}" style="width:80px;height:60px;object-fit:cover;border-radius:4px" onerror="this.style.display='none'">`;
+   html += `<div style="flex:1;min-width:0"><div style="color:#fff;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</div>`;
+   html += `<div style="color:#aaa;font-size:0.8rem">👁 ${views.toLocaleString()} | 🔥 Score: ${score}/100</div></div>`;
+   html += `<a href="${url}" target="_blank" class="btn btn-secondary" style="font-size:0.75rem;padding:4px 8px">Abrir</a></div>`;
+  }
+  html += '</div>';
+  el.innerHTML = html;
+ } catch(e) {
+  el.innerHTML = '<div class="empty-state">Erro na busca: ' + e.message + '</div>';
+ }
+}
+
+async function loadRadar() {
+ const main = document.getElementById('main-content');
+ main.innerHTML = `
+ <h2 style="margin-bottom:1rem">📡 Radar GTA VI — Descoberta de Conteúdos</h2>
+ <div class="card" style="margin-bottom:1rem">
+ <div class="card-header"><span class="card-icon">🔍</span><div class="card-title">Busca Personalizada</div></div>
+ <div style="padding:1rem">
+ <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+ <input type="text" id="radar-query" placeholder="Termo de busca (ex: GTA VI gameplay)" value="GTA VI" style="flex:1;min-width:200px;padding:10px;background:#1a1a2e;border:1px solid #333;color:#fff;border-radius:6px;font-size:0.95rem">
+ <select id="radar-date" style="padding:10px;background:#1a1a2e;border:1px solid #333;color:#fff;border-radius:6px">
+ <option value="24h">Últimas 24h</option>
+ <option value="7d" selected>Últimos 7 dias</option>
+ <option value="30d">Últimos 30 dias</option>
+ <option value="all">Todos</option>
+ </select>
+ <button class="btn btn-primary" onclick="runRadarSearch()">🔍 Buscar</button>
+ <button class="btn" onclick="runRadarDiscover()" style="background:#1a5c2e;color:#fff">📡 Descobrir Automático</button>
+ </div>
+ <div id="radar-status" style="color:#aaa;margin-bottom:8px"></div>
+ </div>
+ </div>
+ <div class="card">
+ <div class="card-header"><span class="card-icon">🎬</span><div class="card-title">Resultados</div><button class="btn btn-sm" onclick="refreshRadarResults()" style="margin-left:auto;font-size:0.75rem">↻</button></div>
+ <div id="radar-results" style="padding:1rem">Clique em Buscar ou Descobrir Automático para encontrar vídeos.</div>
+ </div>`;
+ // Tentar carregar cache
+ try {
+ const cache = await api('/api/radar/cache?max_age_hours=24');
+ if (cache.cached && cache.count > 0) {
+ renderRadarResults(cache.results);
+ document.getElementById('radar-status').textContent = `📦 ${cache.count} resultados em cache (últimas 24h)`;
+ }
+ } catch(e) {}
+}
+
+async function runRadarSearch() {
+ const query = document.getElementById('radar-query').value.trim() || 'GTA VI';
+ const dateFilter = document.getElementById('radar-date').value;
+ const statusEl = document.getElementById('radar-status');
+ statusEl.innerHTML = '<span style="color:#ff0">⏳ Buscando no YouTube...</span>';
+ try {
+ const data = await api(`/api/radar/search?query=${encodeURIComponent(query)}&max_results=15&date_filter=${dateFilter}`);
+ if (data.error) { statusEl.innerHTML = `<span style="color:#f44">❌ ${data.error}</span>`; return; }
+ renderRadarResults(data.results || []);
+ statusEl.innerHTML = `<span style="color:#0f0">✅ ${data.count} resultados encontrados para "${query}" (${dateFilter})</span>`;
+ } catch(e) {
+ statusEl.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
+ }
+}
+
+async function runRadarDiscover() {
+ const dateFilter = document.getElementById('radar-date').value;
+ const statusEl = document.getElementById('radar-status');
+ statusEl.innerHTML = '<span style="color:#ff0">⏳ Buscando com todos os termos pré-definidos (pode levar ~60s)...</span>';
+ try {
+ const data = await api(`/api/radar/discover?max_per_term=3&date_filter=${dateFilter}`);
+ if (data.error) { statusEl.innerHTML = `<span style="color:#f44">❌ ${data.error}</span>`; return; }
+ renderRadarResults(data.results || []);
+ statusEl.innerHTML = `<span style="color:#0f0">✅ ${data.count} resultados descobertos usando ${data.terms_used} termos</span>`;
+ } catch(e) {
+ statusEl.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
+ }
+}
+
+async function refreshRadarResults() {
+ try {
+ const cache = await api('/api/radar/cache?max_age_hours=48');
+ if (cache.cached && cache.count > 0) {
+ renderRadarResults(cache.results);
+ } else {
+ document.getElementById('radar-results').textContent = 'Cache vazio. Execute uma busca.';
+ }
+ } catch(e) {
+ document.getElementById('radar-results').textContent = 'Erro ao carregar cache.';
+ }
+}
+
+function renderRadarResults(results) {
+ const el = document.getElementById('radar-results');
+ if (!results || !results.length) { el.textContent = 'Nenhum resultado encontrado.'; return; }
+ el.innerHTML = '<table class="data-table"><thead><tr><th>Título</th><th>Autor</th><th>Duração</th><th>Views</th><th>Score</th><th>Oficial</th><th>Importado</th><th>Ações</th></tr></thead><tbody>' +
+ results.map(r => {
+ const dur = r.duration ? `${Math.floor(r.duration/60)}:${String(Math.round(r.duration%60)).padStart(2,'0')}` : '-';
+ const views = r.view_count ? Number(r.view_count).toLocaleString('pt-BR') : '-';
+ const official = r.is_official ? '⭐' : '';
+ const imported = r.already_imported ? '<span style="color:#f44">🔄 Sim</span>' : '<span style="color:#0f0">Não</span>';
+ const importBtn = r.already_imported ? '' : `<button class="btn btn-sm" onclick="importFromRadar('${r.url}')" style="font-size:0.7rem">📥 Importar</button>`;
+ const openBtn = `<a href="${r.url}" target="_blank" class="btn btn-sm" style="font-size:0.7rem;text-decoration:none">🔗 Abrir</a>`;
+ return `<tr>
+ <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.title||'').replace(/"/g,'&quot;')}">${(r.title||'?').substring(0,45)}</td>
+ <td>${(r.author||'?').substring(0,20)}</td>
+ <td>${dur}</td>
+ <td>${views}</td>
+ <td style="color:${r.relevance_score>=70?'#0f0':r.relevance_score>=40?'#ff0':'#f44'}">${r.relevance_score||0}</td>
+ <td>${official}</td>
+ <td>${imported}</td>
+ <td>${openBtn} ${importBtn}</td>
+ </tr>`;
+ }).join('') + '</tbody></table>';
+}
+
+async function importFromRadar(url) {
+ if (!url) return;
+ try {
+ const resp = await fetch(`${API}/api/import/url/download`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({url})
+ });
+ const data = await resp.json();
+ if (data.status === 'duplicate') {
+ alert('URL já foi importada anteriormente');
+ } else {
+ alert('Download iniciado! Verifique a seção Importar URL.');
+ setTimeout(() => { if(document.querySelector('[data-page="url-import"]')) document.querySelector('[data-page="url-import"]').click(); }, 1000);
+ }
+ } catch(e) {
+ alert('Erro ao iniciar download: ' + e.message);
+ }
+}
+
+// === MISSÃO 040.1 ETAPA 2 — Publicação Assistida Operacional ===
+let _selectedJobForPublish = null;
+
+async function loadAssistedPub() {
+ const el = document.getElementById('assisted-jobs-list');
+ if (!el) return;
+ el.innerHTML = '<span style="color:#aaa">⏳ Carregando reels prontos...</span>';
+ try {
+ const data = await api('/api/publish/ready-jobs');
+ if (!data.jobs || !data.jobs.length) {
+ el.textContent = 'Nenhum reel pronto para publicação no momento.';
+ return;
+ }
+ el.innerHTML = '<table class="data-table"><thead><tr><th>Job ID</th><th>Título</th><th>Plataforma</th><th>Arquivo</th><th>Ação</th></tr></thead><tbody>' +
+ data.jobs.map(j => `<tr>
+ <td style="font-family:monospace;font-size:0.8rem">${j.job_id}</td>
+ <td>${(j.title||'?').substring(0,40)}</td>
+ <td>${j.platform||'?'}</td>
+ <td style="font-size:0.8rem;color:#aaa">${(j.video_filename||'?').substring(0,30)}</td>
+ <td><button class="btn btn-sm" onclick="selectJobForPublish('${j.job_id}','${(j.title||'').replace(/'/g,"\\'")}')" style="font-size:0.7rem;background:#1a5c2e;color:#fff">🚀 Selecionar</button></td>
+ </tr>`).join('') + '</tbody></table>';
+ el.innerHTML += `<div style="margin-top:8px;color:#aaa;font-size:0.85rem">Total: ${data.count} reels prontos</div>`;
+ } catch(e) {
+ el.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
+ }
+}
+
+function selectJobForPublish(jobId, title) {
+ _selectedJobForPublish = jobId;
+ document.getElementById('assisted-selected-job').innerHTML = `<span style="color:#0f0;font-weight:bold">✅ Reel selecionado:</span> <strong>${jobId}</strong> — ${(title||'').substring(0,50)}`;
+ document.getElementById('confirm-job-id').value = jobId;
+}
+
+async function prepareAssisted(platform) {
+ const el = document.getElementById('assisted-prepare-result');
+ if (!_selectedJobForPublish) {
+ el.innerHTML = '<span style="color:#f44">❌ Selecione um reel primeiro na tabela acima.</span>';
+ return;
+ }
+ el.innerHTML = '<span style="color:#ff0">⏳ Preparando publicação...</span>';
+ try {
+ const resp = await fetch(`${API}/api/publish/assisted-prepare`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({ job_id: _selectedJobForPublish, platform })
+ });
+ const data = await resp.json();
+ if (data.detail) {
+ el.innerHTML = `<span style="color:#f44">❌ ${data.detail}</span>`;
+ return;
+ }
+ // Abrir página de upload no Safari
+ window.open(data.upload_url, '_blank');
+ // Tentar copiar metadados via clipboard API como fallback
+ const clipText = `${data.title}\n\n${data.description}\n\n${data.hashtags.join(' ')}`;
+ try { await navigator.clipboard.writeText(clipText); } catch(e) {}
+ el.innerHTML = `
+ <div style="background:#1a1a2e;padding:12px;border-radius:8px;border:1px solid #0f033">
+ <strong style="color:#0f0">✅ Preparado para ${platform.toUpperCase()}!</strong><br>
+ <span style="color:#aaa">👤 Conta: ${data.account}</span><br>
+ <span style="color:#aaa">📋 Título e descrição copiados para a área de transferência</span><br>
+ <span style="color:#aaa">📁 Arquivo: ${data.video_filename}</span><br>
+ <span style="color:#ff0">➡️ Arraste o arquivo para a página de upload aberta no navegador</span><br>
+ <hr style="border-color:#333;margin:8px 0">
+ <small style="color:#888">${data.instructions}</small>
+ </div>`;
+ } catch(e) {
+ el.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
+ }
+}
+
+async function prepareAllPlatforms() {
+ const el = document.getElementById('assisted-prepare-result');
+ if (!_selectedJobForPublish) {
+ el.innerHTML = '<span style="color:#f44">❌ Selecione um reel primeiro na tabela acima.</span>';
+ return;
+ }
+ el.innerHTML = '<span style="color:#ff0">⏳ Preparando para as 3 redes...</span>';
+ const platforms = ['instagram', 'youtube', 'tiktok'];
+ let html = '';
+ for (const p of platforms) {
+ try {
+ const resp = await fetch(`${API}/api/publish/assisted-prepare`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({ job_id: _selectedJobForPublish, platform: p })
+ });
+ const data = await resp.json();
+ if (data.detail) {
+ html += `<div style="color:#f44;margin-bottom:4px">❌ ${p}: ${data.detail}</div>`;
+ } else {
+ html += `<div style="color:#0f0;margin-bottom:4px">✅ ${p.toUpperCase()}: <a href="${data.upload_url}" target="_blank" style="color:#4af">${data.upload_url}</a> (${data.account})</div>`;
+ }
+ } catch(e) {
+ html += `<div style="color:#f44;margin-bottom:4px">❌ ${p}: ${e.message}</div>`;
+ }
+ }
+ el.innerHTML = `<div style="background:#1a1a2e;padding:12px;border-radius:8px;border:1px solid #1a5c2e33">${html}<hr style="border-color:#333;margin:8px 0"><span style="color:#ff0">Abra cada link acima e arraste o vídeo para publicar em cada plataforma.</span></div>`;
+}
+
+async function confirmAssistedPub() {
+ const jobId = document.getElementById('confirm-job-id').value.trim();
+ const platform = document.getElementById('confirm-platform').value;
+ const url = document.getElementById('confirm-url').value.trim();
+ const el = document.getElementById('confirm-result');
+ if (!jobId) { el.innerHTML = '<span style="color:#f44">Informe o Job ID</span>'; return; }
+ el.innerHTML = '<span style="color:#ff0">⏳ Confirmando...</span>';
+ try {
+ const resp = await fetch(`${API}/api/publish/assisted-confirm`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({ job_id: jobId, platform, published_url: url })
+ });
+ const data = await resp.json();
+ if (data.confirmed) {
+ el.innerHTML = `<span style="color:#0f0;font-weight:bold">✅ Publicação confirmada! Job ${jobId} marcado como publicado no ${platform}.</span>`;
+ } else {
+ el.innerHTML = `<span style="color:#f44">❌ Falha ao confirmar: ${JSON.stringify(data)}</span>`;
+ }
+ } catch(e) {
+ el.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
+ }
+}
+
+// === MISSÃO 040.2 — Radar Viral Instagram ===
+async function loadInstagramRadar() {
+ const main = document.getElementById('main-content');
+ main.innerHTML = `
+ <h2 style="margin-bottom:1rem">📸 Radar Viral Instagram — GTA VI</h2>
+ <div class="card" style="margin-bottom:1rem;border-left:3px solid #E1306C">
+ <div class="card-header"><span class="card-icon">⚠️</span><div class="card-title">Limitação Real do Instagram</div></div>
+ <div style="padding:1rem;color:#ccc;font-size:0.9rem">
+ O Instagram <strong>não oferece API pública de busca de Reels</strong> e bloqueia scraping via yt-dlp (requer cookies de sessão autenticada).<br>
+ Este radar funciona em dois modos:<br>
+ • <strong>Busca por URL:</strong> cole links de Reels específicos para analisar métricas e importar.<br>
+ • <strong>Monitoramento de perfis:</strong> quando configurado com cookies de sessão, busca automática funciona.<br>
+ Vídeos de terceiros são classificados como <em>referência editorial</em> — use para inspirar conteúdo original.
+ </div>
+ </div>
+ <div class="card" style="margin-bottom:1rem">
+ <div class="card-header"><span class="card-icon">🔍</span><div class="card-title">Buscar Reel por URL</div></div>
+ <div style="padding:1rem">
+ <div style="display:flex;gap:8px;margin-bottom:1rem">
+ <input type="text" id="ig-radar-url" placeholder="Cole URL do Reel Instagram (ex: https://www.instagram.com/reel/...)" style="flex:1;padding:10px;background:#1a1a2e;border:1px solid #333;color:#fff;border-radius:6px;font-size:0.95rem">
+ <button class="btn btn-primary" onclick="analyzeIgReel()">🔍 Analisar</button>
+ </div>
+ <div id="ig-reel-analysis" style="min-height:40px"></div>
+ </div>
+ </div>
+ <div class="card" style="margin-bottom:1rem">
+ <div class="card-header"><span class="card-icon">👤</span><div class="card-title">Perfis Monitorados</div><button class="btn btn-sm" onclick="refreshIgProfiles()" style="margin-left:auto;font-size:0.75rem">↻</button></div>
+ <div style="padding:1rem">
+ <div style="display:flex;gap:8px;margin-bottom:1rem">
+ <input type="text" id="ig-profile-input" placeholder="@perfil_para_monitorar" style="flex:1;padding:8px;background:#1a1a2e;border:1px solid #333;color:#fff;border-radius:6px">
+ <button class="btn" onclick="addIgProfile()" style="background:#E1306C;color:#fff">+ Adicionar</button>
+ </div>
+ <div id="ig-profiles-list">Carregando...</div>
+ </div>
+ </div>
+ <div class="card" style="margin-bottom:1rem">
+ <div class="card-header"><span class="card-icon">📡</span><div class="card-title">Descoberta Automática</div></div>
+ <div style="padding:1rem">
+ <button class="btn btn-primary" onclick="runIgDiscover()" style="background:#E1306C;color:#fff;font-weight:bold">🔍 Buscar Tendências GTA VI</button>
+ <div id="ig-discover-status" style="margin-top:8px;color:#aaa"></div>
+ </div>
+ </div>
+ <div class="card">
+ <div class="card-header"><span class="card-icon">🎬</span><div class="card-title">Resultados — Viral Score</div></div>
+ <div id="ig-radar-results" style="padding:1rem">Execute uma busca ou análise para ver resultados.</div>
+ </div>`;
+ refreshIgProfiles();
+ // Tentar carregar cache
+ try {
+ const cache = await api('/api/instagram-radar/cache?max_age_hours=24');
+ if (cache.cached && cache.count > 0) {
+ renderIgResults(cache.results);
+ document.getElementById('ig-discover-status').textContent = `📦 ${cache.count} resultados em cache`;
+ }
+ } catch(e) {}
+}
+
+async function analyzeIgReel() {
+ const url = document.getElementById('ig-radar-url').value.trim();
+ const el = document.getElementById('ig-reel-analysis');
+ if (!url) { el.innerHTML = '<span style="color:#f44">Cole uma URL primeiro</span>'; return; }
+ el.innerHTML = '<span style="color:#ff0">⏳ Analisando Reel...</span>';
+ try {
+ const resp = await fetch(`${API}/api/import/url/metadata`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({url})
+ });
+ const data = await resp.json();
+ if (data.error) {
+ el.innerHTML = `<span style="color:#f44">❌ ${data.error}<br><small>Instagram pode exigir cookies de sessão. Tente importar via URL na seção "Importar URL".</small></span>`;
+ return;
+ }
+ const dup = data.is_duplicate;
+ const thumb = data.thumbnail ? `<img src="${data.thumbnail}" style="max-width:150px;border-radius:6px;margin-top:8px;display:block">` : '';
+ el.innerHTML = `
+ <div style="background:#1a1a2e;padding:12px;border-radius:8px;border:1px solid #E1306C33">
+ <strong>${data.title || 'Sem título'}</strong><br>
+ <span style="color:#aaa">👤 ${data.author || '?'} | ⏱️ ${Math.round(data.duration||0)}s | 📐 ${data.resolution||'?'} | 👁️ ${(data.view_count||0).toLocaleString()} views</span><br>
+ ${dup ? '<span style="color:#f44;font-weight:bold">⚠️ JÁ IMPORTADO</span>' : `<button class="btn btn-sm" onclick="importIgReel('${url}')" style="margin-top:8px;background:#E1306C;color:#fff">📥 Importar para Produção</button>`}
+ ${thumb}
+ </div>`;
+ } catch(e) {
+ el.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
+ }
+}
+
+async function importIgReel(url) {
+ if (!url) return;
+ try {
+ const resp = await fetch(`${API}/api/import/url/download`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({url})
+ });
+ const data = await resp.json();
+ alert(data.status === 'duplicate' ? 'URL já importada' : 'Download iniciado! Verifique Importar URL.');
+ } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function refreshIgProfiles() {
+ const el = document.getElementById('ig-profiles-list');
+ if (!el) return;
+ try {
+ const data = await api('/api/instagram-radar/profiles');
+ const profiles = data.profiles || [];
+ if (!profiles.length) { el.textContent = 'Nenhum perfil monitorado.'; return; }
+ el.innerHTML = profiles.map(p => `<span style="display:inline-block;background:#E1306C33;color:#E1306C;padding:4px 10px;border-radius:12px;margin:2px 4px;font-size:0.85rem">@${p} <button onclick="removeIgProfile('${p}')" style="background:none;border:none;color:#f44;cursor:pointer;font-size:0.8rem">×</button></span>`).join('');
+ } catch(e) { el.textContent = 'Erro ao carregar'; }
+}
+
+async function addIgProfile() {
+ const input = document.getElementById('ig-profile-input');
+ const profile = input.value.trim().replace(/^@/, '');
+ if (!profile) return;
+ try {
+ await fetch(`${API}/api/instagram-radar/profiles/add`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({profile})
+ });
+ input.value = '';
+ refreshIgProfiles();
+ } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function removeIgProfile(profile) {
+ try {
+ await fetch(`${API}/api/instagram-radar/profiles/remove`, {
+ method: 'POST', headers: {'Content-Type':'application/json'},
+ body: JSON.stringify({profile})
+ });
+ refreshIgProfiles();
+ } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function runIgDiscover() {
+ const statusEl = document.getElementById('ig-discover-status');
+ statusEl.innerHTML = '<span style="color:#ff0">⏳ Buscando tendências (pode levar ~60s)...</span>';
+ try {
+ const data = await api('/api/instagram-radar/discover?max_per_source=3');
+ if (data.count > 0) {
+ renderIgResults(data.results);
+ statusEl.innerHTML = `<span style="color:#0f0">✅ ${data.count} resultados encontrados</span>`;
+ } else {
+ statusEl.innerHTML = '<span style="color:#ff0">⚠️ 0 resultados — Instagram bloqueia scraping sem cookies. Use "Buscar por URL" acima ou configure cookies em data/publishing/credentials/.</span>';
+ }
+ } catch(e) {
+ statusEl.innerHTML = `<span style="color:#f44">❌ Erro: ${e.message}</span>`;
+ }
+}
+
+function renderIgResults(results) {
+ const el = document.getElementById('ig-radar-results');
+ if (!results || !results.length) { el.textContent = 'Nenhum resultado.'; return; }
+ el.innerHTML = '<table class="data-table"><thead><tr><th>Cat.</th><th>Título</th><th>Autor</th><th>Score</th><th>Conf.</th><th>Views</th><th>Direitos</th><th>Ações</th></tr></thead><tbody>' +
+ results.map(r => {
+ const scoreColor = r.viral_score >= 75 ? '#0f0' : r.viral_score >= 50 ? '#ff0' : '#f44';
+ const confPct = Math.round((r.confidence || 0) * 100);
+ const rightsBadge = r.rights_status === 'fair_use' ? '<span style="color:#0f0">Fair Use</span>' : r.rights_status === 'reference_only' ? '<span style="color:#ff0">Referência</span>' : '<span style="color:#aaa">?</span>';
+ return `<tr>
+ <td>${r.category || '?'}</td>
+ <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.title||'').replace(/"/g,'&quot;')}">${(r.title||'?').substring(0,35)}</td>
+ <td>@${(r.author||'?').substring(0,15)}</td>
+ <td style="color:${scoreColor};font-weight:bold">${r.viral_score || 0}</td>
+ <td style="color:${confPct>=80?'#0f0':'#ff0'}">${confPct}%</td>
+ <td>${(r.view_count||0).toLocaleString()}</td>
+ <td>${rightsBadge}</td>
+ <td><a href="${r.url}" target="_blank" class="btn btn-sm" style="font-size:0.7rem;text-decoration:none">🔗 Abrir</a></td>
+ </tr>`;
+ }).join('') + '</tbody></table>';
+}
+
 // === MISSÃO 017 — Audiovisual ===
 async function generateSubtitles() {
  const name = document.getElementById('sub-name').value.trim();
@@ -2118,6 +3102,68 @@ async function loadBrowserPub() {
 }
 
 // Dashboard
+async function loadDashboardAnalytics() {
+ const el = document.getElementById('dashboard-analytics');
+ if (!el) return;
+ try {
+ const data = await api('/api/analytics/dashboard');
+ if (data.error) { el.innerHTML = '<div class="empty-state">Erro: ' + data.error + '</div>'; return; }
+ const cat = data.catalog || {};
+ const pipe = data.pipeline || {};
+ const queue = data.queue || {};
+ const radar = data.radar || {};
+ const accs = data.accounts || {};
+ const videos = cat.total_videos || 0;
+ const mb = cat.total_mb || 0;
+ const jobs = pipe.total_jobs || 0;
+ const byStatus = pipe.by_status || {};
+ const completed = byStatus.completed || 0;
+ const scheduled = byStatus.scheduled || 0;
+ const failed = byStatus.failed || 0;
+ const qStatus = queue.status || 'stopped';
+ const qColor = qStatus === 'running' ? '#4caf50' : qStatus === 'paused' ? '#ff9800' : '#f44336';
+ const qLabel = qStatus === 'running' ? 'Rodando' : qStatus === 'paused' ? 'Pausada' : 'Parada';
+ const radarRuns = radar.total_runs || 0;
+ const radarCount = radar.latest_count || 0;
+ const radarOn = radar.enabled ? '🟢' : '🔴';
+ let accHtml = '';
+ for (const [p, info] of Object.entries(accs)) {
+ const icon = p === 'instagram' ? '📸' : p === 'tiktok' ? '🎵' : '▶️';
+ const name = p.charAt(0).toUpperCase() + p.slice(1);
+ accHtml += `<span style="display:inline-flex;align-items:center;gap:4px;background:#1a1a2e;padding:4px 8px;border-radius:4px;font-size:0.8rem">${icon} ${info.handle || '?'} <span style="color:${info.status==='configured'?'#ff9800':'#aaa'}">(${info.status||'?'})</span></span> `;
+ }
+ el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem">
+ <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:1rem;text-align:center">
+ <div style="font-size:2rem;font-weight:700;color:#4fc3f7">${videos}</div>
+ <div style="color:#aaa;font-size:0.85rem">Vídeos (${mb.toFixed(0)}MB)</div>
+ </div>
+ <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:1rem;text-align:center">
+ <div style="font-size:2rem;font-weight:700;color:#81c784">${completed}</div>
+ <div style="color:#aaa;font-size:0.85rem">Concluídos</div>
+ </div>
+ <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:1rem;text-align:center">
+ <div style="font-size:2rem;font-weight:700;color:#ffb74d">${scheduled}</div>
+ <div style="color:#aaa;font-size:0.85rem">Agendados</div>
+ </div>
+ <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:1rem;text-align:center">
+ <div style="font-size:2rem;font-weight:700;color:#e57373">${failed}</div>
+ <div style="color:#aaa;font-size:0.85rem">Falhas</div>
+ </div>
+ <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:1rem;text-align:center">
+ <div style="font-size:1.2rem;font-weight:700;color:${qColor}">${qLabel}</div>
+ <div style="color:#aaa;font-size:0.85rem">Fila Publicação</div>
+ </div>
+ <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:1rem;text-align:center">
+ <div style="font-size:1.2rem;font-weight:700;color:#ce93d8">${radarOn} ${radarRuns} buscas</div>
+ <div style="color:#aaa;font-size:0.85rem">Radar (${radarCount} resultados)</div>
+ </div>
+ </div>
+ <div style="margin-top:1rem;display:flex;flex-wrap:wrap;gap:0.5rem">${accHtml}</div>`;
+ } catch(e) {
+ el.innerHTML = '<div class="empty-state">Erro ao carregar analytics: ' + e.message + '</div>';
+ }
+}
+
 async function loadDashboard() {
  const h = await api('/api/health');
  const badge = document.getElementById('health-badge');
@@ -2138,6 +3184,7 @@ async function loadDashboard() {
  const profiles = await api('/api/profiles');
  if (!profiles.error) {
  const active = profiles.filter(p => p.enabled);
+ loadDashboardAnalytics();
  document.getElementById('dashboard-profiles').innerHTML =
  '<table class="data-table"><thead><tr><th>ID</th><th>Nome</th><th>Nicho</th><th>Status</th></tr></thead><tbody>' +
  active.map(p => '<tr><td style="font-family:monospace;font-size:0.75rem;color:var(--gta-neon-cyan)">' + p.profile_id + '</td><td style="font-weight:600;color:var(--text-primary)">' + p.name + '</td><td>' + p.niche + '</td><td><span class="badge badge-active">Ativo</span></td></tr>').join('') +
@@ -2473,6 +3520,299 @@ async function schedulePublish() {
  } catch(e) { msg.innerHTML = '<div class="error-box">' + e.message + '</div>'; }
 }
 
+const TUTORIALS_DATA = [
+ {cat:"Acesso",title:"Primeiro acesso e login",content:"<strong>O QUE É:</strong> Tela inicial do aplicativo.<br><strong>PARA QUE SERVE:</strong> Autenticar o usuário.<br><strong>ONDE ENCONTRAR:</strong> Ao abrir http://localhost:8080<br><strong>COMO UTILIZAR:</strong> Digite admin / 160669 e clique Entrar.<br><strong>RESULTADO:</strong> Dashboard principal carregado.<br><strong>PROBLEMAS:</strong> Se voltar ao login, limpe o cache do navegador."},
+ {cat:"Contas",title:"Como conectar Instagram",content:"<strong>O QUE É:</strong> Vincular conta @leonidagta6flashbr.<br><strong>PARA QUE SERVE:</strong> Publicar Reels automaticamente.<br><strong>ONDE ENCONTRAR:</strong> Contas Conectadas → Instagram.<br><strong>COMO UTILIZAR:</strong> Configure OAuth na aba Setup & Config.<br><strong>RESULTADO:</strong> Status muda para 'Conectado'.<br><strong>PROBLEMAS:</strong> Verifique se o app Meta foi aprovado."},
+ {cat:"Contas",title:"Como conectar TikTok",content:"<strong>O QUE É:</strong> Vincular conta @leonidagta6flashbr.<br><strong>PARA QUE SERVE:</strong> Publicar vídeos no TikTok.<br><strong>ONDE ENCONTRAR:</strong> Contas Conectadas → TikTok.<br><strong>COMO UTILIZAR:</strong> Configure OAuth na aba Setup & Config.<br><strong>RESULTADO:</strong> Status muda para 'Conectado'.<br><strong>PROBLEMAS:</strong> Content Posting API requer aprovação do TikTok."},
+ {cat:"Contas",title:"Como conectar YouTube",content:"<strong>O QUE É:</strong> Vincular canal @leonidagta6flashbr.<br><strong>PARA QUE SERVE:</strong> Publicar Shorts automaticamente.<br><strong>ONDE ENCONTRAR:</strong> Contas Conectadas → YouTube.<br><strong>COMO UTILIZAR:</strong> Configure OAuth no Google Cloud Console (ver aba Setup).<br><strong>RESULTADO:</strong> Canal vinculado e pronto para upload.<br><strong>PROBLEMAS:</strong> Não confunda handle com email Google."},
+ {cat:"Contas",title:"Como verificar conta autenticada",content:"<strong>O QUE É:</strong> Confirmar que a conta está realmente conectada.<br><strong>PARA QUE SERVE:</strong> Evitar publicação na conta errada.<br><strong>ONDE ENCONTRAR:</strong> Contas Conectadas.<br><strong>COMO UTILIZAR:</strong> Verifique o status (Configurado vs Conectado).<br><strong>RESULTADO:</strong> 'Conectado' = OAuth válido. 'Configurado' = apenas handle registrado."},
+ {cat:"Radar",title:"Pesquisar vídeos no YouTube",content:"<strong>O QUE É:</strong> Buscar vídeos recentes sobre GTA VI.<br><strong>PARA QUE SERVE:</strong> Descobrir conteúdo viral.<br><strong>ONDE ENCONTRAR:</strong> Radar GTA VI no menu lateral.<br><strong>COMO UTILIZAR:</strong> Digite 'GTA VI' e clique Buscar.<br><strong>RESULTADO:</strong> Lista com thumbnails, títulos, views e Viral Score.<br><strong>PROBLEMAS:</strong> Se vazio, tente termos diferentes como 'Rockstar Games'."},
+ {cat:"Radar",title:"Encontrar Reels populares no Instagram",content:"<strong>O QUE É:</strong> Descobrir Reels virais de GTA VI.<br><strong>PARA QUE SERVE:</strong> Identificar tendências.<br><strong>ONDE ENCONTRAR:</strong> Radar GTA VI → selecione Instagram.<br><strong>COMO UTILIZAR:</strong> Busque por hashtag ou perfil.<br><strong>RESULTADO:</strong> Lista ordenada por engajamento.<br><strong>PROBLEMAS:</strong> Requer cookies do Instagram (ver aba Setup)."},
+ {cat:"Radar",title:"Interpretar o Viral Score",content:"<strong>O QUE É:</strong> Pontuação de 0 a 100.<br><strong>PARA QUE SERVE:</strong> Avaliar potencial viral de um vídeo.<br><strong>ONDE ENCONTRAR:</strong> Nos resultados do Radar.<br><strong>COMO UTILIZAR:</strong> 🔥 80-100 = Altíssimo potencial. 🚀 60-79 = Alto. ⭐ 40-59 = Médio. 📉 0-39 = Baixo.<br><strong>RESULTADO:</strong> Priorize vídeos com score acima de 60.<br><strong>PROBLEMAS:</strong> Score baixo não significa vídeo ruim, apenas menos viral."},
+ {cat:"Importação",title:"Importar vídeo por URL",content:"<strong>O QUE É:</strong> Baixar vídeo de link externo.<br><strong>PARA QUE SERVE:</strong> Adicionar material ao catálogo.<br><strong>ONDE ENCONTRAR:</strong> Importar URL no menu lateral.<br><strong>COMO UTILIZAR:</strong> Cole URL do YouTube/Instagram/TikTok e clique Importar.<br><strong>RESULTADO:</strong> Vídeo baixado, registrado no SmartCatalog e job criado.<br><strong>PROBLEMAS:</strong> Instagram requer cookies. URLs privadas podem falhar."},
+ {cat:"Importação",title:"Baixar vídeo autorizado",content:"<strong>O QUE É:</strong> Download de vídeo para uso editorial.<br><strong>PARA QUE SERVE:</strong> Criar cortes e reels.<br><strong>ONDE ENCONTRAR:</strong> Importar URL ou Radar.<br><strong>COMO UTILIZAR:</strong> Apenas baixe vídeos com permissão de reutilização.<br><strong>RESULTADO:</strong> Arquivo MP4 salvo em data/autoreel/output/.<br><strong>PROBLEMAS:</strong> Respeite direitos autorais. Use apenas conteúdo autorizado."},
+ {cat:"Produção",title:"Criar cortes automaticamente",content:"<strong>O QUE É:</strong> Pipeline de edição automática.<br><strong>PARA QUE SERVE:</strong> Transformar material bruto em reels verticais.<br><strong>ONDE ENCONTRAR:</strong> Produção no menu lateral.<br><strong>COMO UTILIZAR:</strong> Selecione material → Crie job → Aguarde renderização.<br><strong>RESULTADO:</strong> Vídeo vertical 1080x1920 com identidade Leonida.<br><strong>PROBLEMAS:</strong> Jobs falhos aparecem em vermelho. Verifique logs."},
+ {cat:"Produção",title:"Configurar legendas",content:"<strong>O QUE É:</strong> Texto sincronizado ao áudio.<br><strong>PARA QUE SERVE:</strong> Acessibilidade e engajamento.<br><strong>ONDE ENCONTRAR:</strong> Durante criação do job de produção.<br><strong>COMO UTILIZAR:</strong> Ative legendas nas opções do job.<br><strong>RESULTADO:</strong> Legendas embutidas no vídeo final.<br><strong>PROBLEMAS:</strong> Precisão depende da qualidade do áudio original."},
+ {cat:"Produção",title:"Identidade visual Leonida",content:"<strong>O QUE É:</strong> Marca visual dos vídeos.<br><strong>PARA QUE SERVE:</strong> Reconhecimento da marca @leonidagta6flashbr.<br><strong>ONDE ENCONTRAR:</strong> Aplicada automaticamente pela Fábrica de Cortes.<br><strong>COMO UTILIZAR:</strong> Configurada nos templates de produção.<br><strong>RESULTADO:</strong> Intro/outro, cores e fontes consistentes.<br><strong>PROBLEMAS:</strong> Personalize em Branding Studio."},
+ {cat:"Revisão",title:"Visualizar vídeos produzidos",content:"<strong>O QUE É:</strong> Player de vídeo integrado.<br><strong>PARA QUE SERVE:</strong> Assistir antes de aprovar.<br><strong>ONDE ENCONTRAR:</strong> Produção → clique no job.<br><strong>COMO UTILIZAR:</strong> Clique no thumbnail para abrir o player.<br><strong>RESULTADO:</strong> Vídeo reproduzido diretamente no dashboard.<br><strong>PROBLEMAS:</strong> Se não carregar, verifique se o arquivo existe em data/autoreel/output/."},
+ {cat:"Revisão",title:"Aprovar ou rejeitar vídeo",content:"<strong>O QUE É:</strong> Decisão editorial humana.<br><strong>PARA QUE SERVE:</strong> Controle de qualidade antes da publicação.<br><strong>ONDE ENCONTRAR:</strong> Produção → botões Aprovar/Rejeitar.<br><strong>COMO UTILIZAR:</strong> Assista → clique Aprovar (verde) ou Rejeitar (vermelho).<br><strong>RESULTADO:</strong> Aprovado = pronto para publicar. Rejeitado = volta para fila.<br><strong>PROBLEMAS:</strong> Aprovação técnica ≠ aprovação editorial."},
+ {cat:"Publicação",title:"Preparar publicações nas três redes",content:"<strong>O QUE É:</strong> Metadados formatados por plataforma.<br><strong>PARA QUE SERVE:</strong> Agilizar upload manual.<br><strong>ONDE ENCONTRAR:</strong> Publicações → Preparar para as 3 redes.<br><strong>COMO UTILIZAR:</strong> Selecione vídeo → clique Preparar.<br><strong>RESULTADO:</strong> Título, descrição, hashtags copiados para clipboard. Safari abre página de upload.<br><strong>PROBLEMAS:</strong> Cole os metadados manualmente na plataforma."},
+ {cat:"Publicação",title:"Usar publicação assistida",content:"<strong>O QUE É:</strong> Semi-automação do upload.<br><strong>PARA QUE SERVE:</strong> Reduzir trabalho manual sem risco.<br><strong>ONDE ENCONTRAR:</strong> Publicações → botões de plataforma.<br><strong>COMO UTILIZAR:</strong> Selecione vídeo → clique PUBLICAR NO INSTAGRAM/YOUTUBE/TIKTOK.<br><strong>RESULTADO:</strong> Sistema prepara tudo e abre a página certa no navegador.<br><strong>PROBLEMAS:</strong> Você ainda precisa arrastar o vídeo e confirmar na plataforma."},
+ {cat:"Publicação",title:"Habilitar publicação automática",content:"<strong>O QUE É:</strong> Upload direto via API oficial.<br><strong>PARA QUE SERVE:</strong> Zero intervenção manual.<br><strong>ONDE ENCONTRAR:</strong> Setup & Config → OAuth Necessário.<br><strong>COMO UTILIZAR:</strong> Configure credenciais OAuth para cada plataforma.<br><strong>RESULTADO:</strong> Vídeos aprovados são publicados automaticamente.<br><strong>PROBLEMAS:</strong> Requer aprovação das APIs. Verifique instruções na aba Setup."},
+ {cat:"Agendamento",title:"Agendar publicações",content:"<strong>O QUE É:</strong> Definir data/hora de publicação.<br><strong>PARA QUE SERVE:</strong> Otimizar alcance por horário.<br><strong>ONDE ENCONTRAR:</strong> Calendário Editorial.<br><strong>COMO UTILIZAR:</strong> Selecione slot → atribua vídeo → confirme.<br><strong>RESULTADO:</strong> Job agendado aparece na fila com horário definido.<br><strong>PROBLEMAS:</strong> Fila deve estar em status 'Rodando' para processar."},
+ {cat:"Operação",title:"Iniciar, pausar e retomar a fila",content:"<strong>O QUE É:</strong> Controle da fila de publicação.<br><strong>PARA QUE SERVE:</strong> Gerenciar quando processar jobs.<br><strong>ONDE ENCONTRAR:</strong> Contas Conectadas → Controle da Fila.<br><strong>COMO UTILIZAR:</strong> ▶ Iniciar | ⏸ Pausar | ⏯ Retomar | ⏹ Parar.<br><strong>RESULTADO:</strong> Estado persiste entre reinícios do backend.<br><strong>PROBLEMAS:</strong> Se parada, nenhum job será processado."},
+ {cat:"Operação",title:"Acompanhar downloads e renderizações",content:"<strong>O QUE É:</strong> Progresso em tempo real.<br><strong>PARA QUE SERVE:</strong> Saber quando o vídeo estará pronto.<br><strong>ONDE ENCONTRAR:</strong> Produção → status do job.<br><strong>COMO UTILIZAR:</strong> Observe badges: pending/processing/completed/failed.<br><strong>RESULTADO:</strong> Completed = vídeo pronto para revisão.<br><strong>PROBLEMAS:</strong> Failed = verifique logs em /tmp/backend.log."},
+ {cat:"Analytics",title:"Consultar resultados e Analytics",content:"<strong>O QUE É:</strong> Métricas agregadas do sistema.<br><strong>PARA QUE SERVE:</strong> Entender desempenho de produção.<br><strong>ONDE ENCONTRAR:</strong> Dashboard → Analytics em Tempo Real.<br><strong>COMO UTILIZAR:</strong> Veja cards: vídeos, concluídos, agendados, falhas, fila, radar.<br><strong>RESULTADO:</strong> Visão geral instantânea do sistema.<br><strong>PROBLEMAS:</strong> Métricas de plataformas (views/likes) requerem OAuth."},
+ {cat:"Problemas",title:"Resolver erros de login",content:"<strong>SINTOMA:</strong> Dashboard volta ao login após entrar.<br><strong>CAUSA:</strong> Token expirado ou JWT secret mudou.<br><strong>SOLUÇÃO:</strong> Limpe localStorage do navegador (F12 → Application → Local Storage → Clear). Faça login novamente.<br><strong>PERSISTE?</strong> Reinicie o backend e tente novamente."},
+ {cat:"Problemas",title:"Resolver problemas de conexão das plataformas",content:"<strong>SINTOMA:</strong> Conta mostra 'Configurado' em vez de 'Conectado'.<br><strong>CAUSA:</strong> OAuth não configurado ou token expirado.<br><strong>SOLUÇÃO:</strong> Verifique instruções na aba Setup & Config → OAuth Necessário.<br><strong>PERSISTE?</strong> Gere novo token/access key na plataforma."},
+ {cat:"Problemas",title:"Recuperar jobs interrompidos",content:"<strong>SINTOMA:</strong> Job ficou em 'processing' para sempre.<br><strong>CAUSA:</strong> Backend reiniciou durante renderização.<br><strong>SOLUÇÃO:</strong> Na Produção, cancele o job travado e crie um novo com o mesmo material.<br><strong>PERSISTE?</strong> Verifique espaço em disco e memória disponível."},
+ {cat:"Problemas",title:"Identificar publicações que falharam",content:"<strong>SINTOMA:</strong> Vídeo aprovado mas não publicado.<br><strong>CAUSA:</strong> Erro de API, token expirado ou quota excedida.<br><strong>SOLUÇÃO:</strong> Verifique Histórico de Publicação. Reconfigure OAuth se necessário.<br><strong>PERSISTE?</strong> Use Publicação Assistida como fallback."},
+ {cat:"Diário",title:"Como utilizar o aplicativo diariamente",content:"<strong>MANHÃ:</strong> Abra o Dashboard. Verifique métricas. Confira radares.<br><strong>TARDE:</strong> Revise novos vídeos produzidos. Aprove/rejeite. Agende publicações.<br><strong>NOITE:</strong> Verifique publicações realizadas. Consulte Analytics.<br><strong>DICA:</strong> Mantenha a fila em 'Rodando' para processamento contínuo.<br><strong>CELULAR:</strong> Acesse http://IP-DO-MAC:8080 na mesma rede Wi-Fi."}
+];
+
+const FAQ_DATA = [
+ {q:"O app funciona no celular?",a:"Sim! Acesse http://192.168.0.235:8080 no navegador do celular (mesma rede Wi-Fi)."},
+ {q:"Quais são as credenciais de login?",a:"Usuário: admin | Senha: 160669"},
+ {q:"Posso publicar automaticamente?",a:"Sim, após configurar OAuth para cada plataforma. Veja a aba Setup & Config."},
+ {q:"O Radar Instagram funciona?",a:"Parcialmente. Requer cookies do Instagram exportados do Safari. Veja Setup & Config."},
+ {q:"Quantos vídeos posso produzir?",a:"Sem limite técnico. Depende do espaço em disco e memória do MacBook."},
+ {q:"O que é Viral Score?",a:"Pontuação de 0 a 100 que estima o potencial viral de um vídeo baseado em métricas disponíveis."},
+ {q:"Como faço backup dos vídeos?",a:"Os vídeos ficam em data/autoreel/output/. Copie essa pasta para backup."},
+ {q:"O app funciona sem internet?",a:"Parcialmente. Login e produção funcionam offline. Radar e publicação requerem internet."}
+];
+
+const GLOSSARY_DATA = [
+ {term:"SmartCatalog",def:"Banco de dados que indexa todos os vídeos importados com metadados."},
+ {term:"Pipeline",def:"Sequência de etapas: importação → corte → edição → quality gate → aprovação."},
+ {term:"QualityGate",def:"Validação técnica automática (formato, resolução, codec, duração)."},
+ {term:"OAuth",def:"Protocolo de autorização que permite publicar via API oficial das plataformas."},
+ {term:"Viral Score",def:"Métrica proprietária de 0-100 baseada em views, likes, comments, recência e engajamento."},
+ {term:"AutoReel",def:"Motor de produção automática de vídeos verticais com identidade visual."},
+ {term:"Scheduler",def:"Sistema de agendamento que gerencia quando cada vídeo será publicado."},
+ {term:"Publish Pipeline",def:"Máquina de estados: draft → ready → publishing → published/failed."},
+ {term:"JWT",def:"JSON Web Token — mecanismo de autenticação usado pelo dashboard."},
+ {term:"CORS",def:"Cross-Origin Resource Sharing — política de segurança do navegador para requisições entre origens diferentes."}
+];
+
+function renderTutorials(filter) {
+ const el = document.getElementById('tutorials-list');
+ if (!el) return;
+ const q = (filter || '').toLowerCase();
+ const filtered = TUTORIALS_DATA.filter(t => !q || t.title.toLowerCase().includes(q) || t.cat.toLowerCase().includes(q) || t.content.toLowerCase().includes(q));
+ if (!filtered.length) { el.innerHTML = '<div class="empty-state">Nenhum tutorial encontrado para "' + filter + '"</div>'; return; }
+ let html = '<div style="display:grid;gap:0.75rem">';
+ const cats = [...new Set(filtered.map(t => t.cat))];
+ for (const cat of cats) {
+ html += '<div style="color:#4fc3f7;font-weight:700;font-size:0.9rem;margin-top:0.5rem;text-transform:uppercase">' + cat + '</div>';
+ for (const t of filtered.filter(x => x.cat === cat)) {
+ html += '<details style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:0.75rem;cursor:pointer">';
+ html += '<summary style="color:#fff;font-weight:600">' + t.title + '</summary>';
+ html += '<div style="color:#ccc;line-height:1.8;margin-top:0.5rem">' + t.content + '</div>';
+ html += '</details>';
+ }
+ }
+ html += '</div>';
+ el.innerHTML = html;
+}
+
+function filterTutorials() {
+ const q = document.getElementById('tutorial-search').value.trim();
+ renderTutorials(q);
+}
+
+function renderFAQ() {
+ const el = document.getElementById('faq-list');
+ if (!el) return;
+ let html = '<div style="display:grid;gap:0.5rem">';
+ for (const f of FAQ_DATA) {
+ html += '<details style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:0.75rem;cursor:pointer">';
+ html += '<summary style="color:#fff;font-weight:600">❓ ' + f.q + '</summary>';
+ html += '<div style="color:#ccc;line-height:1.8;margin-top:0.5rem">' + f.a + '</div>';
+ html += '</details>';
+ }
+ html += '</div>';
+ el.innerHTML = html;
+}
+
+function renderGlossary() {
+ const el = document.getElementById('glossary-list');
+ if (!el) return;
+ let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:0.5rem">';
+ for (const g of GLOSSARY_DATA) {
+ html += '<div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:0.75rem">';
+ html += '<div style="color:#4fc3f7;font-weight:700">' + g.term + '</div>';
+ html += '<div style="color:#ccc;font-size:0.85rem;margin-top:4px">' + g.def + '</div>';
+ html += '</div>';
+ }
+ html += '</div>';
+ el.innerHTML = html;
+}
+
+function nextGuidedStep(step) {
+ for (let i = 0; i <= 7; i++) {
+ const el = document.getElementById('guided-step-' + i);
+ if (el) el.style.display = i === step ? 'block' : 'none';
+ }
+}
+
+function skipGuidedTutorial() {
+ document.getElementById('guided-tutorial').innerHTML = '<div style="color:#4caf50;font-weight:600;padding:1rem">✅ Tutorial concluído! Explore o menu lateral para descobrir todas as funcionalidades.</div>';
+}
+
+async function loadTutorials() {
+ renderTutorials('');
+ renderFAQ();
+ renderGlossary();
+}
+
+async function loadSetupStatus() {
+ const el = document.getElementById('setup-system-status');
+ if (!el) return;
+ try {
+ const data = await api('/api/analytics/dashboard');
+ if (data.error) { el.innerHTML = '<div class="empty-state">Erro: ' + data.error + '</div>'; return; }
+ const cat = data.catalog || {};
+ const pipe = data.pipeline || {};
+ const radar = data.radar || {};
+ const byStatus = pipe.by_status || {};
+ el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.75rem">' +
+ '<div style="background:#1a1a2e;padding:0.75rem;border-radius:6px"><div style="color:#4fc3f7;font-size:1.5rem;font-weight:700">' + (cat.total_videos||0) + '</div><div style="color:#aaa;font-size:0.8rem">Vídeos</div></div>' +
+ '<div style="background:#1a1a2e;padding:0.75rem;border-radius:6px"><div style="color:#81c784;font-size:1.5rem;font-weight:700">' + (byStatus.completed||0) + '</div><div style="color:#aaa;font-size:0.8rem">Concluídos</div></div>' +
+ '<div style="background:#1a1a2e;padding:0.75rem;border-radius:6px"><div style="color:#ffb74d;font-size:1.5rem;font-weight:700">' + (byStatus.scheduled||0) + '</div><div style="color:#aaa;font-size:0.8rem">Agendados</div></div>' +
+ '<div style="background:#1a1a2e;padding:0.75rem;border-radius:6px"><div style="color:#ce93d8;font-size:1.5rem;font-weight:700">' + (radar.total_runs||0) + '</div><div style="color:#aaa;font-size:0.8rem">Buscas Radar</div></div>' +
+ '</div>';
+ } catch(e) { el.innerHTML = '<div class="empty-state">Erro: ' + e.message + '</div>'; }
+}
+
+async function loadRadarMonitor() {
+ const el = document.getElementById('radar-monitor-panel');
+ if (!el) return;
+ try {
+ const data = await api('/api/radar-monitor/status');
+ if (data.error) { el.innerHTML = '<div class="empty-state">Erro: ' + data.error + '</div>'; return; }
+ const state = data.state || {};
+ const latest = data.latest_results || {};
+ const enabled = state.enabled ? true : false;
+ const runs = state.total_runs || 0;
+ const lastCount = latest.count || 0;
+ const lastTime = state.last_run ? new Date(state.last_run * 1000).toLocaleString('pt-BR') : 'Nunca';
+ const interval = state.interval || 1800;
+ const statusColor = enabled ? '#4caf50' : '#ff9800';
+ const statusLabel = enabled ? '🟢 Ativo' : '🟡 Inativo';
+ el.innerHTML = `<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+ <div style="flex:1;min-width:200px">
+ <div style="font-size:1.2rem;font-weight:700;color:${statusColor}">${statusLabel}</div>
+ <div style="color:#aaa;font-size:0.85rem;margin-top:4px">Execuções: ${runs} | Última: ${lastTime} | Resultados: ${lastCount} | Intervalo: ${interval/60}min</div>
+ </div>
+ <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+ <button class="btn btn-primary" onclick="radarMonitorAction('run')">🔍 Buscar Agora</button>
+ <button class="btn btn-secondary" onclick="radarMonitorToggle(${!enabled})">${enabled ? '⏸ Desativar' : '▶ Ativar'}</button>
+ </div>
+ </div>`;
+ } catch(e) {
+ el.innerHTML = '<div class="empty-state">Erro ao carregar monitor: ' + e.message + '</div>';
+ }
+}
+
+async function radarMonitorAction(action) {
+ const el = document.getElementById('radar-monitor-panel');
+ if (el) el.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div>Executando busca...</div>';
+ try {
+ const data = await api('/api/radar-monitor/' + action, {method:'POST'});
+ if (data.error) { alert('Erro: ' + data.error); }
+ else if (data.ok) { alert('Busca concluída: ' + (data.results || 0) + ' resultados encontrados'); }
+ loadRadarMonitor();
+ } catch(e) { alert('Erro: ' + e.message); loadRadarMonitor(); }
+}
+
+async function radarMonitorToggle(enable) {
+ try {
+ const data = await api('/api/radar-monitor/enable', {method:'POST', body: JSON.stringify({enabled: enable, interval: 1800}), headers:{'Content-Type':'application/json'}});
+ if (data.error) { alert('Erro: ' + data.error); }
+ loadRadarMonitor();
+ } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function loadQueueControl() {
+ const el = document.getElementById('queue-control');
+ if (!el) return;
+ try {
+ const data = await api('/api/queue/status');
+ if (data.error) { el.innerHTML = '<div class="empty-state">Erro: ' + data.error + '</div>'; return; }
+ const status = data.queue_status || 'stopped';
+ const colors = {running:'#4caf50',paused:'#ff9800',stopped:'#f44336'};
+ const labels = {running:'🟢 Rodando',paused:'🟡 Pausada',stopped:'🔴 Parada'};
+ const color = colors[status] || '#aaa';
+ const label = labels[status] || status;
+ const eligible = data.eligible_now || 0;
+ const active = data.active_jobs || 0;
+ const history = data.history_count || 0;
+ el.innerHTML = `<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+ <div style="flex:1;min-width:200px">
+ <div style="font-size:1.5rem;font-weight:700;color:${color}">${label}</div>
+ <div style="color:#aaa;font-size:0.85rem;margin-top:4px">Jobs ativos: ${active} | Elegíveis agora: ${eligible} | Histórico: ${history}</div>
+ </div>
+ <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+ <button class="btn btn-primary" onclick="queueAction('start')" ${status==='running'?'disabled':''}>▶ Iniciar</button>
+ <button class="btn btn-secondary" onclick="queueAction('pause')" ${status!=='running'?'disabled':''}>⏸ Pausar</button>
+ <button class="btn btn-secondary" onclick="queueAction('resume')" ${status!=='paused'?'disabled':''}>⏯ Retomar</button>
+ <button class="btn btn-danger" onclick="queueAction('stop')">⏹ Parar</button>
+ </div>
+ </div>`;
+ } catch(e) {
+ el.innerHTML = '<div class="empty-state">Erro ao carregar status da fila: ' + e.message + '</div>';
+ }
+}
+
+async function queueAction(action) {
+ try {
+ const data = await api('/api/queue/' + action, {method:'POST'});
+ if (data.error) { alert('Erro: ' + data.error); return; }
+ loadQueueControl();
+ } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function connectOAuth(platform) {
+ try {
+ const data = await api('/api/oauth/start/leonidagta6flashbr/' + platform + '?redirect_base=' + window.location.origin.replace(/:\d+$/, ':8001'));
+ if (data.error) { alert('Erro OAuth: ' + data.error); return; }
+ if (data.url) { window.open(data.url, '_blank'); }
+ else { alert('URL de autorização não gerada.'); }
+ } catch(e) { alert('Erro ao iniciar OAuth: ' + e.message); }
+}
+
+async function disconnectOAuth(platform) {
+ if (!confirm('Desconectar ' + platform + '?')) return;
+ try {
+ const data = await api('/api/oauth/disconnect/leonidagta6flashbr/' + platform, {method:'POST'});
+ if (data.error) { alert('Erro: ' + data.error); return; }
+ loadAccounts();
+ } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function loadAccounts() {
+ const el = document.getElementById('accounts-list');
+ if (!el) return;
+ try {
+ const data = await api('/api/accounts');
+ if (data.error) { el.innerHTML = '<div class="empty-state">Erro: ' + data.error + '</div>'; return; }
+ let html = '<div style="display:grid;gap:1rem">';
+ const platforms = [
+ {key:'instagram', icon:'📸', name:'Instagram'},
+ {key:'tiktok', icon:'🎵', name:'TikTok'},
+ {key:'youtube', icon:'▶️', name:'YouTube'}
+ ];
+ for (const p of platforms) {
+ const acc = data[p.key] || {};
+ const handle = acc.handle || '—';
+ const status = acc.status || 'not_configured';
+ const method = acc.auth_method || 'manual';
+ const verified = acc.last_verified ? new Date(acc.last_verified).toLocaleString('pt-BR') : 'Nunca';
+ const statusColor = status === 'connected' ? '#4caf50' : status === 'configured' ? '#ff9800' : '#f44336';
+ const statusLabel = status === 'connected' ? 'Conectado' : status === 'configured' ? 'Configurado' : 'Não configurado';
+ const connectBtn = status === 'connected'
+ ? `<button onclick="disconnectOAuth('${p.key}')" style="background:#f44336;color:#fff;border:none;border-radius:4px;padding:0.4rem 0.8rem;font-size:0.75rem;cursor:pointer;margin-top:0.3rem">Desconectar</button>`
+ : `<button onclick="connectOAuth('${p.key}')" style="background:#4caf50;color:#fff;border:none;border-radius:4px;padding:0.4rem 0.8rem;font-size:0.75rem;cursor:pointer;margin-top:0.3rem">🔗 Conectar</button>`;
+ html += `<div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:1rem;display:flex;align-items:center;gap:1rem">
+ <span style="font-size:2rem">${p.icon}</span>
+ <div style="flex:1">
+ <div style="font-weight:600;color:#fff">${p.name}</div>
+ <div style="color:#aaa;font-size:0.85rem">${handle}</div>
+ ${connectBtn}
+ </div>
+ <div style="text-align:right">
+ <div style="color:${statusColor};font-weight:600;font-size:0.85rem">${statusLabel}</div>
+ <div style="color:#666;font-size:0.75rem">Auth: ${method} | Verificado: ${verified}</div>
+ </div>
+ </div>`;
+ }
+ html += '</div>';
+ el.innerHTML = html;
+ } catch(e) {
+ el.innerHTML = '<div class="empty-state">Erro ao carregar contas: ' + e.message + '</div>';
+ }
+}
+
 async function loadPublishJobs() {
  const pid = document.getElementById('pub-queue-profile').value;
  const jobs = await api('/api/publishing/jobs/' + pid);
@@ -2653,8 +3993,356 @@ document.querySelectorAll('.nav-item').forEach(item => {
  item.addEventListener('click', item._thumbHandler);
 });
 
+// ===== ANALYTICS DASHBOARD =====
+async function loadAnalytics() {
+ const container = document.getElementById('analytics-content');
+ if (!container) return;
+ container.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div>Carregando métricas...</div>';
+ try {
+  const report = await api('/api/analytics/report');
+  if (report.error) { container.innerHTML = '<div class="error-box">' + report.error + '</div>'; return; }
+  let html = '';
+  // Summary row
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px;">';
+  html += '<div style="background:rgba(0,255,170,0.08);border:1px solid rgba(0,255,170,0.2);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:1.4rem;font-weight:800;color:var(--gta-neon-green)">' + (report.total_videos_published || 0) + '</div><div style="font-size:0.7rem;opacity:0.7">Publicados</div></div>';
+  html += '<div style="background:rgba(0,200,255,0.08);border:1px solid rgba(0,200,255,0.2);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:1.4rem;font-weight:800;color:var(--gta-neon-cyan)">' + (report.total_views_all_platforms || 0).toLocaleString() + '</div><div style="font-size:0.7rem;opacity:0.7">Views Total</div></div>';
+  html += '<div style="background:rgba(255,0,170,0.08);border:1px solid rgba(255,0,170,0.2);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:1.4rem;font-weight:800;color:var(--gta-neon-pink)">' + (report.best_performing_platform || '—') + '</div><div style="font-size:0.7rem;opacity:0.7">Melhor Plataforma</div></div>';
+  html += '</div>';
+  // Platform cards
+  const platforms = report.platforms || {};
+  const platKeys = Object.keys(platforms);
+  if (platKeys.length) {
+   html += '<div style="font-weight:700;margin:10px 0 6px;font-size:0.85rem;">Desempenho por Plataforma</div>';
+   html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-bottom:12px;">';
+   for (const k of platKeys) {
+    const p = platforms[k];
+    const srcColor = p.data_source === 'unavailable' ? '#666' : 'var(--gta-neon-green)';
+    const engRate = p.engagement_rate !== undefined ? p.engagement_rate.toFixed(2) + '%' : '—';
+    html += '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:10px;">';
+    html += '<div style="font-weight:700;text-transform:uppercase;font-size:0.8rem;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;"><span>' + k + '</span><span style="font-size:0.6rem;color:' + srcColor + '">' + p.data_source + '</span></div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:0.75rem;">';
+    html += '<div>Posts: <b>' + p.total_posts + '</b></div>';
+    html += '<div>Views: <b>' + (p.total_views || 0).toLocaleString() + '</b></div>';
+    html += '<div>Likes: <b>' + (p.total_likes || 0).toLocaleString() + '</b></div>';
+    html += '<div>Eng.: <b>' + engRate + '</b></div>';
+    html += '</div></div>';
+   }
+   html += '</div>';
+  }
+  // Top videos
+  const vids = report.top_videos || [];
+  if (vids.length) {
+   html += '<div style="font-weight:700;margin:10px 0 6px;font-size:0.85rem;">Top Vídeos</div>';
+   html += '<table class="data-table"><thead><tr><th>Título</th><th>Plataforma</th><th>Views</th><th>Likes</th><th>Eng.</th></tr></thead><tbody>';
+   for (const v of vids.slice(0, 5)) {
+    const vEng = v.engagement_rate !== undefined ? v.engagement_rate.toFixed(2) + '%' : '—';
+    html += '<tr><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + (v.title||'').replace(/"/g,'&quot;') + '">' + (v.title || v.video_id || '?') + '</td><td>' + v.platform + '</td><td>' + (v.views||0).toLocaleString() + '</td><td>' + (v.likes||0).toLocaleString() + '</td><td>' + vEng + '</td></tr>';
+   }
+   html += '</tbody></table>';
+  }
+  // Suggestions
+  const sugs = report.suggestions || [];
+  if (sugs.length) {
+   html += '<div style="font-weight:700;margin:10px 0 6px;font-size:0.85rem;">Sugestões de Otimização</div>';
+   html += '<div style="display:flex;flex-direction:column;gap:4px;">';
+   for (const s of sugs) {
+    html += '<div style="background:rgba(255,200,0,0.06);border-left:3px solid var(--gta-neon-yellow,#ffc800);padding:6px 10px;border-radius:0 6px 6px 0;font-size:0.78rem;line-height:1.3;">' + s + '</div>';
+   }
+   html += '</div>';
+  }
+  if (!platKeys.length && !vids.length && !sugs.length) {
+   html += '<div class="empty-state">Nenhum dado disponível. Publique vídeos para ver métricas.</div>';
+  }
+  container.innerHTML = html;
+ } catch (e) {
+  container.innerHTML = '<div class="error-box">Erro ao carregar analytics: ' + e.message + '</div>';
+ }
+}
+
+// ===== PRODUCTION PIPELINE UI =====
+async function createSmartJob() {
+ const statusEl = document.getElementById('pipeline-status');
+ const previewEl = document.getElementById('pipeline-catalog-preview');
+ const materialEl = document.getElementById('pipeline-selected-material');
+ statusEl.textContent = '⏳ Selecionando melhor material do catálogo...';
+ try {
+ const job = await apiPost('/api/pipeline/create', {
+ platform: document.getElementById('ar-platform')?.value || 'tiktok',
+ market: document.getElementById('ar-market')?.value || 'br',
+ title: document.getElementById('ar-subtitle')?.value || '',
+ subtitle_text: document.getElementById('ar-subtitle')?.value || '',
+ auto_select: true,
+ });
+ if (job.error) { statusEl.innerHTML = '<span style="color:#fc8181">❌ ' + job.error + '</span>'; return; }
+ if (job.materials_used && job.materials_used.length) {
+ previewEl.style.display = 'block';
+ materialEl.innerHTML = '🎬 <b>' + job.materials_used[0] + '</b><br>Status: ' + job.status + ' | Job ID: ' + job.job_id;
+ } else {
+ previewEl.style.display = 'none';
+ }
+ statusEl.innerHTML = '✅ Job criado: <b>' + job.job_id + '</b> (' + job.status + ')';
+ // Auto-execute
+ statusEl.textContent += ' → 🎬 Produzindo...';
+ const result = await apiPost('/api/pipeline/execute/' + job.job_id, {});
+ if (result.error) {
+ statusEl.innerHTML = '<span style="color:#fc8181">❌ ' + result.error + '</span>';
+ } else if (result.status === 'completed') {
+ statusEl.innerHTML = '✅ Produção concluída! Output: ' + (result.output_path || 'N/A') + ' | QG: ' + (result.quality_passed ? '✅' : '❌') + ' Score: ' + (result.quality_score || 0).toFixed(0);
+ // Auto-schedule
+ const sched = await apiPost('/api/pipeline/schedule/' + job.job_id, {});
+ if (sched.status === 'submitted') {
+ statusEl.innerHTML += '<br>📅 Agendado internamente: ' + sched.job_id;
+ }
+ } else {
+ statusEl.innerHTML = '⚠️ Status: ' + result.status + (result.error ? ' | ' + result.error : '');
+ }
+ loadPipelineJobs();
+ } catch(e) {
+ statusEl.innerHTML = '<span style="color:#fc8181">❌ Erro: ' + e.message + '</span>';
+ }
+}
+
+async function loadPipelineJobs() {
+ const el = document.getElementById('pipeline-jobs-list');
+ try {
+ const data = await api('/api/pipeline/jobs?limit=20');
+ const jobs = data.jobs || [];
+ if (!jobs.length) { el.textContent = 'Nenhum job na fila.'; return; }
+ const statusColors = { pending:'#718096', selecting:'#a78bfa', producing:'#f59e0b', validating:'#38bdf8', completed:'#4ade80', scheduled:'#818cf8', failed:'#fc8181' };
+ el.innerHTML = jobs.map(j => {
+ const color = statusColors[j.status] || '#718096';
+ const time = j.created_at ? new Date(j.created_at * 1000).toLocaleTimeString('pt-BR') : '?';
+ const hasVideo = j.output_path && (j.status === 'completed' || j.status === 'scheduled');
+ const videoUrl = hasVideo ? '/api/pipeline/job/' + j.job_id + '/video' : '';
+ const schedId = j.scheduler_job_id || j.job_id;
+ let actions = '';
+ if (hasVideo) {
+ actions = '<div style="display:flex;gap:4px;margin-top:6px;">' +
+ '<button onclick="previewJob(\'' + j.job_id + '\')" style="font-size:10px;padding:3px 8px;background:#2d2d44;color:#e2e8f0;border:1px solid #4a5568;border-radius:4px;cursor:pointer;">▶️ Preview</button>' +
+ '<button onclick="approveJob(\'' + schedId + '\')" style="font-size:10px;padding:3px 8px;background:#065f46;color:#4ade80;border:1px solid #4ade80;border-radius:4px;cursor:pointer;">✅ Aprovar</button>' +
+ '<button onclick="rejectJob(\'' + schedId + '\')" style="font-size:10px;padding:3px 8px;background:#7f1d1d;color:#fc8181;border:1px solid #fc8181;border-radius:4px;cursor:pointer;">❌ Rejeitar</button>' +
+ '<a href="' + videoUrl + '" download style="font-size:10px;padding:3px 8px;background:#2d2d44;color:#e2e8f0;border-radius:4px;text-decoration:none;">📥</a>' +
+ '</div>';
+ }
+ return '<div style="padding:8px 0;border-bottom:1px solid #2d2d44;">' +
+ '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+ '<div><strong style="color:' + color + '">[' + j.status.toUpperCase() + ']</strong> ' +
+ '<span style="color:#e2e8f0;font-size:12px;">' + (j.title || j.job_id) + '</span><br>' +
+ '<span style="font-size:11px;color:#718096;">' + j.platform + ' | ' + j.market + ' | ' + time +
+ (j.materials_used?.length ? ' | 📦 ' + j.materials_used[0] : '') +
+ (j.quality_score ? ' | QG:' + j.quality_score.toFixed(0) : '') + '</span>' +
+ actions + '</div></div></div>';
+ }).join('');
+ } catch(e) { el.textContent = 'Erro: ' + e.message; }
+}
+
+// Player inline para preview de vídeo
+let activePreview = null;
+function previewJob(jobId) {
+ // Fechar preview anterior se existir
+ if (activePreview) { activePreview.remove(); activePreview = null; }
+ const container = document.createElement('div');
+ container.id = 'video-preview-' + jobId;
+ container.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:#000;border:2px solid #4ade80;border-radius:12px;padding:8px;max-width:360px;box-shadow:0 0 40px rgba(0,0,0,0.8);';
+ container.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+ '<span style="color:#4ade80;font-weight:700;font-size:13px;">🎬 Preview — ' + jobId + '</span>' +
+ '<button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:#fc8181;font-size:16px;cursor:pointer;">✕</button></div>' +
+ '<video src="/api/pipeline/job/' + jobId + '/video" controls autoplay muted playsinline style="width:100%;max-height:500px;border-radius:8px;background:#111;"></video>';
+ document.body.appendChild(container);
+ activePreview = container;
+}
+
+async function approveJob(schedId) {
+ try {
+ const r = await fetch('/api/autopublish/approve/' + schedId + '?score=1.0', { method: 'POST' });
+ const d = await r.json();
+ alert('✅ Aprovado: ' + JSON.stringify(d));
+ loadPipelineJobs();
+ } catch(e) { alert('❌ Erro: ' + e.message); }
+}
+
+async function rejectJob(schedId) {
+ if (!confirm('Rejeitar job ' + schedId + '?')) return;
+ try {
+ const r = await fetch('/api/autopublish/reject/' + schedId + '?score=0.0', { method: 'POST' });
+ const d = await r.json();
+ alert('❌ Rejeitado: ' + JSON.stringify(d));
+ loadPipelineJobs();
+ } catch(e) { alert('❌ Erro: ' + e.message); }
+}
+
 // Init
 loadDashboard();
+loadAnalytics();
+// ===== YOUTUBE AUTO-PUBLISH DASHBOARD =====
+async function loadYtAutoStatus() {
+ const container = document.getElementById('yt-auto-status');
+ const controls = document.getElementById('yt-auto-controls');
+ try {
+ const resp = await fetch('/api/youtube/auto-publish/status');
+ if (!resp.ok) { container.innerHTML = '<div class="empty-state" style="color:#ff4444">Erro ao carregar status YouTube</div>'; return; }
+ const d = await resp.json();
+
+ const workerColor = d.worker_running ? '#00C851' : '#ff4444';
+ const launchdColor = d.launchd_active ? '#00C851' : '#ffaa00';
+ const tokenValid = d.token_health && d.token_health.has_refresh;
+ const tokenColor = tokenValid ? '#00C851' : '#ff4444';
+ const pausedBadge = !d.auto_publish_enabled || (d.paused === true)
+ ? '<span style="background:#ff4444;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.75rem;margin-left:8px">PAUSADO</span>'
+ : '<span style="background:#00C851;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.75rem;margin-left:8px">ATIVO</span>';
+
+ // Published videos links
+ let videosHtml = '';
+ if (d.published_video_ids && d.published_video_ids.length > 0) {
+ videosHtml = d.published_video_ids.map(vid =>
+ `<a href="https://www.youtube.com/watch?v=${vid}" target="_blank" style="color:#FF0000;text-decoration:none;display:block;margin:2px 0">▶ ${vid}</a>`
+ ).join('');
+ } else {
+ videosHtml = '<span style="color:#888">Nenhum vídeo publicado hoje</span>';
+ }
+
+ // Recent logs
+ let logsHtml = '';
+ if (d.recent_logs && d.recent_logs.length > 0) {
+ logsHtml = d.recent_logs.map(l => `<div style="font-family:monospace;font-size:0.7rem;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l}</div>`).join('');
+ }
+
+ container.innerHTML = `
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1rem">
+ <div style="background:#1a1a2e;padding:1rem;border-radius:8px">
+ <div style="font-size:0.7rem;color:#888;text-transform:uppercase">Worker</div>
+ <div style="color:${workerColor};font-weight:bold;font-size:1.1rem">${d.worker_running ? '🟢 Rodando' : '🔴 Parado'}${pausedBadge}</div>
+ <div style="font-size:0.75rem;color:#666">PID: ${d.worker_pid || 'N/A'} | Launchd: <span style="color:${launchdColor}">${d.launchd_active ? '✅' : '❌'}</span></div>
+ </div>
+ <div style="background:#1a1a2e;padding:1rem;border-radius:8px">
+ <div style="font-size:0.7rem;color:#888;text-transform:uppercase">Publicações Hoje</div>
+ <div style="color:#fff;font-weight:bold;font-size:1.5rem">${d.published_today} / ${d.max_per_day}</div>
+ <div style="font-size:0.75rem;color:#666">Próximo slot: ${d.next_scheduled_hour !== null ? d.next_scheduled_hour + ':00 BRT' : 'N/A'}</div>
+ </div>
+ <div style="background:#1a1a2e;padding:1rem;border-radius:8px">
+ <div style="font-size:0.7rem;color:#888;text-transform:uppercase">Canal</div>
+ <div style="color:#FF0000;font-weight:bold">${d.channel_id ? '✅ Conectado' : '❌ Desconectado'}</div>
+ <div style="font-size:0.75rem;color:#666">${d.channel_id || 'N/A'}</div>
+ </div>
+ <div style="background:#1a1a2e;padding:1rem;border-radius:8px">
+ <div style="font-size:0.7rem;color:#888;text-transform:uppercase">Token OAuth</div>
+ <div style="color:${tokenColor};font-weight:bold">${tokenValid ? '✅ Válido' : '❌ Expirado'}</div>
+ <div style="font-size:0.75rem;color:#666">Expira: ${d.token_health && d.token_health.expiry ? new Date(d.token_health.expiry).toLocaleString('pt-BR') : 'N/A'}</div>
+ </div>
+ <div style="background:#1a1a2e;padding:1rem;border-radius:8px">
+ <div style="font-size:0.7rem;color:#888;text-transform:uppercase">Fila</div>
+ <div style="color:#fff;font-weight:bold;font-size:1.2rem">${d.pending_count} pendentes</div>
+ <div style="font-size:0.75rem;color:#666">Total elegíveis: ${d.total_eligible}</div>
+ </div>
+ <div style="background:#1a1a2e;padding:1rem;border-radius:8px">
+ <div style="font-size:0.7rem;color:#888;text-transform:uppercase">Vídeos Publicados Hoje</div>
+ <div style="margin-top:4px">${videosHtml}</div>
+ </div>
+ </div>
+ ${logsHtml ? '<div style="background:#0d0d1a;padding:0.75rem;border-radius:8px;margin-top:0.5rem"><div style="font-size:0.7rem;color:#666;margin-bottom:4px">LOGS RECENTES</div>' + logsHtml + '</div>' : ''}
+ `;
+ controls.style.display = 'flex';
+ } catch (e) {
+ container.innerHTML = `<div class="empty-state" style="color:#ff4444">Erro: ${e.message}</div>`;
+ }
+}
+
+async function ytAutoPause() {
+ try {
+ const resp = await fetch('/api/youtube/auto-publish/pause?reason=manual_dashboard', { method: 'POST' });
+ const result = await resp.json();
+ alert(result.status === 'paused' ? '⏸️ Auto-publish pausado com sucesso' : 'Erro: ' + JSON.stringify(result));
+ loadYtAutoStatus();
+ } catch (e) { alert('Erro ao pausar: ' + e.message); }
+}
+
+async function ytAutoResume() {
+ try {
+ const resp = await fetch('/api/youtube/auto-publish/resume', { method: 'POST' });
+ const result = await resp.json();
+ alert(result.status === 'resumed' ? '▶️ Auto-publish retomado com sucesso' : 'Erro: ' + JSON.stringify(result));
+ loadYtAutoStatus();
+ } catch (e) { alert('Erro ao retomar: ' + e.message); }
+}
+
+// Auto-load YouTube status when publishing page is shown
+const origNav = window.navigateTo;
+if (typeof origNav === 'function') {
+ window.navigateTo = function(pageId) {
+ origNav(pageId);
+ if (pageId === 'page-publishing') { loadYtAutoStatus(); }
+ };
+}
+document.addEventListener('DOMContentLoaded', () => {
+ if (document.getElementById('page-publishing')?.classList.contains('active')) {
+ loadYtAutoStatus();
+ }
+});
+
+// ===== TIKTOK HYBRID PUBLISHER DASHBOARD (MISSAO 020) =====
+async function loadTtAutoStatus() {
+ const container = document.getElementById('tt-auto-status');
+ const controls = document.getElementById('tt-auto-controls');
+ try {
+ const resp = await fetch('/api/tiktok/auto-publish/status');
+ if (!resp.ok) { container.innerHTML = '<div class="empty-state" style="color:#ff4444">Erro ao carregar status TikTok</div>'; return; }
+ const d = await resp.json();
+
+ const apiColor = d.api_available ? '#00C851' : '#ffaa00';
+ const browserColor = d.browser_available ? '#00C851' : '#ffaa00';
+ const hybridColor = d.hybrid_ready ? '#00C851' : '#ff4444';
+ const pausedBadge = d.paused
+ ? '<span style="background:#ff4444;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.75rem;margin-left:8px">PAUSADO</span>'
+ : '<span style="background:#00C851;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.75rem;margin-left:8px">ATIVO</span>';
+
+ let videosHtml = '';
+ if (d.published_video_ids && d.published_video_ids.length > 0) {
+ videosHtml = d.published_video_ids.map(vid =>
+ `<a href="https://www.tiktok.com/@user/video/${vid}" target="_blank" style="color:#00f2ea;text-decoration:none;display:block;margin:2px 0">▶ ${vid}</a>`
+ ).join('');
+ } else {
+ videosHtml = '<span style="color:#888">Nenhum video publicado hoje</span>';
+ }
+
+ let logsHtml = '';
+ if (d.recent_logs && d.recent_logs.length > 0) {
+ logsHtml = d.recent_logs.map(l => `<div style="font-family:monospace;font-size:0.7rem;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l}</div>`).join('');
+ }
+
+ container.innerHTML = `
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1rem">
+ <div style="background:#1a1a2e;padding:1rem;border-radius:8px">
+ <div style="font-size:0.7rem;color:#888;text-transform:uppercase">API Oficial</div>
+ <div style="color:${apiColor};font-weight:bold;font-size:1.1rem">${d.api_available ? '🟢 Conectada' : '🟡 ' + d.api_state}${pausedBadge}</div>
+ <div style="font-size:0.75rem;color:#666">Token: ${d.token_health.exists ? '✅' : '❌'} | Refresh: ${d.token_health.has_refresh ? '✅' : '❌'}</div>
+ </div>
+ <div style="background:#1a1a2e;padding:1rem;border-radius:8px">
+ <div style="font-size:0.7rem;color:#888;text-transform:uppercase">Playwright Browser</div>
+ <div style="color:${browserColor};font-weight:bold;font-size:1.1rem">${d.browser_available ? '🟢 Pronto' : '🟡 Indisponivel'}</div>
+ <div style="font-size:0.75rem;color:#666">Sessao: ${d.browser_session_active ? '✅' : '❌'} | PW: ${d.playwright_available ? '✅' : '❌'} | Cookies: ${d.browser_cookie_count}</div>
+ </div>
+ <div style="background:#1a1a2e;padding:1rem;border-radius:8px">
+ <div style="font-size:0.7rem;color:#888;text-transform:uppercase">Modo Hibrido</div>
+ <div style="color:${hybridColor};font-weight:bold;font-size:1.2rem">${d.hybrid_ready ? '✅ PRONTO' : '❌ BLOQUEADO'}</div>
+ <div style="font-size:0.75rem;color:#666">Metodo: ${d.api_available ? 'API prioritaria' : (d.browser_available ? 'Playwright fallback' : 'Nenhum disponivel')}</div>
+ </div>
+ <div style="background:#1a1a2e;padding:1rem;border-radius:8px">
+ <div style="font-size:0.7rem;color:#888;text-transform:uppercase">Videos</div>
+ <div style="color:#fff;font-weight:bold;font-size:1.2rem">${d.eligible_videos} elegiveis</div>
+ <div style="font-size:0.75rem;color:#666">Total: ${d.total_tiktok_videos} | Publicados hoje: ${d.published_today}/${d.max_per_day}</div>
+ </div>
+ <div style="background:#1a1a2e;padding:1rem;border-radius:8px">
+ <div style="font-size:0.7rem;color:#888;text-transform:uppercase">Publicacoes Hoje</div>
+ <div style="margin-top:4px">${videosHtml}</div>
+ </div>
+ </div>
+ ${logsHtml ? '<div style="background:#0d0d1a;padding:0.75rem;border-radius:8px;margin-top:0.5rem"><div style="font-size:0.7rem;color:#666;margin-bottom:4px">LOGS RECENTES</div>' + logsHtml + '</div>' : ''}
+ `;
+ controls.style.display = 'flex';
+ } catch (e) {
+ container.innerHTML = `<div class="empty-state" style="color:#ff4444">Erro: ${e.message}</div>`;
+ }
+}
 </script>
 </body>
 </html>

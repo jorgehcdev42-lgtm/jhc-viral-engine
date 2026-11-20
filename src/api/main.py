@@ -721,6 +721,108 @@ async def get_scheduler_status():
     return scheduler.get_scheduler_status()
 
 
+# --- AutoPublish Queue Control ---
+
+@app.get("/api/queue/status")
+async def get_queue_status():
+    """Get autopublish queue control status."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    s = AutoPublishScheduler(DATA_ROOT)
+    return s.get_queue_status()
+
+@app.post("/api/queue/start")
+async def start_queue():
+    """Start the autopublish queue."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    s = AutoPublishScheduler(DATA_ROOT)
+    return s.start_queue()
+
+@app.post("/api/queue/pause")
+async def pause_queue():
+    """Pause the autopublish queue."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    s = AutoPublishScheduler(DATA_ROOT)
+    return s.pause_queue()
+
+@app.post("/api/queue/resume")
+async def resume_queue():
+    """Resume a paused autopublish queue."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    s = AutoPublishScheduler(DATA_ROOT)
+    return s.resume_queue()
+
+@app.post("/api/queue/stop")
+async def stop_queue():
+    """Stop the autopublish queue."""
+    from src.automation.autopublish_scheduler import AutoPublishScheduler
+    s = AutoPublishScheduler(DATA_ROOT)
+    return s.stop_queue()
+
+
+# --- Radar Monitor Control ---
+
+RADAR_STATE_FILE = DATA_ROOT / "scheduler" / "radar_monitor_state.json"
+RADAR_RESULTS_FILE = DATA_ROOT / "radar" / "latest_youtube_results.json"
+
+@app.get("/api/radar-monitor/status")
+async def get_radar_monitor_status():
+    """Get radar monitor state and latest results."""
+    state = {"enabled": False, "last_run": None, "interval": 1800, "total_runs": 0}
+    if RADAR_STATE_FILE.exists():
+        try:
+            state = json.loads(RADAR_STATE_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    results = {"count": 0, "timestamp": None, "results": []}
+    if RADAR_RESULTS_FILE.exists():
+        try:
+            results = json.loads(RADAR_RESULTS_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {"state": state, "latest_results": results}
+
+@app.post("/api/radar-monitor/run")
+async def run_radar_monitor():
+    """Trigger a single radar search cycle now."""
+    import subprocess
+    venv_python = "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/.venv/bin/python3"
+    script = "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/scripts/radar_monitor.py"
+    project_cwd = "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6"
+    try:
+        result = subprocess.run(
+            [venv_python, "-I", script],
+            capture_output=True, text=True, timeout=60,
+            cwd=project_cwd,
+        )
+        if result.returncode == 0:
+            output = json.loads(result.stdout) if result.stdout.strip() else {}
+            return {"ok": True, "results": output.get("results", 0)}
+        return {"ok": False, "error": result.stderr[:200]}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "Timeout (60s)"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
+
+@app.post("/api/radar-monitor/enable")
+async def enable_radar_monitor(request: Request):
+    """Enable or disable periodic radar monitoring."""
+    body = await request.json()
+    enabled = body.get("enabled", True)
+    interval = body.get("interval", 1800)
+    state = {"enabled": False, "last_run": None, "interval": 1800, "total_runs": 0}
+    if RADAR_STATE_FILE.exists():
+        try:
+            state = json.loads(RADAR_STATE_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    state["enabled"] = enabled
+    state["interval"] = interval
+    RADAR_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    RADAR_STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    status_label = "ativado" if enabled else "desativado"
+    return {"ok": True, "enabled": enabled, "interval": interval, "message": f"Monitor {status_label}"}
+
+
 @app.get("/api/scheduler/quota/{profile_id}")
 async def get_quota(profile_id: str):
     """Get production quota for a specific profile."""
@@ -959,7 +1061,7 @@ async def check_connection(profile_id: str, platform: str):
 async def oauth_start(
     profile_id: str,
     platform: str,
-    redirect_base: str = Query("http://127.0.0.1:8765"),
+    redirect_base: str = Query("http://127.0.0.1:8001"),
 ):
     """Generate OAuth authorization URL with PKCE for profile + platform."""
     from src.publishing.oauth import OAuthManager
@@ -998,7 +1100,43 @@ async def get_all_oauth_connections():
     """Get connection states for all active profiles × all platforms."""
     from src.publishing.oauth import OAuthManager
     manager = OAuthManager(DATA_ROOT)
-    return manager.get_all_connections(["gta6-br", "gta6-global"])
+    # Include all known profiles + any with stored credentials on disk
+    known_profiles = ["gta6-br", "gta6-global", "leonidagta6flashbr"]
+    # Auto-discover additional profiles from credentials directory
+    creds_dir = DATA_ROOT / "credentials"
+    if creds_dir.exists():
+        for p in creds_dir.iterdir():
+            if p.is_dir() and p.name not in known_profiles:
+                known_profiles.append(p.name)
+    return manager.get_all_connections(known_profiles)
+
+
+@app.post("/api/oauth/instagram/refresh")
+async def refresh_instagram_token(request: Request):
+    """Refresh Instagram long-lived token via ig_refresh_token grant.
+
+    Requires JSON body with profile_id. Returns new expiry or error state.
+    Does NOT require user re-authentication for valid long-lived tokens.
+    """
+    from src.publishing.oauth import OAuthManager
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"detail": "Invalid JSON body"})
+
+    profile_id = body.get("profile_id", "").strip()
+    if not profile_id:
+        return JSONResponse(status_code=400, content={"detail": "profile_id is required"})
+
+    manager = OAuthManager(DATA_ROOT)
+    result = manager.refresh_instagram_token(profile_id)
+
+    if result.get("success"):
+        return result
+    else:
+        status_code = 401 if result.get("state") in ("token_expired", "auth_required") else 502
+        return JSONResponse(status_code=status_code, content=result)
+
 
 # --- AutoPublish Scheduler Endpoints (PRIORIDADE 3+4) ---
 
@@ -1008,6 +1146,258 @@ async def autopublish_status():
     from src.automation.autopublish_scheduler import AutoPublishScheduler
     scheduler = AutoPublishScheduler(DATA_ROOT)
     return scheduler.get_status_summary()
+
+
+@app.get("/api/youtube/auto-publish/status")
+async def youtube_auto_publish_status():
+    """Get YouTube auto-publisher worker status for dashboard."""
+    import subprocess
+    from pathlib import Path as _Path
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+
+    BRAZIL_TZ = _tz(_td(hours=-3))
+    queue_file = DATA_ROOT / "scheduler" / "publish_queue.json"
+    stats_file = DATA_ROOT / "scheduler" / "daily_stats.json"
+    log_file = _Path("/tmp/jhc_yt_publisher.log")
+
+    # Worker process check
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", "youtube_auto_publisher.*daemon"],
+            capture_output=True, text=True, timeout=5
+        )
+        worker_running = bool(result.stdout.strip())
+        worker_pid = result.stdout.strip().split("\n")[0] if worker_running else None
+    except Exception:
+        worker_running = False
+        worker_pid = None
+
+    # Launchd status
+    try:
+        result = subprocess.run(
+            ["launchctl", "list", "com.jhc.youtube-publisher"],
+            capture_output=True, text=True, timeout=5
+        )
+        launchd_active = result.returncode == 0
+    except Exception:
+        launchd_active = False
+
+    # Queue state
+    queue = {}
+    if queue_file.exists():
+        try:
+            queue = json.loads(queue_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Daily stats
+    today = _dt.now(BRAZIL_TZ).strftime("%Y-%m-%d")
+    key = f"leonidagta6flashbr:{today}"
+    daily = {"approved": 0, "failed": 0, "published_videos": []}
+    if stats_file.exists():
+        try:
+            all_stats = json.loads(stats_file.read_text(encoding="utf-8"))
+            daily = all_stats.get(key, daily)
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Last log lines
+    last_logs = []
+    if log_file.exists():
+        try:
+            lines = log_file.read_text(encoding="utf-8").strip().split("\n")
+            last_logs = lines[-5:] if len(lines) >= 5 else lines
+        except OSError:
+            pass
+
+    # OAuth token health
+    token_path = DATA_ROOT / "credentials" / "leonidagta6flashbr" / "youtube_oauth.json"
+    token_health = {"exists": token_path.exists(), "has_refresh": False, "expiry": None}
+    if token_path.exists():
+        try:
+            tdata = json.loads(token_path.read_text(encoding="utf-8"))
+            token_health["has_refresh"] = bool(tdata.get("refresh_token"))
+            token_health["expiry"] = tdata.get("expiry")
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Next scheduled hour
+    schedule_hours = queue.get("schedule_hours", [11, 16, 20])
+    now_hour = _dt.now(BRAZIL_TZ).hour
+    next_slot = None
+    for h in sorted(schedule_hours):
+        if h > now_hour:
+            next_slot = h
+            break
+    if next_slot is None and schedule_hours:
+        next_slot = schedule_hours[0]  # wraps to first slot tomorrow
+
+    return {
+        "worker_running": worker_running,
+        "worker_pid": worker_pid,
+        "launchd_active": launchd_active,
+        "auto_publish_enabled": queue.get("auto_publish", False),
+        "channel_id": queue.get("channel_id", ""),
+        "max_per_day": queue.get("max_per_day", 3),
+        "schedule_hours": schedule_hours,
+        "next_scheduled_hour": next_slot,
+        "timezone": queue.get("timezone", "America/Sao_Paulo"),
+        "today": today,
+        "published_today": daily.get("approved", 0),
+        "failed_today": daily.get("failed", 0),
+        "published_video_ids": daily.get("published_videos", []),
+        "pending_count": len(queue.get("pending", [])),
+        "total_eligible": queue.get("total_eligible", 0),
+        "token_health": token_health,
+        "recent_logs": last_logs,
+    }
+
+@app.post("/api/youtube/auto-publish/pause")
+async def youtube_auto_publish_pause(reason: str = Query("manual")):
+    """Pause the YouTube auto-publisher worker."""
+    queue_file = DATA_ROOT / "scheduler" / "publish_queue.json"
+    if not queue_file.exists():
+        return {"error": "No publish queue found"}
+    try:
+        q = json.loads(queue_file.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {"error": "Could not read queue"}
+    q["paused"] = True
+    q["pause_reason"] = reason
+    q["paused_at"] = time.time()
+    queue_file.write_text(json.dumps(q, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"status": "paused", "reason": reason}
+
+@app.post("/api/youtube/auto-publish/resume")
+async def youtube_auto_publish_resume():
+    """Resume the YouTube auto-publisher worker."""
+    queue_file = DATA_ROOT / "scheduler" / "publish_queue.json"
+    if not queue_file.exists():
+        return {"error": "No publish queue found"}
+    try:
+        q = json.loads(queue_file.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {"error": "Could not read queue"}
+    q["paused"] = False
+    q["pause_reason"] = None
+    q["resumed_at"] = time.time()
+    queue_file.write_text(json.dumps(q, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"status": "resumed"}
+
+
+@app.get("/api/tiktok/auto-publish/status")
+async def tiktok_auto_publish_status():
+    """Get TikTok hybrid publisher status for dashboard (Mission 020)."""
+    import subprocess
+    from pathlib import Path as _Path
+
+    queue_file = DATA_ROOT / "scheduler" / "publish_queue.json"
+    stats_file = DATA_ROOT / "scheduler" / "daily_stats.json"
+    token_path = DATA_ROOT / "credentials" / "leonidagta6flashbr" / "tiktok_token.json"
+    cookies_path = DATA_ROOT / "browser_sessions" / "tiktok_cookies.json"
+    log_file = _Path("/tmp/jhc_tiktok_publisher.log")
+
+    # API adapter state
+    api_state = "not_configured"
+    token_health = {"exists": False, "has_refresh": False, "expiry": None}
+    if token_path.exists():
+        try:
+            tdata = json.loads(token_path.read_text(encoding="utf-8"))
+            token_health["exists"] = True
+            token_health["has_refresh"] = bool(tdata.get("refresh_token"))
+            token_health["expiry"] = tdata.get("expires_at")
+            if tdata.get("access_token"):
+                expires = tdata.get("expires_at", 0)
+                if expires and time.time() > expires:
+                    api_state = "token_expired"
+                else:
+                    api_state = "connected"
+            else:
+                api_state = "auth_required"
+        except (json.JSONDecodeError, OSError):
+            api_state = "error"
+
+    # Browser session state
+    browser_session_active = cookies_path.exists()
+    browser_cookie_count = 0
+    if browser_session_active:
+        try:
+            cdata = json.loads(cookies_path.read_text(encoding="utf-8"))
+            browser_cookie_count = len(cdata) if isinstance(cdata, list) else 0
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Playwright installed check
+    playwright_available = False
+    try:
+        result = subprocess.run(
+            [str(_PROJECT_ROOT.parent / ".venv/bin/python3"), "-c", "from playwright.async_api import async_playwright; print('OK')"],
+            capture_output=True, text=True, timeout=10
+        )
+        playwright_available = "OK" in result.stdout
+    except Exception:
+        pass
+
+    # Queue state (shared with YouTube)
+    queue = {}
+    if queue_file.exists():
+        try:
+            queue = json.loads(queue_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Daily stats for TikTok
+    today = time.strftime("%Y-%m-%d")
+    key = f"leonidagta6flashbr:{today}"
+    daily = {"approved": 0, "failed": 0, "published_videos": []}
+    if stats_file.exists():
+        try:
+            all_stats = json.loads(stats_file.read_text(encoding="utf-8"))
+            daily = all_stats.get(key, daily)
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Count eligible TikTok videos
+    tiktok_videos = list((DATA_ROOT / "autoreel" / "output").glob("*_br_tiktok.mp4"))
+    eligible_count = sum(1 for v in tiktok_videos if v.stat().st_size > 100_000)
+
+    # Recent logs
+    last_logs = []
+    if log_file.exists():
+        try:
+            lines = log_file.read_text(encoding="utf-8").strip().split("\n")
+            last_logs = lines[-5:] if len(lines) >= 5 else lines
+        except OSError:
+            pass
+
+    # Hybrid method availability
+    api_available = api_state == "connected"
+    browser_available = browser_session_active and playwright_available
+    hybrid_ready = api_available or browser_available
+
+    return {
+        "platform": "tiktok",
+        "handle": "@leonidagta6flashbr",
+        "api_state": api_state,
+        "api_available": api_available,
+        "browser_session_active": browser_session_active,
+        "browser_cookie_count": browser_cookie_count,
+        "playwright_available": playwright_available,
+        "browser_available": browser_available,
+        "hybrid_ready": hybrid_ready,
+        "token_health": token_health,
+        "today": today,
+        "published_today": daily.get("approved", 0),
+        "failed_today": daily.get("failed", 0),
+        "published_video_ids": daily.get("published_videos", []),
+        "eligible_videos": eligible_count,
+        "total_tiktok_videos": len(tiktok_videos),
+        "max_per_day": queue.get("max_per_day", 3),
+        "auto_publish_enabled": queue.get("auto_publish", False),
+        "paused": queue.get("paused", False),
+        "recent_logs": last_logs,
+    }
+
 
 @app.post("/api/autopublish/submit")
 async def autopublish_submit(
@@ -2164,6 +2554,93 @@ async def pack_progress():
     importer = PackBulkImporter(ssd_root=ssd_path, data_root=str(DATA_ROOT))
     return importer.get_progress()
 
+@app.get("/api/import/pack/dashboard")
+async def pack_dashboard():
+    """Dashboard completo do acervo — MISSÃO 032 FASE 2.
+
+    Retorna dados reais: breakdown por tipo, velocidade, worker status,
+    histórico de downloads, últimos erros. Nunca valores simulados.
+    """
+    from src.media.pack_bulk_importer import PackBulkImporter
+
+    ssd_path = os.environ.get("JHC_SSD_PATH", "/Volumes/SSD EXT MACBOOK")
+    importer = PackBulkImporter(ssd_root=ssd_path, data_root=str(DATA_ROOT))
+    return importer.get_dashboard_data()
+
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+@app.post("/api/import/pack/worker/start")
+async def worker_start():
+    """Inicia worker persistente em background — MISSÃO 032 FASE 3."""
+    import subprocess
+    result = subprocess.run(
+        [str(_PROJECT_ROOT.parent / ".venv" / "bin" / "python3"), "-I",
+         str(_PROJECT_ROOT / "scripts" / "bulk_worker.py"), "start"],
+        capture_output=True, text=True, cwd=str(_PROJECT_ROOT),
+    )
+    return {"stdout": result.stdout.strip(), "stderr": result.stderr.strip(), "returncode": result.returncode}
+
+
+@app.post("/api/import/pack/worker/stop")
+async def worker_stop():
+    """Para worker persistente gracefulmente."""
+    import subprocess
+    result = subprocess.run(
+        [str(_PROJECT_ROOT.parent / ".venv" / "bin" / "python3"), "-I",
+         str(_PROJECT_ROOT / "scripts" / "bulk_worker.py"), "stop"],
+        capture_output=True, text=True, cwd=str(_PROJECT_ROOT),
+    )
+    return {"stdout": result.stdout.strip(), "stderr": result.stderr.strip(), "returncode": result.returncode}
+
+
+@app.post("/api/import/pack/worker/pause")
+async def worker_pause():
+    """Pausa worker após lote atual."""
+    import subprocess
+    result = subprocess.run(
+        [str(_PROJECT_ROOT.parent / ".venv" / "bin" / "python3"), "-I",
+         str(_PROJECT_ROOT / "scripts" / "bulk_worker.py"), "pause"],
+        capture_output=True, text=True, cwd=str(_PROJECT_ROOT),
+    )
+    return {"stdout": result.stdout.strip(), "stderr": result.stderr.strip(), "returncode": result.returncode}
+
+
+@app.post("/api/import/pack/worker/resume")
+async def worker_resume():
+    """Retoma worker pausado."""
+    import subprocess
+    result = subprocess.run(
+        [str(_PROJECT_ROOT.parent / ".venv" / "bin" / "python3"), "-I",
+         str(_PROJECT_ROOT / "scripts" / "bulk_worker.py"), "resume"],
+        capture_output=True, text=True, cwd=str(_PROJECT_ROOT),
+    )
+    return {"stdout": result.stdout.strip(), "stderr": result.stderr.strip(), "returncode": result.returncode}
+
+
+@app.get("/api/import/pack/worker/status")
+async def worker_status():
+    """Status do worker persistente."""
+    import subprocess
+    result = subprocess.run(
+        [str(_PROJECT_ROOT.parent / ".venv" / "bin" / "python3"), "-I",
+         str(_PROJECT_ROOT / "scripts" / "bulk_worker.py"), "status"],
+        capture_output=True, text=True, cwd=str(_PROJECT_ROOT),
+    )
+    return {"output": result.stdout.strip(), "returncode": result.returncode}
+
+
+@app.post("/api/import/pack/retry-failed")
+async def pack_retry_failed():
+    """Reenfileira entradas FAILED para nova tentativa."""
+    from src.media.pack_bulk_importer import PackBulkImporter
+
+    ssd_path = os.environ.get("JHC_SSD_PATH", "/Volumes/SSD EXT MACBOOK")
+    importer = PackBulkImporter(ssd_root=ssd_path, data_root=str(DATA_ROOT))
+    retried = importer.retry_failed()
+    return {"retried": retried}
+
+
 @app.get("/api/import/pack/entries")
 async def pack_entries(state: str = "", limit: int = 100):
     """Lista entradas de download filtradas por estado."""
@@ -2199,6 +2676,32 @@ async def pack_fetch_catalog(request: Request):
 
     # Don't return raw HTML in response (too large)
     result.pop("html", None)
+    return result
+
+
+@app.post("/api/import/pack/load-catalog")
+async def pack_load_catalog(request: Request):
+    """Carrega catálogo JSON local (pro_catalog.json) na fila do PackBulkImporter.
+
+    Body: {"catalog_path": "data/auth/pro_catalog.json", "target_dir": "VIDEOS CORTES", "max_entries": 0}
+    max_entries=0 carrega todas as entradas. Use valor pequeno para teste inicial.
+    """
+    body = await request.json()
+    catalog_path = body.get("catalog_path", "data/auth/pro_catalog.json")
+    target_dir = body.get("target_dir", "VIDEOS CORTES")
+    max_entries = body.get("max_entries", 0)
+
+    ssd_path = os.environ.get("JHC_SSD_PATH", "/Volumes/SSD EXT MACBOOK")
+    importer = PackBulkImporter(ssd_root=ssd_path, data_root=str(DATA_ROOT))
+    result = importer.load_catalog_from_file(
+        catalog_path=catalog_path,
+        target_dir=target_dir,
+        max_entries=max_entries,
+    )
+
+    if result.get("error"):
+        return JSONResponse(status_code=400, content=result)
+
     return result
 
 
@@ -2272,3 +2775,1068 @@ async def auth_session_discover(request: Request):
         return catalog
     finally:
         await session.close()
+
+
+# --- Analytics / Inteligência de Crescimento ---
+
+@app.get("/api/analytics/dashboard")
+async def get_dashboard_analytics():
+    """Analytics agregados para o painel do dashboard — não depende de src.analytics."""
+    import os
+    result = {"catalog": {}, "pipeline": {}, "queue": {}, "radar": {}, "accounts": {}}
+
+    # Catalog stats
+    try:
+        from src.catalog.smart_catalog import SmartCatalog
+        cat = SmartCatalog(data_root=DATA_ROOT)
+        stats = cat.get_stats() if hasattr(cat, "get_stats") else {}
+        result["catalog"] = stats if isinstance(stats, dict) else {}
+    except Exception:
+        # Fallback: count files directly
+        output_dir = DATA_ROOT / "autoreel" / "output"
+        mp4_count = len(list(output_dir.glob("*.mp4"))) if output_dir.exists() else 0
+        total_mb = sum(f.stat().st_size for f in output_dir.glob("*.mp4")) / 1_048_576 if output_dir.exists() else 0
+        result["catalog"] = {"total_videos": mp4_count, "total_mb": round(total_mb, 1)}
+
+    # Pipeline stats
+    try:
+        jobs_file = DATA_ROOT / "production_pipeline" / "production_jobs.json"
+        if jobs_file.exists():
+            jobs_data = json.loads(jobs_file.read_text(encoding="utf-8"))
+            by_status = {}
+            for j in jobs_data.values():
+                s = j.get("status", "unknown")
+                by_status[s] = by_status.get(s, 0) + 1
+            result["pipeline"] = {"total_jobs": len(jobs_data), "by_status": by_status}
+    except Exception:
+        pass
+
+    # Queue status
+    try:
+        from src.automation.autopublish_scheduler import AutoPublishScheduler
+        sched = AutoPublishScheduler(DATA_ROOT)
+        qs = sched.get_queue_status()
+        result["queue"] = {"status": qs.get("queue_status"), "active_jobs": qs.get("active_jobs"), "eligible_now": qs.get("eligible_now")}
+    except Exception:
+        pass
+
+    # Radar monitor
+    radar_state_file = DATA_ROOT / "scheduler" / "radar_monitor_state.json"
+    radar_results_file = DATA_ROOT / "radar" / "latest_youtube_results.json"
+    try:
+        if radar_state_file.exists():
+            rs = json.loads(radar_state_file.read_text(encoding="utf-8"))
+            result["radar"]["enabled"] = rs.get("enabled", False)
+            result["radar"]["total_runs"] = rs.get("total_runs", 0)
+        if radar_results_file.exists():
+            rr = json.loads(radar_results_file.read_text(encoding="utf-8"))
+            result["radar"]["latest_count"] = rr.get("count", 0)
+    except Exception:
+        pass
+
+    # Accounts
+    accounts_file = DATA_ROOT / "publishing" / "credentials" / "accounts.json"
+    try:
+        if accounts_file.exists():
+            acc = json.loads(accounts_file.read_text(encoding="utf-8"))
+            for platform in ["instagram", "tiktok", "youtube"]:
+                info = acc.get("accounts", {}).get(platform, {})
+                result["accounts"][platform] = {"handle": info.get("handle", "?"), "status": info.get("status", "?")}
+    except Exception:
+        pass
+
+    return result
+
+
+@app.get("/api/analytics/report")
+async def get_analytics_report():
+    """Relatório consolidado de analytics multiplataforma."""
+    from src.analytics import generate_report
+    report = generate_report(data_root="data")
+    return report.to_dict()
+
+
+@app.get("/api/analytics/platforms")
+async def get_platform_stats():
+    """Estatísticas por plataforma (TikTok, Instagram, YouTube)."""
+    from src.analytics import collect_platform_stats
+    stats = collect_platform_stats(data_root="data")
+    return {k: v.to_dict() for k, v in stats.items()}
+
+
+@app.get("/api/analytics/suggestions")
+async def get_optimization_suggestions():
+    """Sugestões fundamentadas de otimização baseadas em métricas."""
+    from src.analytics import generate_report
+    report = generate_report(data_root="data")
+    return {"suggestions": report.suggestions}
+
+
+# ===== SMART CATALOG — FÁBRICA INTELIGENTE DE AUTOREELS =====
+
+@app.get("/api/catalog/stats")
+async def get_catalog_stats():
+    """Estatísticas do catálogo inteligente de materiais."""
+    from src.production.smart_catalog import SmartCatalog
+    catalog = SmartCatalog(data_root="data")
+    catalog.load()
+    return catalog.get_stats()
+
+
+@app.get("/api/catalog/select")
+async def select_materials(
+    theme: str = "",
+    max_results: int = 10,
+    prefer_vertical: bool = True,
+    min_duration: float = 5.0,
+    max_duration: float = 120.0,
+    min_width: int = 720,
+):
+    """Seleção inteligente de materiais para produção AutoReel."""
+    from src.production.smart_catalog import SmartCatalog, SelectionCriteria
+    catalog = SmartCatalog(data_root="data")
+    catalog.load()
+    criteria = SelectionCriteria(
+        theme=theme,
+        max_results=max_results,
+        prefer_vertical=prefer_vertical,
+        min_duration=min_duration,
+        max_duration=max_duration,
+        min_width=min_width,
+    )
+    selected = catalog.select_materials(criteria)
+    return {
+        "count": len(selected),
+        "criteria": {
+            "theme": theme,
+            "prefer_vertical": prefer_vertical,
+            "min_duration": min_duration,
+            "max_duration": max_duration,
+            "min_width": min_width,
+        },
+        "materials": [
+            {
+                "filename": e.filename,
+                "path": e.path,
+                "width": e.width,
+                "height": e.height,
+                "duration": round(e.duration, 1),
+                "codec": e.codec,
+                "quality_score": e.quality_score(),
+                "is_vertical": e.is_vertical(),
+                "used_count": e.used_count,
+            }
+            for e in selected
+        ],
+    }
+
+
+@app.post("/api/catalog/record-usage")
+async def record_material_usage(body: dict):
+    """Registra uso de materiais em produção AutoReel."""
+    from src.production.smart_catalog import SmartCatalog
+    filenames = body.get("filenames", [])
+    reel_id = body.get("reel_id", "")
+    if not filenames:
+        return {"error": "filenames required"}
+    catalog = SmartCatalog(data_root="data")
+    catalog.load()
+    catalog.record_usage(filenames, reel_id)
+    return {"recorded": len(filenames), "reel_id": reel_id}
+
+
+@app.get("/api/catalog/select-fresh")
+async def select_fresh_materials(
+    theme: str = "",
+    max_results: int = 10,
+    prefer_vertical: bool = True,
+    min_duration: float = 5.0,
+    max_duration: float = 120.0,
+    min_width: int = 720,
+):
+    """Seleção inteligente que exclui conteúdo desatualizado automaticamente."""
+    from src.production.smart_catalog import SmartCatalog, SelectionCriteria
+    catalog = SmartCatalog(data_root="data")
+    catalog.load()
+    criteria = SelectionCriteria(
+        theme=theme,
+        max_results=max_results,
+        prefer_vertical=prefer_vertical,
+        min_duration=min_duration,
+        max_duration=max_duration,
+        min_width=min_width,
+    )
+    selected = catalog.select_fresh_materials(criteria)
+    return {
+        "count": len(selected),
+        "filtered_stale": True,
+        "materials": [
+            {
+                "filename": e.filename,
+                "path": e.path,
+                "width": e.width,
+                "height": e.height,
+                "duration": round(e.duration, 1),
+                "quality_score": e.quality_score(),
+                "is_vertical": e.is_vertical(),
+            }
+            for e in selected
+        ],
+    }
+
+
+ACCOUNTS_FILE = Path("data/publishing/credentials/accounts.json")
+
+
+@app.get("/api/accounts")
+async def get_accounts():
+    """Retorna configuração persistente das contas conectadas."""
+    if ACCOUNTS_FILE.exists():
+        try:
+            data = json.loads(ACCOUNTS_FILE.read_text())
+            return data.get("accounts", {})
+        except Exception:
+            pass
+    # Fallback: retorna estrutura padrão com handles corretos
+    return {
+        "instagram": {"handle": "@leonidagta6flashbr", "status": "configured", "auth_method": "manual"},
+        "tiktok": {"handle": "@leonidagta6flashbr", "status": "configured", "auth_method": "manual"},
+        "youtube": {"handle": "@leonidagta6flashbr", "status": "configured", "auth_method": "manual"},
+    }
+
+
+@app.post("/api/accounts/update")
+async def update_accounts(request: Request):
+    """Atualiza configuração de uma conta específica."""
+    body = await request.json()
+    platform = body.get("platform", "")
+    updates = body.get("updates", {})
+    if not platform or platform not in ("instagram", "tiktok", "youtube"):
+        return JSONResponse(status_code=400, content={"detail": "Plataforma inválida"})
+
+    accounts = {}
+    if ACCOUNTS_FILE.exists():
+        try:
+            accounts = json.loads(ACCOUNTS_FILE.read_text()).get("accounts", {})
+        except Exception:
+            pass
+
+    if platform not in accounts:
+        accounts[platform] = {"handle": "", "status": "not_configured", "auth_method": "manual"}
+
+    accounts[platform].update(updates)
+    import datetime
+    payload = {"accounts": accounts, "updated_at": datetime.datetime.utcnow().isoformat() + "Z"}
+    ACCOUNTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    ACCOUNTS_FILE.write_text(json.dumps(payload, indent=2, ensure_ascii=False))
+    return {"ok": True, "platform": platform, "account": accounts[platform]}
+
+
+@app.get("/api/auth/platforms/status")
+async def get_auth_platforms_status():
+    """Status das sessões autenticadas por plataforma social."""
+    from pathlib import Path
+    import json, time
+    sessions_dir = Path("data/browser_sessions")
+    result = {}
+    for platform in ("tiktok", "instagram", "youtube"):
+        cookie_file = sessions_dir / f"{platform}_cookies.json"
+        state_file = sessions_dir / f"{platform}_state.json"
+        profile_dir = sessions_dir / f"{platform}_profile"
+        if cookie_file.exists() and state_file.exists():
+            try:
+                cookies = json.loads(cookie_file.read_text())
+                age_h = (time.time() - cookie_file.stat().st_mtime) / 3600
+                result[platform] = {
+                    "authenticated": True,
+                    "cookie_count": len(cookies),
+                    "saved_hours_ago": round(age_h, 1),
+                }
+            except Exception:
+                result[platform] = {"authenticated": False, "error": "cookie_read_failed"}
+        elif profile_dir.exists() and any(profile_dir.iterdir()):
+            result[platform] = {"authenticated": False, "has_profile": True}
+        else:
+            result[platform] = {"authenticated": False}
+    return result
+
+# ===== PRODUCTION PIPELINE — FÁBRICA AUTÔNOMA =====
+
+@app.post("/api/pipeline/create")
+async def pipeline_create_job(body: dict):
+    """Cria job de produção com auto-seleção do catálogo."""
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    job = pipeline.create_job(
+        video_path=body.get("video_path", ""),
+        platform=body.get("platform", "tiktok"),
+        market=body.get("market", "br"),
+        title=body.get("title", ""),
+        subtitle_text=body.get("subtitle_text", ""),
+        auto_select=body.get("auto_select", False),
+    )
+    return job.to_dict()
+
+@app.post("/api/pipeline/execute/{job_id}")
+async def pipeline_execute_job(job_id: str):
+    """Executa job de produção (com semáforo de render)."""
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    try:
+        job = pipeline.execute_job(job_id)
+        return job.to_dict()
+    except ValueError as e:
+        return JSONResponse(status_code=404, content={"error": str(e)})
+
+@app.post("/api/pipeline/schedule/{job_id}")
+async def pipeline_schedule_job(job_id: str, body: dict = None):
+    """Agenda job concluído para publicação interna."""
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    scheduled_at = (body or {}).get("scheduled_at")
+    return pipeline.schedule_job(job_id, scheduled_at)
+
+@app.get("/api/pipeline/jobs")
+async def pipeline_list_jobs(limit: int = 50):
+    """Lista jobs de produção."""
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    return {"jobs": pipeline.list_jobs(limit=limit)}
+
+@app.get("/api/pipeline/job/{job_id}")
+async def pipeline_get_job(job_id: str):
+    """Detalhes de um job específico."""
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    job = pipeline.get_job(job_id)
+    if not job:
+        return JSONResponse(status_code=404, content={"error": "Job não encontrado"})
+    return job
+
+@app.get("/api/pipeline/job/{job_id}/video")
+async def pipeline_job_video(job_id: str):
+    """Stream de vídeo de um job da pipeline para preview inline."""
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    job = pipeline.get_job(job_id)
+    if not job or not job.get("output_path"):
+        raise HTTPException(status_code=404, detail="Job ou vídeo não encontrado")
+    video_path = Path(job["output_path"])
+    if not video_path.exists():
+        raise HTTPException(status_code=404, detail="Arquivo de vídeo não existe")
+    return FileResponse(str(video_path), media_type="video/mp4")
+
+
+@app.get("/api/pipeline/stats")
+async def pipeline_stats():
+    """Estatísticas da pipeline de produção."""
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    return pipeline.get_stats()
+
+
+# =============================================================================
+# MISSÃO 040 FASE 1 — Importação por URL (yt-dlp)
+# =============================================================================
+
+@app.post("/api/import/url/metadata")
+async def import_url_metadata(request: Request):
+    """Busca metadados de um vídeo por URL sem baixar."""
+    from src.media.url_importer import UrlImporter
+    body = await request.json()
+    url = body.get("url", "").strip()
+    if not url:
+        return JSONResponse(status_code=400, content={"detail": "url obrigatória"})
+    importer = UrlImporter()
+    meta = importer.fetch_metadata(url)
+    meta["is_duplicate"] = importer.is_duplicate(url)
+    return meta
+
+
+@app.post("/api/import/url/download")
+async def import_url_download(request: Request):
+    """Inicia download de vídeo por URL. Retorna imediatamente com status."""
+    import threading
+    from src.media.url_importer import UrlImporter
+
+    body = await request.json()
+    url = body.get("url", "").strip()
+    if not url:
+        return JSONResponse(status_code=400, content={"detail": "url obrigatória"})
+
+    importer = UrlImporter()
+
+    if importer.is_duplicate(url):
+        return {"status": "duplicate", "message": "URL já importada anteriormente"}
+
+    # Download em background para não bloquear a resposta
+    def _do_download():
+        try:
+            importer.download_video(url)
+        except Exception as e:
+            logger.error(f"Background download failed for {url}: {e}")
+
+    thread = threading.Thread(target=_do_download, daemon=True)
+    thread.start()
+
+    return {"status": "downloading", "message": "Download iniciado em background"}
+
+
+@app.get("/api/import/url/history")
+async def import_url_history(limit: int = 50, status: str = ""):
+    """Histórico de importações por URL."""
+    from src.media.url_importer import UrlImporter
+    importer = UrlImporter()
+    return importer.get_history(limit=limit, status_filter=status)
+
+
+@app.get("/api/import/url/stats")
+async def import_url_stats():
+    """Estatísticas de importação por URL."""
+    from src.media.url_importer import UrlImporter
+    importer = UrlImporter()
+    return importer.get_stats()
+
+
+@app.delete("/api/import/url/entry")
+async def import_url_delete(request: Request):
+    """Remove entrada do histórico e arquivo associado."""
+    from src.media.url_importer import UrlImporter
+    body = await request.json()
+    url = body.get("url", "").strip()
+    if not url:
+        return JSONResponse(status_code=400, content={"detail": "url obrigatória"})
+    importer = UrlImporter()
+    deleted = importer.delete_entry(url)
+    return {"deleted": deleted}
+
+
+# =============================================================================
+# MISSÃO 040 FASE 2 — Radar GTA VI (Busca YouTube)
+# =============================================================================
+
+@app.get("/api/radar/search")
+async def radar_search(
+    query: str = "",
+    max_results: int = 10,
+    date_filter: str = "7d",
+):
+    """Busca vídeos sobre GTA VI no YouTube via yt-dlp (assíncrono)."""
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    from src.research.youtube_radar import YouTubeRadar
+
+    def _do_search():
+        radar = YouTubeRadar()
+        results = radar.search(query=query, max_results=max_results, date_filter=date_filter)
+        results = radar.check_already_imported(results)
+        return results
+
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        results = await loop.run_in_executor(executor, _do_search)
+    return {"results": results, "count": len(results), "query": query, "date_filter": date_filter}
+
+
+@app.get("/api/radar/discover")
+async def radar_discover(max_per_term: int = 5, date_filter: str = "7d"):
+    """Busca automática usando todos os termos pré-definidos (assíncrono com timeout graceful)."""
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    from src.research.youtube_radar import YouTubeRadar
+
+    def _do_discover():
+        radar = YouTubeRadar()
+        results = radar.search_all_terms(max_per_term=max_per_term, date_filter=date_filter)
+        results = radar.check_already_imported(results)
+        radar.save_to_cache(results)
+        return results
+
+    loop = asyncio.get_event_loop()
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = loop.run_in_executor(executor, _do_discover)
+            results = await asyncio.wait_for(future, timeout=30)
+        return {"results": results, "count": len(results), "terms_used": 12}
+    except asyncio.TimeoutError:
+        # Fallback para cache se scraping demorar demais
+        radar = YouTubeRadar()
+        cached = radar.get_cached_results(max_age_hours=48)
+        return {"results": cached, "count": len(cached), "terms_used": 0, "note": "timeout_fallback_cache"}
+
+
+@app.get("/api/radar/cache")
+async def radar_cache(max_age_hours: int = 24):
+    """Retorna resultados em cache se ainda válidos."""
+    from src.research.youtube_radar import YouTubeRadar
+    radar = YouTubeRadar()
+    results = radar.get_cached_results(max_age_hours=max_age_hours)
+    return {"results": results, "count": len(results), "cached": len(results) > 0}
+
+
+# =============================================================================
+# MISSÃO 040 FASE 3 — Catalog Bridge (Import → SmartCatalog → Pipeline)
+# =============================================================================
+
+@app.post("/api/catalog/bridge/register")
+async def catalog_bridge_register(request: Request):
+    """Registra vídeo importado no SmartCatalog e opcionalmente cria job de produção."""
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    from src.media.catalog_bridge import CatalogBridge
+
+    body = await request.json()
+    file_path = body.get("file_path", "").strip()
+    if not file_path:
+        return JSONResponse(status_code=400, content={"detail": "file_path obrigatório"})
+
+    def _do_register():
+        bridge = CatalogBridge()
+        return bridge.auto_process_import(
+            file_path=file_path,
+            source_url=body.get("source_url", ""),
+            title=body.get("title", ""),
+            author=body.get("author", ""),
+            platform=body.get("platform", "youtube"),
+            auto_produce=body.get("auto_produce", True),
+        )
+
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        result = await loop.run_in_executor(executor, _do_register)
+    return result
+
+
+@app.get("/api/catalog/bridge/pending")
+async def catalog_bridge_pending():
+    """Lista vídeos importados ainda não registrados no catálogo."""
+    from src.media.catalog_bridge import CatalogBridge
+    bridge = CatalogBridge()
+    pending = bridge.get_pending_imports()
+    return {"pending": pending, "count": len(pending)}
+
+
+# =============================================================================
+# MISSÃO 040.1 ETAPA 2 — Publicação Assistida Operacional
+# =============================================================================
+
+PLATFORM_UPLOAD_URLS = {
+    "tiktok": "https://www.tiktok.com/upload",
+    "instagram": "https://www.instagram.com/",
+    "youtube": "https://studio.youtube.com/channel/UC/upload",
+}
+
+
+@app.post("/api/publish/assisted-prepare")
+async def publish_assisted_prepare(request: Request):
+    """Prepara metadados e abre página de upload no Safari para publicação assistida.
+
+    Retorna: título, descrição, hashtags, URL de upload, caminho do vídeo.
+    O frontend usa window.open() para abrir a URL e navigator.clipboard para copiar metadados.
+    """
+    body = await request.json()
+    job_id = body.get("job_id", "").strip()
+    platform = body.get("platform", "tiktok").strip().lower()
+
+    if not job_id:
+        return JSONResponse(status_code=400, content={"detail": "job_id obrigatório"})
+    if platform not in PLATFORM_UPLOAD_URLS:
+        return JSONResponse(status_code=400, content={"detail": f"Plataforma inválida: {platform}. Use: tiktok, instagram, youtube"})
+
+    # Buscar job na pipeline
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    job = pipeline.get_job(job_id)
+    if not job:
+        return JSONResponse(status_code=404, content={"detail": f"Job não encontrado: {job_id}"})
+
+    video_path = job.get("output_path", "") or job.get("video_path", "")
+    if not video_path or not Path(video_path).exists():
+        return JSONResponse(status_code=404, content={"detail": "Arquivo de vídeo não encontrado"})
+
+    title = job.get("title", f"GTA VI Reel {job_id}")
+    description = job.get("description", "") or f"GTA VI conteúdo exclusivo! 🎮 #GTA6 #GTAVI #LeonidaFlashBR"
+    hashtags = job.get("hashtags", ["#GTA6", "#GTAVI", "#RockstarGames", "#LeonidaFlashBR", "#Gaming"])
+
+    # Contas por plataforma
+    accounts = {
+        "tiktok": "@leonidagta6flashbr",
+        "instagram": "@leonidagta6flashbr",
+        "youtube": "@leonidagta6flashbr",
+    }
+
+    upload_url = PLATFORM_UPLOAD_URLS[platform]
+    account = accounts.get(platform, "")
+
+    # Copiar metadados para clipboard via osascript (macOS)
+    clipboard_text = f"{title}\n\n{description}\n\n{' '.join(hashtags)}"
+    try:
+        subprocess.run(
+            ["osascript", "-e", f'set the clipboard to "{clipboard_text.replace(chr(34), chr(92)+chr(34))}"'],
+            capture_output=True, timeout=5,
+        )
+    except Exception:
+        pass  # Clipboard é best-effort; frontend tem fallback
+
+    return {
+        "job_id": job_id,
+        "platform": platform,
+        "account": account,
+        "title": title,
+        "description": description,
+        "hashtags": hashtags,
+        "upload_url": upload_url,
+        "video_path": video_path,
+        "video_filename": Path(video_path).name,
+        "clipboard_ready": True,
+        "instructions": f"1. Arraste '{Path(video_path).name}' para a página de upload\n2. Cole título/descrição (Ctrl+V)\n3. Confirme a publicação\n4. Volte ao dashboard e clique 'Confirmar Publicação'",
+    }
+
+
+@app.post("/api/publish/assisted-confirm")
+async def publish_assisted_confirm(request: Request):
+    """Confirma publicação assistida após usuário completar upload manualmente."""
+    body = await request.json()
+    job_id = body.get("job_id", "").strip()
+    platform = body.get("platform", "").strip()
+    published_url = body.get("published_url", "").strip()
+
+    if not job_id:
+        return JSONResponse(status_code=400, content={"detail": "job_id obrigatório"})
+
+    # Registrar no scheduler como publicado
+    sched_file = Path("data/scheduler/autopublish_jobs.json")
+    jobs = []
+    if sched_file.exists():
+        try:
+            jobs = json.loads(sched_file.read_text())
+        except (json.JSONDecodeError, OSError):
+            jobs = []
+
+    entry = {
+        "job_id": job_id,
+        "platform": platform,
+        "status": "published",
+        "approval_status": "approved",
+        "published_url": published_url,
+        "published_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "method": "assisted",
+    }
+
+    # Atualizar ou adicionar
+    found = False
+    for i, j in enumerate(jobs):
+        if j.get("job_id") == job_id and j.get("platform") == platform:
+            jobs[i] = entry
+            found = True
+            break
+    if not found:
+        jobs.append(entry)
+
+    sched_file.parent.mkdir(parents=True, exist_ok=True)
+    sched_file.write_text(json.dumps(jobs, indent=2, ensure_ascii=False))
+
+    return {"confirmed": True, "job_id": job_id, "platform": platform, "status": "published"}
+
+
+@app.get("/api/publish/ready-jobs")
+async def publish_ready_jobs():
+    """Lista jobs prontos para publicação (completed na pipeline, com vídeo válido)."""
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    ready = []
+    for jid, job in pipeline._jobs.items():
+        if job.status == "completed":
+            video_path = job.output_path or job.video_path
+            if video_path and Path(video_path).exists():
+                ready.append({
+                    "job_id": jid,
+                    "title": job.title,
+                    "platform": job.platform,
+                    "video_path": video_path,
+                    "video_filename": Path(video_path).name,
+                    "created_at": job.created_at,
+                })
+    ready.sort(key=lambda x: x.get("created_at", 0), reverse=True)
+    return {"jobs": ready, "count": len(ready)}
+
+
+# =============================================================================
+# MISSÃO 040.1 ETAPA 2+3 — Publicação Assistida + Auto-Publish Connectors
+# =============================================================================
+
+PLATFORM_UPLOAD_URLS = {
+    "tiktok": "https://www.tiktok.com/upload",
+    "instagram": "https://www.instagram.com/",
+    "youtube": "https://studio.youtube.com/channel/UC/upload",
+}
+
+
+@app.post("/api/publish/assisted-prepare")
+async def publish_assisted_prepare(request: Request):
+    """Prepara metadados e abre página de upload no Safari para publicação assistida."""
+    body = await request.json()
+    job_id = body.get("job_id", "").strip()
+    platform = body.get("platform", "tiktok").strip().lower()
+
+    if not job_id:
+        return JSONResponse(status_code=400, content={"detail": "job_id obrigatório"})
+    if platform not in PLATFORM_UPLOAD_URLS:
+        return JSONResponse(status_code=400, content={"detail": f"Plataforma inválida: {platform}"})
+
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    job = pipeline.get_job(job_id)
+    if not job:
+        return JSONResponse(status_code=404, content={"detail": f"Job não encontrado: {job_id}"})
+
+    video_path = job.get("output_path", "") or job.get("video_path", "")
+    if not video_path or not Path(video_path).exists():
+        return JSONResponse(status_code=404, content={"detail": "Arquivo de vídeo não encontrado"})
+
+    title = job.get("title", f"GTA VI Reel {job_id}")
+    description = job.get("description", "") or f"GTA VI conteúdo exclusivo! 🎮 #GTA6 #GTAVI #LeonidaFlashBR"
+    hashtags = job.get("hashtags", ["#GTA6", "#GTAVI", "#RockstarGames", "#LeonidaFlashBR", "#Gaming"])
+
+    accounts = {
+        "tiktok": "@leonidagta6flashbr",
+        "instagram": "@leonidagta6flashbr",
+        "youtube": "@leonidagta6flashbr",
+    }
+
+    upload_url = PLATFORM_UPLOAD_URLS[platform]
+    account = accounts.get(platform, "")
+
+    clipboard_text = f"{title}\n\n{description}\n\n{' '.join(hashtags)}"
+    try:
+        subprocess.run(
+            ["osascript", "-e", f'set the clipboard to "{clipboard_text.replace(chr(34), chr(92)+chr(34))}"'],
+            capture_output=True, timeout=5,
+        )
+    except Exception:
+        pass
+
+    return {
+        "job_id": job_id,
+        "platform": platform,
+        "account": account,
+        "title": title,
+        "description": description,
+        "hashtags": hashtags,
+        "upload_url": upload_url,
+        "video_path": video_path,
+        "video_filename": Path(video_path).name,
+        "clipboard_ready": True,
+        "instructions": f"1. Arraste '{Path(video_path).name}' para a página de upload\n2. Cole título/descrição (Ctrl+V)\n3. Confirme a publicação\n4. Volte ao dashboard e clique 'Confirmar Publicação'",
+    }
+
+
+@app.post("/api/publish/assisted-confirm")
+async def publish_assisted_confirm(request: Request):
+    """Confirma publicação assistida após usuário completar upload manualmente."""
+    body = await request.json()
+    job_id = body.get("job_id", "").strip()
+    platform = body.get("platform", "").strip()
+    published_url = body.get("published_url", "").strip()
+
+    if not job_id:
+        return JSONResponse(status_code=400, content={"detail": "job_id obrigatório"})
+
+    sched_file = Path("data/scheduler/autopublish_jobs.json")
+    jobs = []
+    if sched_file.exists():
+        try:
+            jobs = json.loads(sched_file.read_text())
+        except (json.JSONDecodeError, OSError):
+            jobs = []
+
+    entry = {
+        "job_id": job_id,
+        "platform": platform,
+        "status": "published",
+        "approval_status": "approved",
+        "published_url": published_url,
+        "published_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "method": "assisted",
+    }
+
+    found = False
+    for i, j in enumerate(jobs):
+        if j.get("job_id") == job_id and j.get("platform") == platform:
+            jobs[i] = entry
+            found = True
+            break
+    if not found:
+        jobs.append(entry)
+
+    sched_file.parent.mkdir(parents=True, exist_ok=True)
+    sched_file.write_text(json.dumps(jobs, indent=2, ensure_ascii=False))
+
+    return {"confirmed": True, "job_id": job_id, "platform": platform, "status": "published"}
+
+
+@app.get("/api/publish/ready-jobs")
+async def publish_ready_jobs():
+    """Lista jobs prontos para publicação (completed na pipeline, com vídeo válido)."""
+    from src.production.pipeline import ProductionPipeline
+    pipeline = ProductionPipeline(data_root="data")
+    ready = []
+    for jid, job in pipeline._jobs.items():
+        if job.status == "completed":
+            video_path = job.output_path or job.video_path
+            if video_path and Path(video_path).exists():
+                ready.append({
+                    "job_id": jid,
+                    "title": job.title,
+                    "platform": job.platform,
+                    "video_path": video_path,
+                    "video_filename": Path(video_path).name,
+                    "created_at": job.created_at,
+                })
+    ready.sort(key=lambda x: x.get("created_at", 0), reverse=True)
+    return {"jobs": ready, "count": len(ready)}
+
+
+@app.get("/api/auto-publish/status")
+async def auto_publish_status():
+    """DEPRECATED: Use /api/autopublish/status (AutoPublishScheduler with adapters.py)."""
+    return {
+        "deprecated": True,
+        "message": "Legacy AutoPublisher removed. Use /api/autopublish/status for the canonical scheduler.",
+        "replacement": "/api/autopublish/status",
+    }
+
+
+@app.post("/api/auto-publish/publish")
+async def auto_publish_execute(request: Request):
+    """DEPRECATED: Use /api/autopublish/queue/add (AutoPublishScheduler with adapters.py)."""
+    return JSONResponse(
+        status_code=410,
+        content={
+            "deprecated": True,
+            "message": "Legacy AutoPublisher removed. Use /api/autopublish/queue/add with the canonical adapter-based scheduler.",
+            "replacement": "/api/autopublish/queue/add",
+        },
+    )
+
+
+@app.post("/api/auto-publish/publish-all")
+async def auto_publish_all(request: Request):
+    """DEPRECATED: Use /api/autopublish/queue/add per platform (AutoPublishScheduler)."""
+    return JSONResponse(
+        status_code=410,
+        content={
+            "deprecated": True,
+            "message": "Legacy AutoPublisher removed. Queue jobs individually via /api/autopublish/queue/add.",
+            "replacement": "/api/autopublish/queue/add",
+        },
+    )
+
+
+@app.get("/api/auto-publish/history")
+async def auto_publish_history(limit: int = 50):
+    """DEPRECATED: Use /api/autopublish/status for queue summary."""
+    return {
+        "deprecated": True,
+        "history": [],
+        "message": "Legacy AutoPublisher removed. Use /api/autopublish/status for current queue and history.",
+        "replacement": "/api/autopublish/status",
+    }
+
+
+# =============================================================================
+# MISSAO 040.2 -- Radar Viral Instagram
+# =============================================================================
+
+@app.get("/api/instagram-radar/search")
+async def instagram_radar_search(profile: str = "", hashtag: str = "", max_results: int = 10):
+    """Busca no Instagram com timeout graceful — retorna cache se scraping demorar."""
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    from src.research.instagram_radar import InstagramRadar
+    def _do():
+        radar = InstagramRadar()
+        if profile:
+            return radar.search_profile(profile, max_results)
+        elif hashtag:
+            return radar.search_hashtag(hashtag, max_results)
+        else:
+            return radar.search_all(max_per_source=max_results)
+    loop = asyncio.get_event_loop()
+    try:
+        with ThreadPoolExecutor(max_workers=1) as ex:
+            future = loop.run_in_executor(ex, _do)
+            results = await asyncio.wait_for(future, timeout=30)
+        results = InstagramRadar().check_already_imported(results)
+        return {"results": results, "count": len(results)}
+    except asyncio.TimeoutError:
+        radar = InstagramRadar()
+        cached = radar.load_cache("latest", max_age_hours=48)
+        return {"results": cached, "count": len(cached), "note": "timeout_fallback_cache"}
+
+@app.get("/api/instagram-radar/discover")
+async def instagram_radar_discover(max_per_source: int = 5):
+    """Descoberta automática com fontes múltiplas: Instagram (yt-dlp) → RSS → YouTube cross-platform.
+
+    Quando o scraping direto do Instagram falha ou retorna vazio (limitação conhecida do yt-dlp),
+    o endpoint busca automaticamente em fontes alternativas legítimas:
+    - RSS feeds de gaming (Eurogamer, VGC) filtrados por GTA VI
+    - YouTube search por termos cross-platform (GTA VI Instagram/Reels/Shorts)
+    Resultados incluem campo 'source' indicando a origem real de cada item.
+    """
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    from src.research.instagram_radar import InstagramRadar
+
+    def _do_ig_scrape():
+        radar = InstagramRadar()
+        r = radar.search_all(max_per_source=max_per_source)
+        r = radar.check_already_imported(r)
+        if r:
+            radar.save_cache(r, "latest")
+        return r
+
+    def _do_alternative_sources():
+        """Busca em fontes alternativas quando Instagram direto falha."""
+        alt_results = []
+
+        # Fonte 1: RSS feeds de gaming filtrados por GTA VI
+        try:
+            from src.research.rss_source import fetch_rss
+            rss_feeds = [
+                ("Eurogamer", "https://www.eurogamer.net/?format=rss"),
+                ("VGC", "https://www.videogameschronicle.com/feed"),
+            ]
+            gta_keywords = ["gta", "rockstar", "vice city", "leonida"]
+            for source_name, url in rss_feeds:
+                try:
+                    items = fetch_rss(url, source_name=source_name, timeout=10)
+                    for item in items:
+                        title_lower = item.title.lower()
+                        if any(kw in title_lower for kw in gta_keywords):
+                            alt_results.append({
+                                "url": item.url,
+                                "title": item.title,
+                                "author": item.source,
+                                "source": f"rss:{item.source}",
+                                "source_type": "rss",
+                                "published_at": getattr(item, "published", ""),
+                                "confidence": 1.0,
+                                "rights_status": "reference_only",
+                            })
+                except Exception:
+                    continue
+        except ImportError:
+            pass
+
+        # Fonte 2: YouTube search por termos cross-platform IG/GTA
+        try:
+            from src.research.youtube_radar import YouTubeRadar
+            yt_radar = YouTubeRadar()
+            ig_terms = ["GTA VI Instagram", "GTA 6 Reels viral", "GTA VI Shorts"]
+            for term in ig_terms:
+                try:
+                    yt_results = yt_radar.search(query=term, max_results=5)
+                    for r in yt_results:
+                        if isinstance(r, dict):
+                            alt_results.append({
+                                "url": r.get("url", ""),
+                                "title": r.get("title", ""),
+                                "author": r.get("author", ""),
+                                "view_count": r.get("view_count", 0),
+                                "source": "youtube:cross_platform",
+                                "source_type": "youtube",
+                                "confidence": 0.9,
+                                "rights_status": "reference_only",
+                            })
+                except Exception:
+                    continue
+        except ImportError:
+            pass
+
+        return alt_results
+
+    loop = asyncio.get_event_loop()
+
+    # Tentar scraping Instagram direto primeiro
+    ig_results = []
+    try:
+        with ThreadPoolExecutor(max_workers=1) as ex:
+            future = loop.run_in_executor(ex, _do_ig_scrape)
+            ig_results = await asyncio.wait_for(future, timeout=30)
+    except asyncio.TimeoutError:
+        pass
+
+    # Se Instagram retornou resultados reais, usar diretamente
+    if ig_results:
+        return {"results": ig_results, "count": len(ig_results), "source": "instagram_direct"}
+
+    # Fallback: buscar em fontes alternativas
+    try:
+        with ThreadPoolExecutor(max_workers=1) as ex:
+            future = loop.run_in_executor(ex, _do_alternative_sources)
+            alt_results = await asyncio.wait_for(future, timeout=20)
+    except asyncio.TimeoutError:
+        alt_results = []
+
+    if alt_results:
+        # Salvar no cache do Instagram Radar para uso futuro
+        try:
+            radar = InstagramRadar()
+            radar.save_cache(alt_results, "latest")
+        except Exception:
+            pass
+        return {
+            "results": alt_results,
+            "count": len(alt_results),
+            "source": "alternative_sources",
+            "note": "instagram_scraping_unavailable_using_rss_and_youtube",
+        }
+
+    # Último fallback: cache antigo
+    try:
+        radar = InstagramRadar()
+        cached = radar.load_cache("latest", max_age_hours=48)
+        if cached:
+            return {"results": cached, "count": len(cached), "source": "cache", "note": "all_sources_empty_using_cache"}
+    except Exception:
+        pass
+
+    return {"results": [], "count": 0, "source": "none", "note": "no_results_from_any_source"}
+
+@app.get("/api/instagram-radar/cache")
+async def instagram_radar_cache(max_age_hours: int = 24):
+    from src.research.instagram_radar import InstagramRadar
+    radar = InstagramRadar()
+    results = radar.load_cache("latest", max_age_hours)
+    return {"results": results, "count": len(results), "cached": len(results) > 0}
+
+@app.get("/api/instagram-radar/filters")
+async def instagram_radar_filters():
+    from src.research.instagram_radar import InstagramRadar
+    return InstagramRadar().get_filter_options()
+
+@app.get("/api/instagram-radar/profiles")
+async def instagram_radar_profiles():
+    from src.research.instagram_radar import InstagramRadar
+    return {"profiles": InstagramRadar()._monitored_profiles}
+
+@app.post("/api/instagram-radar/profiles/add")
+async def instagram_radar_add_profile(request: Request):
+    from src.research.instagram_radar import InstagramRadar
+    body = await request.json()
+    profile = body.get("profile", "").strip()
+    if not profile:
+        return JSONResponse(status_code=400, content={"detail": "profile obrigatorio"})
+    radar = InstagramRadar()
+    return {"profiles": radar.add_monitored_profile(profile), "added": profile}
+
+@app.post("/api/instagram-radar/profiles/remove")
+async def instagram_radar_remove_profile(request: Request):
+    from src.research.instagram_radar import InstagramRadar
+    body = await request.json()
+    profile = body.get("profile", "").strip()
+    if not profile:
+        return JSONResponse(status_code=400, content={"detail": "profile obrigatorio"})
+    radar = InstagramRadar()
+    return {"profiles": radar.remove_monitored_profile(profile), "removed": profile}

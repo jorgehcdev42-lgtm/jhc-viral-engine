@@ -1,0 +1,134 @@
+[
+  {
+    "success": 4,
+    "failed": 0,
+    "skipped": 0,
+    "jobs": [
+      {
+        "job_id": "4a12a6e9-1d3",
+        "material": "Vídeo 0007.mp4",
+        "output": "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/data/autoreel/output/7c68de8145e9_br_tiktok.mp4",
+        "score": 100,
+        "size_mb": 70.2,
+        "duration": 114.71
+      },
+      {
+        "job_id": "7b0b8816-217",
+        "material": "Vídeo 0015.mp4",
+        "output": "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/data/autoreel/output/8a1923a1b1fb_br_tiktok.mp4",
+        "score": 100,
+        "size_mb": 86.8,
+        "duration": 189.65
+      },
+      {
+        "job_id": "65437462-844",
+        "material": "Vídeo 0017.mp4",
+        "output": "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/data/autoreel/output/05fee8d4f9ce_br_tiktok.mp4",
+        "score": 100,
+        "size_mb": 93.1,
+        "duration": 265.38
+      },
+      {
+        "job_id": "fd2d3f01-059",
+        "material": "Vídeo 0018.mp4",
+        "output": "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/data/autoreel/output/bfc74910f4e0_br_tiktok.mp4",
+        "score": 100,
+        "size_mb": 90.9,
+        "duration": 219.26
+      }
+    ],
+    "elapsed_seconds": 789.5,
+    "completed_at": "2026-11-17 02:09:56"
+  },
+  {
+    "success": 2,
+    "failed": 0,
+    "skipped": 0,
+    "jobs": [
+      {
+        "job_id": "414385e1-d41",
+        "material": "Vídeo 0007.mp4",
+        "output": "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/data/autoreel/output/918135995946_br_tiktok.mp4",
+        "score": 100,
+        "size_mb": 70.8,
+        "duration": 123.25
+      },
+      {
+        "job_id": "0f832f12-bb7",
+        "material": "Vídeo 0015.mp4",
+        "output": "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/data/autoreel/output/af04945b6814_br_tiktok.mp4",
+        "score": 100,
+        "size_mb": 87.2,
+        "duration": 262.95
+      }
+    ],
+    "elapsed_seconds": 386.4,
+    "completed_at": "2026-11-17 03:13:30"
+  },
+  {
+    "success": 4,
+    "failed": 0,
+    "skipped": 0,
+    "jobs": [
+      {
+        "job_id": "72eef445-eba",
+        "material": "Vídeo 0007.mp4",
+        "output": "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/data/autoreel/output/ba7fb34232de_br_tiktok.mp4",
+        "score": 100,
+        "size_mb": 70.8,
+        "duration": 118.62
+      },
+      {
+        "job_id": "00478fff-e1c",
+        "material": "Vídeo 0015.mp4",
+        "output": "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/data/autoreel/output/cde4b2a1ea86_br_tiktok.mp4",
+        "score": 100,
+        "size_mb": 87.2,
+        "duration": 201.61
+      },
+      {
+        "job_id": "1cf9d224-eeb",
+        "material": "Vídeo 0017.mp4",
+        "output": "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/data/autoreel/output/4d7c93602acc_br_tiktok.mp4",
+        "score": 100,
+        "size_mb": 92.8,
+        "duration": 313.32
+      },
+      {
+        "job_id": "614fbe76-c38",
+        "material": "Vídeo 0018.mp4",
+        "output": "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/data/autoreel/output/6e7c5f8c7ba5_br_tiktok.mp4",
+        "score": 100,
+        "size_mb": 90.7,
+        "duration": 239.66
+      }
+    ],
+    "elapsed_seconds": 873.6,
+    "completed_at": "2026-11-17 15:30:31"
+  },
+  {
+    "success": 2,
+    "failed": 0,
+    "skipped": 0,
+    "jobs": [
+      {
+        "job_id": "d1b0843a-a36",
+        "material": "Vídeo 0007.mp4",
+        "output": "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/data/autoreel/output/5014021f5f9c_br_tiktok.mp4",
+        "score": 100,
+        "size_mb": 70.8,
+        "duration": 105.01
+      },
+      {
+        "job_id": "604d6b68-db3",
+        "material": "Vídeo 0015.mp4",
+        "output": "/Volumes/SSD EXT MACBOOK/JHC-PROJETOS/JHC VIRAL ENGINE/GTA 6/data/autoreel/output/2502d3ba97d6_br_tiktok.mp4",
+        "score": 100,
+        "size_mb": 87.2,
+        "duration": 179.41
+      }
+    ],
+    "elapsed_seconds": 284.6,
+    "completed_at": "2026-11-17 16:12:21"
+  }
+]

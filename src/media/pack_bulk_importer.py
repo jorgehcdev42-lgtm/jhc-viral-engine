@@ -13,6 +13,7 @@ import time
 import hashlib
 import shutil
 import subprocess
+import threading
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Optional
@@ -82,13 +83,17 @@ class PackBulkImporter:
     MANIFEST_FILE = "pack_manifest.json"
     IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
 
-    def __init__(self, ssd_root: str, data_root: str = "data", cookies: str = ""):
+    MIN_SSD_FREE_BYTES = int(os.environ.get("JHC_SSD_RESERVE_GB", "10")) * 1024 * 1024 * 1024  # 10GB default, configurável via env
+
+    def __init__(self, ssd_root: str, data_root: str = "data", cookies: str = "", max_concurrent: int = 2):
         self.ssd_root = Path(ssd_root)
         self.data_root = Path(data_root)
         self.import_dir = self.data_root / "bulk_import"
         self.downloads_dir = self.ssd_root / "JHC-VIRAL-IMPORTS"
         self.state_dir = self.import_dir / "state"
         self.cookies = cookies  # Cookie header string for authenticated requests
+        self.max_concurrent = max_concurrent
+        self._semaphore = threading.Semaphore(max_concurrent)
 
         for d in [self.import_dir, self.downloads_dir, self.state_dir]:
             d.mkdir(parents=True, exist_ok=True)
@@ -190,22 +195,160 @@ class PackBulkImporter:
             return False, str(e)
 
     def _download_direct(self, url: str, dest: Path) -> tuple[bool, str]:
-        """Baixa arquivo via URL direta com curl."""
+        """Baixa arquivo via URL direta com curl, suportando HTTP Range resume."""
         try:
-            result = subprocess.run(
-                ["curl", "-L", "-o", str(dest), "-s", "-S",
-                 "--max-time", "600", "--retry", "2", url],
-                capture_output=True, text=True, timeout=620
-            )
-            if dest.exists() and dest.stat().st_size > 1024:
+            # Verificar se existe parcial para retomar via HTTP Range
+            partial = dest.with_suffix(dest.suffix + ".part")
+            existing_bytes = 0
+            range_header = ""
+            if partial.exists():
+                existing_bytes = partial.stat().st_size
+                if existing_bytes > 0:
+                    range_header = f"-r {existing_bytes}-"
+
+            # Usar -C - (resume automático do curl) se houver parcial
+            curl_args = ["curl", "-L", "-s", "-S",
+                         "--max-time", "600", "--retry", "2"]
+            if existing_bytes > 0:
+                curl_args.extend(["-C", "-", "-o", str(partial)])
+            else:
+                curl_args.extend(["-o", str(partial)])
+            curl_args.append(url)
+
+            result = subprocess.run(curl_args, capture_output=True, text=True, timeout=620)
+
+            # Renomear parcial para destino final se download completou
+            if partial.exists() and partial.stat().st_size > 1024:
+                # Verificar se não é página HTML de erro
+                with open(partial, "rb") as f:
+                    header = f.read(200)
+                if b"<html" in header.lower() and existing_bytes == 0:
+                    partial.unlink(missing_ok=True)
+                    return False, "URL retornou página HTML (possível auth/expirado)"
+                partial.rename(dest)
+                return True, ""
+            elif dest.exists() and dest.stat().st_size > 1024:
                 return True, ""
             else:
-                dest.unlink(missing_ok=True)
+                # Manter parcial para próxima tentativa de resume
+                if not partial.exists() or partial.stat().st_size < 1024:
+                    partial.unlink(missing_ok=True)
                 return False, "Download falhou ou arquivo vazio"
         except subprocess.TimeoutExpired:
             return False, "Timeout"
         except Exception as e:
             return False, str(e)
+
+    def load_catalog_from_file(self, catalog_path: str, target_dir: str = "", max_entries: int = 0, filter_type: str = "") -> dict:
+        """Carrega catálogo JSON local (pro_catalog.json) e adiciona à fila.
+
+        Args:
+            catalog_path: Caminho para arquivo JSON com lista de entradas
+            target_dir: Subpasta dentro de downloads_dir (ex: 'VIDEOS CORTES')
+            max_entries: Limite de entradas a carregar (0 = todas)
+            filter_type: Filtrar por tipo — "video" (type=v), "image" (type=img), "" (todos)
+
+        Returns:
+            {"loaded": int, "videos": int, "images": int, "skipped": int}
+        """
+        path = Path(catalog_path)
+        if not path.exists():
+            return {"error": f"Arquivo não encontrado: {catalog_path}", "loaded": 0}
+
+        try:
+            data = json.loads(path.read_text())
+        except json.JSONDecodeError as e:
+            return {"error": f"JSON inválido: {e}", "loaded": 0}
+
+        if not isinstance(data, list):
+            return {"error": "Catálogo deve ser uma lista JSON", "loaded": 0}
+
+        # Determinar diretório de destino
+        if target_dir:
+            dest_base = self.ssd_root / target_dir
+        else:
+            dest_base = self.downloads_dir / "monetizegta6_pack"
+        dest_base.mkdir(parents=True, exist_ok=True)
+
+        loaded = 0
+        videos = 0
+        images = 0
+        skipped = 0
+
+        # Mapear filter_type para valores do catálogo
+        type_filter_map = {"video": "v", "image": "img"}
+        target_type = type_filter_map.get(filter_type, "")
+
+        for item in data:
+            if max_entries > 0 and loaded >= max_entries:
+                break
+
+            drive_id = item.get("drive", "")
+            title = item.get("t", "untitled")
+            item_type = item.get("type", "v")
+            is_hd = item.get("hd", 0)
+
+            if not drive_id:
+                skipped += 1
+                continue
+
+            # Filtrar por tipo se solicitado
+            if target_type and item_type != target_type:
+                skipped += 1
+                continue
+
+            # Construir URL de download autenticada
+            download_url = f"https://drive.usercontent.google.com/download?id={drive_id}&export=download&confirm=t"
+
+            # Verificar duplicata por URL exata (construída deterministicamente)
+            download_url_check = f"https://drive.usercontent.google.com/download?id={drive_id}&export=download&confirm=t"
+            if download_url_check in self._entries:
+                skipped += 1
+                continue
+
+            # Determinar extensão e nome do arquivo
+            safe_title = "".join(c if c.isalnum() or c in " _-" else "_" for c in title).strip()
+            if item_type == "img":
+                ext = ".jpg"
+                images += 1
+            else:
+                ext = ".mp4"
+                videos += 1
+
+            filename = f"{safe_title}{ext}"
+            dest_path = dest_base / filename
+
+            # Evitar colisão de nomes
+            counter = 1
+            while dest_path.exists() or any(e.dest_path == str(dest_path) for e in self._entries.values()):
+                filename = f"{safe_title}_{counter:03d}{ext}"
+                dest_path = dest_base / filename
+                counter += 1
+
+            entry = DownloadEntry(
+                url=download_url,
+                filename=filename,
+                dest_path=str(dest_path),
+                tags=[f"hd={is_hd}", f"type={item_type}"] if is_hd else [f"type={item_type}"],
+                category="cortes" if item_type != "img" else "imagens",
+                source_pack="monetizegta6_gta6",
+                created_at=time.time(),
+            )
+            self._entries[download_url] = entry
+            loaded += 1
+
+        self._progress.total_discovered = len(self._entries)
+        self._progress.total_duplicates += skipped
+        self._save_state()
+
+        return {
+            "loaded": loaded,
+            "videos": videos,
+            "images": images,
+            "skipped": skipped,
+            "total_in_queue": len(self._entries),
+            "dest_dir": str(dest_base),
+        }
 
     def add_entries(self, entries: list[dict]) -> dict:
         """Adiciona entradas de download ao queue."""
@@ -245,13 +388,26 @@ class PackBulkImporter:
         self._save_state()
         return {"added": added, "duplicates": duplicates, "total": len(self._entries)}
 
+    def _backoff_delay(self, retries: int) -> float:
+        """Backoff exponencial: 2^retries segundos, max 60s."""
+        return min(2 ** retries, 60)
+
     def process_next(self) -> Optional[dict]:
         """Processa próxima entrada pendente. Retorna resultado ou None se fila vazia."""
         self._progress.ssd_free_bytes = self._compute_ssd_free()
 
-        # Verificar espaço mínimo (1GB)
-        if self._progress.ssd_free_bytes < 1024 * 1024 * 1024:
-            return {"error": "Espaço insuficiente no SSD", "free_gb": self._progress.ssd_free_bytes / (1024**3)}
+        # Verificar espaço mínimo com reserva segura (2GB)
+        if self._progress.ssd_free_bytes < self.MIN_SSD_FREE_BYTES:
+            free_gb = self._progress.ssd_free_bytes / (1024**3)
+            return {
+                "error": f"Espaço insuficiente no SSD ({free_gb:.1f}GB livres, mínimo {self.MIN_SSD_FREE_BYTES // (1024**3)}GB)",
+                "free_gb": free_gb,
+                "paused": True,
+            }
+
+        # Pausa verificada
+        if self._progress.is_paused:
+            return {"error": "Importação pausada", "paused": True}
 
         # Encontrar próxima entrada pendente
         pending = [
@@ -262,62 +418,106 @@ class PackBulkImporter:
             return None
 
         entry = pending[0]
-        entry.state = DownloadState.DOWNLOADING.value
-        entry.started_at = time.time()
-        entry.retries += 1
-        self._save_state()
 
-        # Determinar tipo de download
-        success = False
-        error = ""
+        # Backoff antes de retry
+        if entry.retries > 0:
+            delay = self._backoff_delay(entry.retries)
+            time.sleep(delay)
 
-        if "drive.google.com" in entry.url:
-            # Extrair file ID
-            file_id = entry.url
-            for pattern in ["/d/", "/file/d/", "id="]:
-                if pattern in file_id:
-                    idx = file_id.index(pattern) + len(pattern)
-                    end = file_id[idx:].find("/")
-                    if end == -1:
-                        end = file_id[idx:].find("&")
-                    if end == -1:
-                        file_id = file_id[idx:]
-                    else:
-                        file_id = file_id[idx:idx+end]
-                    break
-            success, error = self._download_gdrive(file_id, Path(entry.dest_path))
-        elif self._is_image_url(entry.url):
-            success, error = self._download_image(entry.url, Path(entry.dest_path))
-        else:
-            success, error = self._download_direct(entry.url, Path(entry.dest_path))
+        # Adquire semaphore para limitar concorrência
+        self._semaphore.acquire()
+        try:
+            entry.state = DownloadState.DOWNLOADING.value
+            entry.started_at = time.time()
+            entry.retries += 1
+            self._save_state()
 
-        if success:
-            entry.state = DownloadState.VERIFYING.value
-            dest = Path(entry.dest_path)
-            entry.size_bytes = dest.stat().st_size
-            entry.sha256 = self._file_hash(dest)
+            # Determinar tipo de download
+            success = False
+            error = ""
 
-            # Verificar integridade básica
-            if entry.size_bytes < 1024:
-                entry.state = DownloadState.FAILED.value
-                entry.error = "Arquivo muito pequeno (<1KB)"
-                self._progress.total_failed += 1
+            if "drive.usercontent.google.com" in entry.url or "drive.google.com" in entry.url:
+                # Extrair file ID da URL autenticada ou padrão
+                file_id = entry.url
+                for pattern in ["id=", "/d/", "/file/d/"]:
+                    if pattern in file_id:
+                        idx = file_id.index(pattern) + len(pattern)
+                        end = file_id[idx:].find("/")
+                        if end == -1:
+                            end = file_id[idx:].find("&")
+                        if end == -1:
+                            file_id = file_id[idx:]
+                        else:
+                            file_id = file_id[idx:idx+end]
+                        break
+                success, error = self._download_gdrive(file_id, Path(entry.dest_path))
+            elif self._is_image_url(entry.url):
+                success, error = self._download_image(entry.url, Path(entry.dest_path))
             else:
-                entry.state = DownloadState.COMPLETED.value
-                entry.completed_at = time.time()
-                self._progress.total_downloaded += 1
-                self._progress.bytes_downloaded += entry.size_bytes
-        else:
-            if "auth" in error.lower() or "confirmação" in error.lower():
-                entry.state = DownloadState.BLOCKED_AUTH.value
-                self._progress.total_blocked_auth += 1
-            elif entry.retries >= entry.max_retries:
-                entry.state = DownloadState.FAILED.value
-                entry.error = error
-                self._progress.total_failed += 1
+                success, error = self._download_direct(entry.url, Path(entry.dest_path))
+
+            if success:
+                entry.state = DownloadState.VERIFYING.value
+                dest = Path(entry.dest_path)
+                entry.size_bytes = dest.stat().st_size
+                entry.sha256 = self._file_hash(dest)
+
+                # Verificar integridade básica + ffprobe para vídeos
+                if entry.size_bytes < 1024:
+                    entry.state = DownloadState.FAILED.value
+                    entry.error = "Arquivo muito pequeno (<1KB)"
+                    self._progress.total_failed += 1
+                elif dest.suffix.lower() in (".mp4", ".mov", ".avi", ".mkv", ".webm"):
+                    # Validação ffprobe para vídeos antes de marcar COMPLETED
+                    try:
+                        probe = subprocess.run(
+                            ["ffprobe", "-v", "error", "-show_entries",
+                             "format=duration,size", "-of", "csv=p=0", str(dest)],
+                            capture_output=True, text=True, timeout=15
+                        )
+                        if probe.returncode == 0 and probe.stdout.strip():
+                            parts = probe.stdout.strip().split(",")
+                            dur = float(parts[0]) if parts[0] else 0
+                            if dur > 0.5:
+                                entry.state = DownloadState.COMPLETED.value
+                                entry.completed_at = time.time()
+                                self._progress.total_downloaded += 1
+                                self._progress.bytes_downloaded += entry.size_bytes
+                            else:
+                                entry.state = DownloadState.FAILED.value
+                                entry.error = f"Duração inválida ({dur:.1f}s)"
+                                self._progress.total_failed += 1
+                        else:
+                            entry.state = DownloadState.FAILED.value
+                            entry.error = "ffprobe falhou na validação"
+                            self._progress.total_failed += 1
+                    except subprocess.TimeoutExpired:
+                        entry.state = DownloadState.FAILED.value
+                        entry.error = "ffprobe timeout"
+                        self._progress.total_failed += 1
+                    except Exception as e:
+                        entry.state = DownloadState.FAILED.value
+                        entry.error = f"Validação falhou: {e}"
+                        self._progress.total_failed += 1
+                else:
+                    # Imagens e outros arquivos: apenas tamanho mínimo
+                    entry.state = DownloadState.COMPLETED.value
+                    entry.completed_at = time.time()
+                    self._progress.total_downloaded += 1
+                    self._progress.bytes_downloaded += entry.size_bytes
             else:
-                entry.state = DownloadState.PENDING.value  # Retry
-                entry.error = error
+                if "auth" in error.lower() or "confirmação" in error.lower():
+                    entry.state = DownloadState.BLOCKED_AUTH.value
+                    self._progress.total_blocked_auth += 1
+                elif entry.retries >= entry.max_retries:
+                    entry.state = DownloadState.FAILED.value
+                    entry.error = error
+                    self._progress.total_failed += 1
+                else:
+                    entry.state = DownloadState.PENDING.value  # Retry
+                    entry.error = error
+        finally:
+            self._semaphore.release()
 
         self._save_state()
         return entry.to_dict()
@@ -343,6 +543,20 @@ class PackBulkImporter:
         self._save_state()
         return count
 
+    def pause(self) -> dict:
+        """Pausa importação. Downloads em andamento terminam, novos não iniciam."""
+        self._progress.is_paused = True
+        self._progress.is_running = False
+        self._save_state()
+        return {"paused": True, "message": "Importação pausada. Use resume() para continuar."}
+
+    def resume(self) -> dict:
+        """Retoma importação pausada."""
+        self._progress.is_paused = False
+        self._progress.is_running = True
+        self._save_state()
+        return {"paused": False, "message": "Importação retomada."}
+
     def get_progress(self) -> dict:
         """Retorna progresso atual."""
         self._progress.ssd_free_bytes = self._compute_ssd_free()
@@ -350,10 +564,129 @@ class PackBulkImporter:
         by_state = {}
         for e in self._entries.values():
             by_state[e.state] = by_state.get(e.state, 0) + 1
+        # Derivar total_pending de by_state para compatibilidade com dashboard
+        pending_count = by_state.get("PENDING", 0) + by_state.get("pending", 0)
         return {
             **self._progress.to_dict(),
             "by_state": by_state,
+            "total_pending": pending_count,
             "ssd_free_gb": round(self._progress.ssd_free_bytes / (1024**3), 2),
+        }
+
+    def get_dashboard_data(self) -> dict:
+        """Retorna dados completos para dashboard do acervo — MISSÃO 032 FASE 2.
+
+        Inclui breakdown por tipo, velocidade, histórico de erros, status do worker.
+        Dados reais do checkpoint, nunca simulados.
+        """
+        import subprocess
+        from pathlib import Path
+
+        progress = self.get_progress()
+        by_state = progress.get("by_state", {})
+
+        # Breakdown por tipo (vídeo vs imagem) via tags ou extensão
+        videos_completed = 0
+        images_completed = 0
+        videos_failed = 0
+        images_failed = 0
+        failed_entries = []
+        completed_times = []
+
+        for e in self._entries.values():
+            is_video = any("type=v" in str(t) for t in (e.tags if hasattr(e, "tags") else []))
+            is_image = any("type=img" in str(t) for t in (e.tags if hasattr(e, "tags") else []))
+            # Fallback por extensão se tags não tiverem type
+            if not is_video and not is_image:
+                fn = e.filename if hasattr(e, "filename") else ""
+                if fn.endswith((".mp4", ".mov", ".avi", ".mkv", ".webm")):
+                    is_video = True
+                elif fn.endswith((".jpg", ".jpeg", ".png", ".gif", ".webp")):
+                    is_image = True
+
+            if e.state == "COMPLETED":
+                if is_video:
+                    videos_completed += 1
+                elif is_image:
+                    images_completed += 1
+                if hasattr(e, "completed_at") and e.completed_at:
+                    completed_times.append(e.completed_at)
+            elif e.state == "FAILED":
+                if is_video:
+                    videos_failed += 1
+                elif is_image:
+                    images_failed += 1
+                failed_entries.append({
+                    "filename": e.filename if hasattr(e, "filename") else "?",
+                    "error": e.error if hasattr(e, "error") else "?",
+                    "retries": e.retries if hasattr(e, "retries") else 0,
+                })
+
+        # Velocidade estimada
+        speed_mbps = 0.0
+        if len(completed_times) >= 2:
+            first_t = min(completed_times)
+            last_t = max(completed_times)
+            duration_s = last_t - first_t
+            if duration_s > 0:
+                total_bytes = sum(
+                    e.size_bytes for e in self._entries.values()
+                    if e.state == "COMPLETED" and hasattr(e, "size_bytes")
+                )
+                speed_mbps = round((total_bytes / (1024 * 1024)) / duration_s, 2)
+
+        # Worker status
+        worker_running = False
+        worker_pid = None
+        pid_file = Path(self.data_root) / "bulk_import" / "state" / "worker.pid"
+        if pid_file.exists():
+            try:
+                pid = int(pid_file.read_text().strip())
+                import os as _os
+                _os.kill(pid, 0)
+                worker_running = True
+                worker_pid = pid
+            except (ValueError, OSError):
+                pass
+
+        # Últimos erros (do log do worker)
+        recent_errors = []
+        log_file = Path(self.data_root) / "bulk_import" / "logs" / "worker.log"
+        if log_file.exists():
+            try:
+                lines = log_file.read_text().strip().split("\n")
+                error_lines = [l for l in lines if "[ERROR]" in l or "[WARNING]" in l]
+                recent_errors = error_lines[-10:]  # últimos 10 erros/warnings
+            except Exception:
+                pass
+
+        # Histórico de downloads (últimos 20 COMPLETED)
+        download_history = []
+        completed_entries = sorted(
+            [e for e in self._entries.values() if e.state == "COMPLETED"],
+            key=lambda x: x.completed_at if hasattr(x, "completed_at") and x.completed_at else 0,
+            reverse=True,
+        )[:20]
+        for e in completed_entries:
+            download_history.append({
+                "filename": e.filename if hasattr(e, "filename") else "?",
+                "size_bytes": e.size_bytes if hasattr(e, "size_bytes") else 0,
+                "completed_at": e.completed_at if hasattr(e, "completed_at") else None,
+            })
+
+        return {
+            **progress,
+            "videos_completed": videos_completed,
+            "images_completed": images_completed,
+            "videos_failed": videos_failed,
+            "images_failed": images_failed,
+            "total_unique": len(self._entries),
+            "speed_mbps": speed_mbps,
+            "worker_running": worker_running,
+            "worker_pid": worker_pid,
+            "recent_errors": recent_errors,
+            "download_history": download_history,
+            "failed_entries": failed_entries[:10],  # top 10 falhas
         }
 
     def get_entries(self, state: str = "", limit: int = 100) -> list[dict]:

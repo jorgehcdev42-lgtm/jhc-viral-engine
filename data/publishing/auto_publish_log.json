@@ -1,0 +1,46 @@
+[
+  {
+    "platform": "youtube",
+    "job_id": "",
+    "status": "success",
+    "published_url": "https://www.youtube.com/watch?v=a1aefet8yCQ",
+    "error": "",
+    "published_at": "2026-11-19T01:57:16-0300",
+    "method": "auto",
+    "metadata": {
+      "video_id": "a1aefet8yCQ"
+    }
+  },
+  {
+    "platform": "youtube",
+    "job_id": "",
+    "status": "success",
+    "published_url": "https://www.youtube.com/watch?v=ETZhPqKoCYc",
+    "error": "",
+    "published_at": "2026-11-19T01:57:42-0300",
+    "method": "auto",
+    "metadata": {
+      "video_id": "ETZhPqKoCYc"
+    }
+  },
+  {
+    "platform": "youtube",
+    "video_id": "orqNYcbvSuE",
+    "file": "b7d4ce7e8669_br_reels.mp4",
+    "title": "GTA VI Novidades - Leonida GTA VI Flash BR #Shorts",
+    "url": "https://www.youtube.com/watch?v=orqNYcbvSuE",
+    "channel_id": "UCQZkEbFYWN2ReXeH-ZZvQEA",
+    "published_at": "2026-11-19T02:37:26-0300",
+    "method": "auto_scheduler"
+  },
+  {
+    "platform": "youtube",
+    "video_id": "v1MSvgSxMBQ",
+    "file": "9e16b55e3f19_br_reels.mp4",
+    "title": "GTA VI Novidades - Leonida GTA VI Flash BR #Shorts",
+    "url": "https://www.youtube.com/watch?v=v1MSvgSxMBQ",
+    "channel_id": "UCQZkEbFYWN2ReXeH-ZZvQEA",
+    "published_at": "2026-11-19T11:12:35-0300",
+    "method": "auto_scheduler"
+  }
+]

@@ -93,13 +93,26 @@ def verify_jwt(token: str, secret: str) -> Optional[dict]:
 
 
 def get_jwt_secret() -> str:
-    """Get JWT signing secret from env vars."""
+    """Get JWT signing secret from env vars.
+
+    Falls back to a stable dev secret so tokens survive backend restarts
+    during local development. In production, JHC_JWT_SECRET MUST be set
+    via environment variable.
+    """
     secret = os.environ.get("JHC_JWT_SECRET", "")
     if not secret:
         secret = os.environ.get("JHC_API_KEY", "")
     if not secret:
-        # Generate ephemeral secret for dev (tokens won't survive restart)
-        secret = secrets.token_hex(32)
+        # Read persistent secret from file (survives restart, not in git)
+        import pathlib
+        sf = pathlib.Path('data/.jwt_secret')
+        if sf.exists():
+            secret = sf.read_text().strip()
+        else:
+            import secrets as _s
+            secret = _s.token_hex(32)
+            sf.parent.mkdir(parents=True, exist_ok=True)
+            sf.write_text(secret)
     return secret
 
 

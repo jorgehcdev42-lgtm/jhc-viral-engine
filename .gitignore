@@ -78,3 +78,22 @@ node_modules/
 out/
 # Local Netlify folder
 .netlify
+# Auth & catalog data — NEVER commit credentials or drive IDs
+data/auth/
+VIDEOS CORTES/
+
+# Bulk import operational state — NEVER commit runtime data
+data/bulk_import/state/
+data/bulk_import/logs/
+data/bulk_import/worker.pid
+*.part
+
+# Branding assets — personal use only, not versioned
+LOGOS E FOTOS DE CAPA E PERFIL/
+
+# Browser sessions — NEVER commit platform credentials or cookies
+data/browser_sessions/
+data/.jwt_secret
+data/credentials/
+data/publishing/credentials/
+data/publishing/tokens/

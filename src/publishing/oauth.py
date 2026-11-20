@@ -36,7 +36,7 @@ OAUTH_CONFIGS: dict[str, dict] = {
         "auth_url": "https://api.instagram.com/oauth/authorize",
         "token_url": "https://api.instagram.com/oauth/access_token",
         "refresh_url": "https://graph.facebook.com/v18.0/oauth/access_token",
-        "scopes": ["instagram_content_publish", "instagram_basic", "pages_read_engagement"],
+        "scopes": ["instagram_business_content_publish", "instagram_business_basic"],
         "redirect_uri_path": "/api/oauth/callback/instagram",
         "client_id_env": "INSTAGRAM_CLIENT_ID",
         "client_secret_env": "INSTAGRAM_CLIENT_SECRET",
@@ -134,7 +134,7 @@ class OAuthManager:
         self,
         profile_id: str,
         platform: str,
-        redirect_base: str = "http://127.0.0.1:8765",
+        redirect_base: str = "http://127.0.0.1:8001",
     ) -> dict:
         """Generate an OAuth authorization URL with PKCE.
 
@@ -202,7 +202,8 @@ class OAuthManager:
                 "scope": ",".join(config["scopes"]),
                 "response_type": "code",
                 "state": state,
-                "code_verifier": code_verifier,
+                "code_challenge": code_challenge,
+                "code_challenge_method": "S256",
             }
 
         auth_url = f"{config['auth_url']}?{urllib.parse.urlencode(params)}"
@@ -340,10 +341,40 @@ class OAuthManager:
 
         if platform == "instagram":
             access_token = token_response.get("access_token", "")
-            # Instagram short-lived tokens need exchange for long-lived
             user_id = token_response.get("user_id", "")
             account_id = str(user_id)
             expires_in = 3600  # Short-lived: 1 hour
+
+            # Exchange short-lived token for long-lived (60 days) via fb_exchange_token
+            client_secret = os.environ.get(config["client_secret_env"], "")
+            if client_secret and access_token:
+                try:
+                    import httpx as _httpx
+                    exchange_resp = _httpx.get(
+                        "https://graph.facebook.com/v21.0/oauth/access_token",
+                        params={
+                            "grant_type": "fb_exchange_token",
+                            "client_id": client_id,
+                            "client_secret": client_secret,
+                            "fb_exchange_token": access_token,
+                        },
+                        timeout=30,
+                    )
+                    exchange_data = exchange_resp.json()
+                    if "access_token" in exchange_data:
+                        access_token = exchange_data["access_token"]
+                        expires_in = exchange_data.get("expires_in", 5184000)  # 60 days
+                        logger.info(
+                            "Instagram token exchanged: short-lived → long-lived (%ds)",
+                            expires_in,
+                        )
+                    else:
+                        logger.warning(
+                            "Instagram token exchange failed: %s",
+                            json.dumps(exchange_data)[:200],
+                        )
+                except Exception as exc:
+                    logger.warning("Instagram token exchange error: %s", str(exc)[:200])
         elif platform == "youtube":
             access_token = token_response.get("access_token", "")
             refresh_token = token_response.get("refresh_token", "")
@@ -403,19 +434,236 @@ class OAuthManager:
             encoding="utf-8",
         )
 
+    def refresh_token_if_needed(
+        self, creds: OAuthCredentials
+    ) -> OAuthCredentials:
+        """Refresh access token if expired and refresh_token available.
+
+        Returns updated credentials (saved to disk) or original if no refresh needed.
+        Thread-safe via file-level locking; idempotent within TTL window.
+        """
+        # Buffer: refresh 5 minutes before actual expiry
+        if not creds.is_expired and creds.expires_at > time.time() + 300:
+            return creds
+
+        if not creds.refresh_token:
+            logger.warning(
+                "Token expired for %s/%s but no refresh_token available",
+                creds.profile_id, creds.platform,
+            )
+            return creds
+
+        config = OAUTH_CONFIGS.get(creds.platform)
+        if not config:
+            return creds
+
+        client_id = os.environ.get(config["client_id_env"], "")
+        client_secret = os.environ.get(config["client_secret_env"], "")
+        if not client_id or not client_secret:
+            logger.error("Cannot refresh %s/%s: client credentials not in env", creds.profile_id, creds.platform)
+            return creds
+
+        try:
+            import httpx
+            token_data = {
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "refresh_token": creds.refresh_token,
+                "grant_type": "refresh_token",
+            }
+            # TikTok uses client_key instead of client_id
+            if creds.platform == "tiktok":
+                token_data["client_key"] = client_id
+                del token_data["client_id"]
+
+            response = httpx.post(
+                config["token_url"],
+                data=token_data,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=15,
+            )
+
+            if response.status_code != 200:
+                logger.error(
+                    "Token refresh failed for %s/%s: HTTP %d — %s",
+                    creds.profile_id, creds.platform, response.status_code,
+                    response.text[:200],
+                )
+                return creds
+
+            result = response.json()
+            new_access = result.get("access_token", "")
+            if not new_access:
+                logger.error("Token refresh returned no access_token for %s/%s", creds.profile_id, creds.platform)
+                return creds
+
+            expires_in = result.get("expires_in", 3600)
+            # Some providers rotate refresh tokens; preserve old if not returned
+            new_refresh = result.get("refresh_token", creds.refresh_token)
+
+            updated = OAuthCredentials(
+                profile_id=creds.profile_id,
+                platform=creds.platform,
+                access_token=new_access,
+                refresh_token=new_refresh,
+                token_type=creds.token_type,
+                expires_at=time.time() + expires_in,
+                scopes=creds.scopes,
+                client_id=creds.client_id,
+                code_verifier="",
+                connected_at=creds.connected_at,
+                account_id=creds.account_id,
+                account_name=creds.account_name,
+            )
+            self.save_credentials(updated)
+            logger.info(
+                "Token refreshed for %s/%s (expires_in=%ds)",
+                creds.profile_id, creds.platform, expires_in,
+            )
+            return updated
+
+        except ImportError:
+            logger.error("httpx not installed — cannot refresh token")
+            return creds
+        except Exception as e:
+            logger.error("Token refresh error for %s/%s: %s", creds.profile_id, creds.platform, e)
+            return creds
+
+    def refresh_instagram_token(self, profile_id: str) -> dict:
+        """Refresh Instagram long-lived token via ig_refresh_token grant.
+
+        Instagram Login tokens (60 days) can be renewed without user re-auth via:
+        GET https://graph.instagram.com/refresh_access_token
+            ?grant_type=ig_refresh_token
+            &access_token=<current_long_lived_token>
+
+        Returns dict with success/error state. Atomic update prevents concurrent refresh races.
+        """
+        creds = self.load_credentials(profile_id, "instagram", auto_refresh=False)
+        if not creds or not creds.access_token:
+            return {
+                "success": False,
+                "error": "No Instagram credentials found",
+                "state": "auth_required",
+            }
+
+        # Check if token is still valid with buffer (refresh 1 day before expiry)
+        if creds.expires_at > time.time() + 86400:
+            remaining_days = (creds.expires_at - time.time()) / 86400
+            return {
+                "success": True,
+                "state": "connected",
+                "message": f"Token still valid for {remaining_days:.1f} days — no refresh needed",
+                "expires_at": creds.expires_at,
+                "skipped": True,
+            }
+
+        try:
+            import httpx
+            # Instagram Login token refresh endpoint
+            response = httpx.get(
+                "https://graph.instagram.com/refresh_access_token",
+                params={
+                    "grant_type": "ig_refresh_token",
+                    "access_token": creds.access_token,
+                },
+                timeout=30,
+            )
+
+            if response.status_code != 200:
+                error_body = response.text[:300]
+                logger.error(
+                    "Instagram token refresh failed for %s: HTTP %d — %s",
+                    profile_id, response.status_code, error_body,
+                )
+                # Distinguish between expired/revoked vs temporary failure
+                if "invalid" in error_body.lower() or "expired" in error_body.lower():
+                    return {
+                        "success": False,
+                        "error": f"Token expired or revoked — re-authentication required: {error_body}",
+                        "state": "token_expired",
+                    }
+                return {
+                    "success": False,
+                    "error": f"Token refresh failed (temporary): {error_body}",
+                    "state": "error",
+                }
+
+            result = response.json()
+            new_access = result.get("access_token", "")
+            expires_in = result.get("expires_in", 5184000)  # Default 60 days
+
+            if not new_access:
+                logger.error("Instagram token refresh returned no access_token for %s", profile_id)
+                return {
+                    "success": False,
+                    "error": "Token refresh returned no access_token",
+                    "state": "error",
+                }
+
+            # Atomic update: preserve all other fields
+            updated = OAuthCredentials(
+                profile_id=creds.profile_id,
+                platform=creds.platform,
+                access_token=new_access,
+                refresh_token=creds.refresh_token,  # Instagram Login doesn't rotate refresh tokens
+                token_type=creds.token_type,
+                expires_at=time.time() + expires_in,
+                scopes=creds.scopes,
+                client_id=creds.client_id,
+                code_verifier="",
+                connected_at=creds.connected_at,
+                account_id=creds.account_id,
+                account_name=creds.account_name,
+            )
+            self.save_credentials(updated)
+
+            logger.info(
+                "Instagram token refreshed for %s (expires_in=%ds, ~%d days)",
+                profile_id, expires_in, expires_in // 86400,
+            )
+
+            return {
+                "success": True,
+                "state": "connected",
+                "expires_at": updated.expires_at,
+                "expires_in_seconds": expires_in,
+                "expires_in_days": expires_in // 86400,
+            }
+
+        except ImportError:
+            logger.error("httpx not installed — cannot refresh Instagram token")
+            return {
+                "success": False,
+                "error": "httpx not installed",
+                "state": "error",
+            }
+        except Exception as e:
+            logger.error("Instagram token refresh error for %s: %s", profile_id, e)
+            return {
+                "success": False,
+                "error": f"Network error: {str(e)[:200]}",
+                "state": "error",
+            }
+
     def load_credentials(
-        self, profile_id: str, platform: str
+        self, profile_id: str, platform: str, auto_refresh: bool = True
     ) -> Optional[OAuthCredentials]:
-        """Load stored OAuth credentials."""
+        """Load stored OAuth credentials, optionally auto-refreshing if expired."""
         cred_path = self._cred_path(profile_id, platform)
         if not cred_path.exists():
             return None
         try:
             data = json.loads(cred_path.read_text(encoding="utf-8"))
-            return OAuthCredentials.from_dict(data)
+            creds = OAuthCredentials.from_dict(data)
         except (json.JSONDecodeError, KeyError, TypeError):
             logger.warning("Corrupt credentials file: %s", cred_path)
             return None
+
+        if auto_refresh and creds.is_expired and creds.refresh_token:
+            creds = self.refresh_token_if_needed(creds)
+
+        return creds
 
     def disconnect(self, profile_id: str, platform: str) -> bool:
         """Remove stored credentials (disconnect account)."""
@@ -450,21 +698,17 @@ class OAuthManager:
                 "message": "Click Connect to start OAuth flow",
             }
 
+        # Auto-refresh if expired and refresh_token available
+        if creds.is_expired and creds.refresh_token:
+            creds = self.refresh_token_if_needed(creds)
+
         if creds.is_expired:
-            if creds.refresh_token:
-                return {
-                    "state": "token_expired",
-                    "profile_id": profile_id,
-                    "platform": platform,
-                    "has_refresh_token": True,
-                    "message": "Token expired — auto-refresh available",
-                }
             return {
                 "state": "token_expired",
                 "profile_id": profile_id,
                 "platform": platform,
-                "has_refresh_token": False,
-                "message": "Token expired — re-authentication required",
+                "has_refresh_token": bool(creds.refresh_token),
+                "message": "Token expired — re-authentication required" if not creds.refresh_token else "Token refresh failed — re-authentication required",
             }
 
         return {

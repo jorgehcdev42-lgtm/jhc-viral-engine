@@ -1,0 +1,63 @@
+{
+  "profile_id": "leonidagta6flashbr",
+  "platform": "youtube",
+  "channel_id": "UCQZkEbFYWN2ReXeH-ZZvQEA",
+  "max_per_day": 3,
+  "schedule_hours": [
+    11,
+    16,
+    20
+  ],
+  "timezone": "America/Sao_Paulo",
+  "auto_publish": true,
+  "created_at": 1795066513.204107,
+  "published_today": [
+    {
+      "video_id": "ETZhPqKoCYc",
+      "published_at": 1795066513.204107,
+      "file": "3ee8cb666bf6_br_reels.mp4"
+    },
+    {
+      "video_id": "orqNYcbvSuE",
+      "file": "b7d4ce7e8669_br_reels.mp4",
+      "published_at": 1795066646.360239,
+      "url": "https://www.youtube.com/watch?v=orqNYcbvSuE"
+    },
+    {
+      "video_id": "v1MSvgSxMBQ",
+      "file": "9e16b55e3f19_br_reels.mp4",
+      "published_at": 1795097555.126431,
+      "url": "https://www.youtube.com/watch?v=v1MSvgSxMBQ",
+      "content_hash": "11e3b58c645781c6"
+    }
+  ],
+  "pending": [
+    "data/autoreel/output/647d0adf8086_br_reels.mp4",
+    "data/autoreel/output/689b4dd3a7bb_br_reels.mp4",
+    "data/autoreel/output/a2996df337fd_br_reels.mp4",
+    "data/autoreel/output/bda6ae9f2c1f_br_reels.mp4",
+    "data/autoreel/output/74c8bb3afce9_br_reels.mp4",
+    "data/autoreel/output/ee0a1e53c585_br_reels.mp4",
+    "data/autoreel/output/d490617e243a_br_reels.mp4",
+    "data/autoreel/output/c91e92087bdc_br_reels.mp4",
+    "data/autoreel/output/2500817e4ec5_br_reels.mp4",
+    "data/autoreel/output/b1d5d65abb92_br_reels.mp4",
+    "data/autoreel/output/c731c141f397_br_reels.mp4",
+    "data/autoreel/output/ac4e72468fce_br_reels.mp4",
+    "data/autoreel/output/2e9099ee377d_br_reels.mp4",
+    "data/autoreel/output/63f9564be0dd_br_reels.mp4",
+    "data/autoreel/output/fadece4e9195_br_reels.mp4",
+    "data/autoreel/output/b34d0221193d_br_reels.mp4",
+    "data/autoreel/output/0d13f09a230e_br_reels.mp4",
+    "data/autoreel/output/e8096e670840_br_reels.mp4"
+  ],
+  "total_eligible": 101,
+  "paused": false,
+  "pause_reason": null,
+  "published_hashes": [
+    "4fd65c793b9109c7",
+    "11e3b58c645781c6"
+  ],
+  "paused_at": 1795069864.90722,
+  "resumed_at": 1795069864.989543
+}
